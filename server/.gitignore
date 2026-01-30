@@ -1,0 +1,25 @@
+# Generic ignores
+.DS_Store
+*.log
+*.tmp
+*.bak
+.env
+.idea/
+.vscode/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Dependency directories
+node_modules/
+bower_components/
+
+# Build artifacts
+dist/
+build/
+coverage/
+
+# OS generated files
+.Trashes
+ehthumbs.db
+Thumbs.db
