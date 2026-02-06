@@ -2,7 +2,15 @@ require('dotenv').config(); // Injected the .env file
 const express = require('express');
 const app = express()
 const mongoose = require('mongoose');
+const WebSocket = require('ws');
 const cookieParser = require('cookie-parser');
+const http = require('http');
+// Create an HTTP server using the Express app
+const server = http.createServer(app);
+
+// Attach WebSocket server to SAME HTTP server
+const wss = new WebSocket.Server({ server });
+
 app.use(express.json());
 app.use(cookieParser());
 
@@ -19,6 +27,22 @@ app.get('/', (req, res) => {
 // this is the route for the authorization
 app.use('/auth', require('./src/routes/middleware/auth'));
 
-app.listen(8081, () => {
+// WebSocket connection handling
+wss.on("connection", (ws, req) => {
+    console.log("New WebSocket connection");
+
+    ws.on("message", (message) => {
+        console.log("Received:", message.toString());
+
+        // Echo message back
+        ws.send("Server received: " + message);
+    });
+
+    ws.on("close", () => {
+        console.log("Client disconnected");
+    });
+});
+
+server.listen(8081, () => {
     console.log("http://localhost:8081");
 })

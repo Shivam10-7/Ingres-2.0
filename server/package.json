@@ -14,8 +14,10 @@
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "http": "^0.0.1-security",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.1.6",
-    "nodemon": "^3.1.11"
+    "nodemon": "^3.1.11",
+    "ws": "^8.19.0"
   }
 }
