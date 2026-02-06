@@ -2,8 +2,10 @@ const express = require("express");
 const jwt = require("jsonwebtoken");
 const router = express.Router();
 const User = require("./models/User");
+const bcrypt = require("bcryptjs");
 
 router.post("/login-email", async (req, res) => {
+    console.log("Login request received with body:", req.body);
     try {
         const { email } = req.body;
 
@@ -39,6 +41,64 @@ router.post("/login-email", async (req, res) => {
     } catch (err) {
         console.error("LOGIN ERROR:", err);
         return res.status(500).json({ error: "Server error during login" });
+    }
+});
+
+
+// sign-up route
+router.post("/signup-email", async (req, res) => {
+    console.log("Signup request received with body:", req.body);
+
+    try {
+        const { email, password, name } = req.body;
+
+        // 1. Basic validation
+        if (!email || !password || !name) {
+            return res.status(400).json({ error: "Name, email, and password are required" });
+        }
+
+        // 2. Check if user already exists
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(409).json({ error: "User already exists" });
+        }
+
+        // 3. Hash password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        // 4. Create user
+        const user = new User({
+            name,
+            email,
+            password: hashedPassword,
+            time_of_ver: new Date(),
+        });
+
+        await user.save();
+
+        // 5. Create JWT
+        const token = jwt.sign(
+            { userId: user._id, email: user.email },
+            process.env.JWT_SECRET,
+            { expiresIn: "1h" }
+        );
+
+        // 6. Send secure cookie
+        res.cookie("jwt", token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "Lax",
+            maxAge: 3600000, // 1 hour
+        });
+
+        return res.status(201).json({
+            message: "User created and logged in successfully",
+        });
+
+    } catch (err) {
+        console.error("SIGNUP ERROR:", err);
+        return res.status(500).json({ error: "Server error during signup" });
     }
 });
 
