@@ -50,21 +50,21 @@ app.post('/chat', (req,res) => {
 });
 
 
-// WebSocket connection handling
-wss.on("connection", (ws, req) => {
-    console.log("New WebSocket connection");
+// WebSocket connection handling 😎😎the websocket is closed for now
+// wss.on("connection", (ws, req) => {
+//     console.log("New WebSocket connection");
 
-    ws.on("message", (message) => {
-        console.log("Received:", message.toString());
+//     ws.on("message", (message) => {
+//         console.log("Received:", message.toString());
 
-        // Echo message back
-        ws.send("Server received: " + message);
-    });
+//         // Echo message back
+//         ws.send("Server received: " + message);
+//     });
 
-    ws.on("close", () => {
-        console.log("Client disconnected");
-    });
-});
+//     ws.on("close", () => {
+//         console.log("Client disconnected");
+//     });
+// });
 
 server.listen(8081, () => {
     console.log("http://localhost:8081");
