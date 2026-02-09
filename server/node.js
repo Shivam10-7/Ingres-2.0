@@ -8,7 +8,7 @@ const http = require('http');
 // Create an HTTP server using the Express app
 const server = http.createServer(app);
 const mysql = require("mysql2"); // Keep the import for the connection block
-
+const classifier = require('./src/routes/classifier');
 // connection with the MYSQL
 const con = mysql.createConnection({
     host: process.env.DB_HOST,
@@ -40,6 +40,15 @@ app.get('/', (req, res) => {
 
 // this is the route for the authorization
 app.use('/auth', require('./src/routes/middleware/auth'));
+
+// these are the routes that we get form the chat
+app.post('/chat', (req,res) => {   
+    const { query, isDetailedResponseNeeded, isVisualizationNeeded} = req.body;
+    console.log("Received query:", query);
+    const response = classifier(isDetailedResponseNeeded, isVisualizationNeeded);// This is the response that we get from the classifier and then we will use this response to call the respective pipeline and then we will return the response to the user
+    res.json({ response });
+});
+
 
 // WebSocket connection handling
 wss.on("connection", (ws, req) => {
