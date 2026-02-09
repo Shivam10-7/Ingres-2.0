@@ -6,7 +6,7 @@
 2. Start Ollama (it should run automatically after installation)
 3. Verify Ollama is running:
    ```bash
-   ollama list
+   ollama lists
    ```
 
 ## Step 2: Pull Embedding Model
