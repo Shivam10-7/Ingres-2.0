@@ -7,6 +7,20 @@ const cookieParser = require('cookie-parser');
 const http = require('http');
 // Create an HTTP server using the Express app
 const server = http.createServer(app);
+const mysql = require("mysql2"); // Keep the import for the connection block
+
+// connection with the MYSQL
+const con = mysql.createConnection({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    database: process.env.DB_NAME,
+    password: process.env.DB_PASSWORD,
+});
+// Trying connection with the MYSQL
+con.connect(function (err) {
+    if (err) throw err;
+    console.log("✅ MySQL Connected!");
+});
 
 // Attach WebSocket server to SAME HTTP server
 const wss = new WebSocket.Server({ server });
