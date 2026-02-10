@@ -130,7 +130,7 @@ const ai = new GoogleGenAI({
 async function main() {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: system_instruction.replace("{{USER_QUERY}}", "What is the stage of groundwater extraction in Maharashtra?"),
+    contents: system_instruction.replace("{{USER_QUERY}}", "What is the stage of groundwater extraction in Punjab?"),
     // config:{
     //     system_instruction: system_instruction
     // }
