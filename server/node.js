@@ -49,6 +49,12 @@ app.post('/chat', (req,res) => {
     res.json({ response });
 });
 
+app.post('/quickchat', (req,res) => {   
+    const { query, isVisualizationNeeded} = req.body;
+    console.log("Received query:", query);
+    const response = classifier(isVisualizationNeeded);
+    res.json({ response });
+});
 
 // WebSocket connection handling 😎😎the websocket is closed for now
 // wss.on("connection", (ws, req) => {
