@@ -1,0 +1,22 @@
+{
+  "success": true,
+  "data": [
+    {
+      "state": "ANDHRA PRADESH",
+      "district": "East Godavari",
+      "assessment_unit_name": "RAJAHMUNDRY (URBAN)",
+      "assessment_unit_type": "BLOCK",
+      "recharge_worthy_area_ha": 1737.75,
+      "total_annual_ground_water_recharge_ham": 168.66,
+      "annual_extractable_ground_water_resource_ham": 160.23,
+      "total_ground_water_extraction_ham": 0,
+      "stage_of_ground_water_extraction_percent": 8.244398677,
+      "categorization": "Safe",
+      "year": 2024
+    }
+  ],
+  "sql_query": "SELECT * FROM groundwater_assessments\nWHERE state = 'ANDHRA PRADESH'\nAND district = 'East Godavari'\nAND assessment_unit_name = 'RAJAHMUNDRY (URBAN)'\nAND year IN ('2023', '2024')\nORDER BY year DESC, categorization;",
+  "execution_time_ms": 0,
+  "rows_returned": 1,
+  "cached": false
+}
