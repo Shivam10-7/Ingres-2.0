@@ -11,7 +11,7 @@ Your task is to convert a natural language user query into a SAFE and CORRECT SQ
 DATABASE TABLE
 ==============================
 
-Table name: groundwater_data
+Table name: **data2023final2** AND **data2024final2**
 
 Columns (use EXACT names with backticks):
 
@@ -124,12 +124,25 @@ NOW GENERATE SQL
 User Query:
 {{USER_QUERY}}
 `; 
-console.log("System Instruction for SQL Generation:");
-  const SQLJresponse = await ApiCaller(sqlGenerator.replace("{{USER_QUERY}}", userQuery));
+try {
+  console.log("System Instruction for SQL Generation:");
+    const SQLJresponse = await ApiCaller(sqlGenerator.replace("{{USER_QUERY}}", userQuery));
+    
+    const FinalResponse=parseLLMJsonString(SQLJresponse);
   
-  const FinalResponse=parseLLMJsonString(SQLJresponse);
+    if (!FinalResponse || FinalResponse.error) {
+      console.warn(`[SQLGen] Model could not generate SQL for: "${userQuery}"`);
+    }
 
-  console.log("Response from SQL Generator API:", FinalResponse);
-  return FinalResponse;
+    return FinalResponse;
+
+} catch (error) {
+      console.error("[SQLGen Error]:", error.message);
+      return {
+      error: "Technical error generating query",
+      sql: null
+    }
+}
+
 }
  module.exports = SQLGen;

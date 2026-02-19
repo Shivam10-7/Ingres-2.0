@@ -42,10 +42,10 @@ app.get('/', (req, res) => {
 app.use('/auth', require('./src/routes/middleware/auth'));
 
 // these are the routes that we get form the chat
-app.post('/chat', (req,res) => {   
+app.post('/chat', async (req,res) => {   
     const { query, isDetailedResponseNeeded, isVisualizationNeeded} = req.body;
     console.log("Received query:", query);
-    const response = classifier(isDetailedResponseNeeded, isVisualizationNeeded , query);// This is the response that we get from the classifier and then we will use this response to call the respective pipeline and then we will return the response to the user
+   const response = await classifier(isDetailedResponseNeeded, isVisualizationNeeded , query);// This is the response that we get from the classifier and then we will use this response to call the respective pipeline and then we will return the response to the user
     res.json({ response });
 });
 
