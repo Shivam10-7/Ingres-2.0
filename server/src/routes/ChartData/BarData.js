@@ -1,7 +1,7 @@
 function buildBarChart(data, title) {
   return {
-    title: { text: title },
-    tooltip: {},
+    // title: { text: title },
+    // tooltip: {}, //didnt work well with bar chart, so removed for now
     xAxis: {
       type: "category",
       data: data.rows.map(r => r[0])
