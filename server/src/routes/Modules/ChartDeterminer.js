@@ -7,7 +7,7 @@
 function getEChartRecommendation( fieldCount, rowCount) {
     let type = '';
     let config = {};
-
+    console.log(`Determining chart type for ${rowCount} rows and ${fieldCount} fields.`);
     // 1. The "Big Number" Case
     if (rowCount === 1 && fieldCount === 1) {
         return { type: 'KPI', recommendation: 'Gauge or Simple Graphic Text' };
