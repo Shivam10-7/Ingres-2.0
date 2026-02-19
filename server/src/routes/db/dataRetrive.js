@@ -22,16 +22,14 @@ async function data_retrive(sql_query) {
 
     // Execute the query
     console.log('Executing SQL Query:', sql_query);
-    const [results] = await connection.query(sql_query);
-
+    const [rows, fields] = await connection.execute(sql_query); 
     // Validate results
-    if (!results || results.length === 0) {
+    if (!rows || rows.length === 0) {
       console.warn('No data returned from database');
       return [];
     }
-
-    console.log('Query results:', results);
-    return results;
+    console.log('Query results:', rows);
+    return [rows, fields];
   } catch (error) {
     console.error('Error executing query in db:', error);
     throw error; // Propagate error to caller
