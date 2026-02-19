@@ -1,5 +1,5 @@
 const mysql = require('mysql2/promise');
-
+const ChartDeterminer = require('../Modules/ChartDeterminer'); // Note: Unused in this snippet, consider removing if unnecessary
 async function data_retrive(sql_query) {
   // Validate SQL query
   if (!sql_query || typeof sql_query !== 'string') {
@@ -28,8 +28,11 @@ async function data_retrive(sql_query) {
       console.warn('No data returned from database');
       return [];
     }
-    console.log('Query results:', rows);
-    return [rows, fields];
+    console.log('Query results:\n rows:'+ JSON.stringify(rows));
+    const ChartType = await ChartDeterminer(fields, rows);
+    console.log('Determined Chart Type:', ChartType);
+    process.exit(0); // Exit the process after successful execution
+    return [rows, fields, ChartType];
   } catch (error) {
     console.error('Error executing query in db:', error);
     throw error; // Propagate error to caller
