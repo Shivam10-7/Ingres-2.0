@@ -7,7 +7,7 @@ const ai = new GoogleGenAI({
 
 async function ApiCaller(SystemInstruction) {
   const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-2.5-flash"||"gemini-3-flash-preview",
     contents: SystemInstruction,
     // contents: system_instruction.replace("{{USER_QUERY}}", "What is the stage of groundwater extraction in Punjab?"),
     // config:{

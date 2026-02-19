@@ -7,8 +7,6 @@ async function dataqueryHandler(Query){
     const sqlQuery = SQLJson.sql;
     console.log("Generated SQL Query:", sqlQuery);
     process.exit(0);
-    // the data extractor
-    // the model for genarating response
-    // return the response example "the weter level of bathinda is xxx meters"
+ 
 }
 module.exports = dataqueryHandler;

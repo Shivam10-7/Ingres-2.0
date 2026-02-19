@@ -1,4 +1,6 @@
 const  ApiCaller  = require("../../../API-Service");
+const parseLLMJsonString = require("../Modules/parseLLMJsonString");
+const ParseModelJson =  require("../Modules/parseLLMJsonString");
 async function SQLGen(userQuery) {
   const sqlGenerator = `
 You are an expert MySQL query generator for a groundwater assessment database.
@@ -122,8 +124,12 @@ NOW GENERATE SQL
 User Query:
 {{USER_QUERY}}
 `; 
+console.log("System Instruction for SQL Generation:");
+  const SQLJresponse = await ApiCaller(sqlGenerator.replace("{{USER_QUERY}}", userQuery));
+  
+  const FinalResponse=parseLLMJsonString(SQLJresponse);
 
-  const SQLJson = await ApiCaller(sqlGenerator.replace("{{USER_QUERY}}", userQuery));
-  return SQLJson
+  console.log("Response from SQL Generator API:", FinalResponse);
+  return FinalResponse;
 }
  module.exports = SQLGen;
