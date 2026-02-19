@@ -1,7 +1,9 @@
-function selectPipeline(isDetailedResponseNeeded, isVisualizationNeeded) {
+async function selectPipeline(isDetailedResponseNeeded, isVisualizationNeeded , query) {
   if (!isDetailedResponseNeeded && !isVisualizationNeeded) {
     console.log("Data query pipeline selected");
-    return "DATA_QUERY_PIPELINE";//here the function would be called that would call the data query pipeline and then return the response to the user
+    const dataqueyryPipeline = require('./pipelines/dataquery');
+   await dataqueyryPipeline(query);
+    // return "DATA_QUERY_PIPELINE";//here the function would be called that would call the data query pipeline and then return the response to the user
   }
 
   if (isDetailedResponseNeeded && !isVisualizationNeeded) {

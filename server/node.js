@@ -45,7 +45,7 @@ app.use('/auth', require('./src/routes/middleware/auth'));
 app.post('/chat', (req,res) => {   
     const { query, isDetailedResponseNeeded, isVisualizationNeeded} = req.body;
     console.log("Received query:", query);
-    const response = classifier(isDetailedResponseNeeded, isVisualizationNeeded);// This is the response that we get from the classifier and then we will use this response to call the respective pipeline and then we will return the response to the user
+    const response = classifier(isDetailedResponseNeeded, isVisualizationNeeded , query);// This is the response that we get from the classifier and then we will use this response to call the respective pipeline and then we will return the response to the user
     res.json({ response });
 });
 
