@@ -42,11 +42,48 @@ app.get('/', (req, res) => {
 app.use('/auth', require('./src/routes/middleware/auth'));
 
 // these are the routes that we get form the chat
-app.post('/chat', async (req,res) => {   
-    const { query, isDetailedResponseNeeded, isVisualizationNeeded} = req.body;
-    console.log("Received query:", query);
-   const response = await classifier(isDetailedResponseNeeded, isVisualizationNeeded , query);// This is the response that we get from the classifier and then we will use this response to call the respective pipeline and then we will return the response to the user
-    res.json({ response });
+app.post('/chat', async (req, res) => { 
+    // 1. Input Validation: Ensure 'query' actually exists before processing
+    const { query, isDetailedResponseNeeded, isVisualizationNeeded } = req.body;
+
+    if (!query || typeof query !== 'string') {
+        console.warn("[Chat Route] Rejected: Missing or invalid query string.");
+        return res.status(400).json({ error: "A valid query string is required." });
+    }
+
+    console.log(`[Chat Route] Processing query: "${query.substring(0, 50)}..."`);
+
+    try {
+        /**
+         * 2. Orchestration:
+         * The classifier acts as the router for different logic pipelines.
+         * We await the result of the full pipeline execution.
+         */
+        const response = await classifier(
+            isDetailedResponseNeeded, 
+            isVisualizationNeeded, 
+            query
+        );
+
+        // 3. Success Response: Send back the structured JSON
+        res.status(200).json({ 
+            success: true,
+            response 
+        });
+
+    } catch (error) {
+        /**
+         * 4. Global Error Catch:
+         * Prevents the server from crashing if the AI or Database fails.
+         */
+        console.error("[Chat Route Error]:", error.message);
+        
+        res.status(500).json({ 
+            success: false,
+            error: "Internal Server Error",
+            message: "I encountered an issue processing your request. Please try again."
+        });
+    }
 });
 
 
