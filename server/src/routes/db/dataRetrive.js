@@ -29,9 +29,8 @@ async function data_retrive(sql_query) {
       return [];
     }
     console.log('Query results:\n rows:'+ JSON.stringify(rows));
-    const ChartType = await ChartDeterminer(fields, rows);
+    const ChartType = await ChartDeterminer(fields.length, rows.length);
     console.log('Determined Chart Type:', ChartType);
-    process.exit(0); // Exit the process after successful execution
     return [rows, fields, ChartType];
   } catch (error) {
     console.error('Error executing query in db:', error);

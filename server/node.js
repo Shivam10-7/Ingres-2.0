@@ -3,6 +3,7 @@ const express = require('express');
 const app = express()
 const mongoose = require('mongoose');
 const WebSocket = require('ws');
+const Database = require('./src/routes/db/dataRetrive');
 const cookieParser = require('cookie-parser');
 const http = require('http');
 const chartDeterminer = require('./src/routes/Modules/ChartDeterminer'); // Ensure this is correctly imported for use in dataRetrive.js
@@ -89,10 +90,9 @@ app.post('/chat', async (req, res) => {
 
 
 app.post('/tester', async (req, res) => { 
-    // 1. Input Validation: Ensure 'query' actually exists before processing
-    const { query, isDetailedResponseNeeded, isVisualizationNeeded } = req.body;
     const sql ='SELECT ROUND(AVG(`Stage of Ground Water  Extraction (%)`),2) AS `Stage_of_Extraction` FROM data2023final2 WHERE `State`=\'Maharashtra\';';
-
+    const [rows, fields, chartType] = await Database(sql);
+    res.status(200).json({ rows, fields, chartType });
 });
 
 // WebSocket connection handling 😎😎the websocket is closed for now
