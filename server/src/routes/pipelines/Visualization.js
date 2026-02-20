@@ -3,6 +3,7 @@ const { model } = require('mongoose'); // Note: Unused in this snippet, consider
 const SQLGen = require('../Modules/SQLGen');
 const database = require('../db/dataRetrive');
 const PieChartPayloadd = require('../ChartData/PieChart');
+const BarChartPayload = require('../ChartData/BarChart'); // Ensure this is correctly imported for use in the tester route
 /**
  * Orchestrates the full RAG (Retrieval-Augmented Generation) flow:
  * Natural Language -> SQL -> Database Data -> Natural Language Response
@@ -39,11 +40,22 @@ async function AnalyticsQueryHandler(Query) {
             case 'pie':
                 return {
                     type: 'pie',
+                    shivam: "correctly reached the pie chart case",
                     // Passing the values and the title to the PieChartPayloadd function to get the ECharts configuration for a pie chart
-                    data: await PieChartPayloadd(rows, QueryResponse.title)
+                    data: console.log(await PieChartPayloadd(rows, "THIS IS THE TITLE"))
                 }
             break;
+            case 'bar':
+                return {
+                    type: 'bar',
+                    data: rows, 
+                }
+            default:return{
+                type: 'table',
+                data: rows,
+                fields: console.log(await BarChartPayload(rows, "THIS IS THE TITLE"))
             }
+        }
                 
         // 3. Stringify data for the LLM
         // We use a fallback empty array string if data is null/undefined
