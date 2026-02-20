@@ -96,7 +96,10 @@ app.post('/tester', async (req, res) => {
     // this  is  for single values that does not generate charts
     // const sql ='SELECT ROUND(AVG(`Stage of Ground Water  Extraction (%)`),2) AS `Stage_of_Extraction` FROM data2023final2 WHERE `State`=\'Maharashtra\';';
     // const sql ='SELECT ROUND((COUNT(CASE WHEN `Categorization` = \'Safe\' THEN 1 END) * 100.0 / COUNT(*)), 2) AS `Percentage_Safe_Units` FROM data2024final2 WHERE `State` = \'Maharashtra\';'
-    const sql = "SELECT Categorization, COUNT(*) AS Count FROM data2023final2 WHERE District = 'Bathinda' GROUP BY Categorization;";
+    // This makes Pieechart
+    // const sql = "SELECT Categorization, COUNT(*) AS Count FROM data2023final2 WHERE District = 'Bathinda' GROUP BY Categorization;";
+    // this is for the bar chart
+    const sql  = "SELECT District, AVG(`Stage of Ground Water  Extraction (%)`) AS Avg_Stage FROM data2024final2 WHERE State = 'Punjab' GROUP BY District ORDER BY Avg_Stage DESC LIMIT 5;";
     const [rows, fields, ChartType] = await Database(sql);
     switch (ChartType.chartType) {
             case 'KPI':
@@ -124,7 +127,7 @@ app.post('/tester', async (req, res) => {
                 fields: console.log(await BarChartPayload(rows, "THIS IS THE TITLE"))
             }
         }
-    // res.status(200).json({ rows, fields, chartType });
+    res.status(200).json({ rows, fields, chartType });
 });
 
 // WebSocket connection handling 😎😎the websocket is closed for now
