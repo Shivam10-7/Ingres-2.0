@@ -6,7 +6,7 @@ function buildPieChart(data, title) {
       {
         type: "pie",
         radius: "60%",
-        data: data.rows.map(r => ({
+        data: data.map(r => ({
           name: r[0],
           value: r[1]
         }))

@@ -1,6 +1,8 @@
 require('dotenv').config(); // Injected the .env file
 const express = require('express');
 const app = express()
+const PieChartPayloadd = require('./src/routes/ChartData/PieChart');
+const BarChartPayload = require('./src/routes/ChartData/BarChart'); // Ensure this is correctly imported for use in the tester route
 const mongoose = require('mongoose');
 const WebSocket = require('ws');
 const Database = require('./src/routes/db/dataRetrive');
@@ -11,6 +13,7 @@ const chartDeterminer = require('./src/routes/Modules/ChartDeterminer'); // Ensu
 const server = http.createServer(app);
 const mysql = require("mysql2"); // Keep the import for the connection block
 const classifier = require('./src/routes/classifier');
+const { stat } = require('fs');
 // connection with the MYSQL
 const con = mysql.createConnection({
     host: process.env.DB_HOST,
@@ -90,9 +93,38 @@ app.post('/chat', async (req, res) => {
 
 
 app.post('/tester', async (req, res) => { 
-    const sql ='SELECT ROUND(AVG(`Stage of Ground Water  Extraction (%)`),2) AS `Stage_of_Extraction` FROM data2023final2 WHERE `State`=\'Maharashtra\';';
-    const [rows, fields, chartType] = await Database(sql);
-    res.status(200).json({ rows, fields, chartType });
+    // this  is  for single values that does not generate charts
+    // const sql ='SELECT ROUND(AVG(`Stage of Ground Water  Extraction (%)`),2) AS `Stage_of_Extraction` FROM data2023final2 WHERE `State`=\'Maharashtra\';';
+    // const sql ='SELECT ROUND((COUNT(CASE WHEN `Categorization` = \'Safe\' THEN 1 END) * 100.0 / COUNT(*)), 2) AS `Percentage_Safe_Units` FROM data2024final2 WHERE `State` = \'Maharashtra\';'
+    const sql = "SELECT Categorization, COUNT(*) AS Count FROM data2023final2 WHERE District = 'Bathinda' GROUP BY Categorization;";
+    const [rows, fields, ChartType] = await Database(sql);
+    switch (ChartType.chartType) {
+            case 'KPI':
+                return {
+                    type: 'KPI',
+                    data: rows
+                }
+            break;
+            case 'pie':
+                return {
+                    type: 'pie',
+                    shivam: "correctly reached the pie chart case",
+                    // Passing the values and the title to the PieChartPayloadd function to get the ECharts configuration for a pie chart
+                    data: console.log(await PieChartPayloadd(rows, "THIS IS THE TITLE"))
+                }
+            break;
+            case 'bar':
+                return {
+                    type: 'bar',
+                    data: rows, 
+                }
+            default:return{
+                type: 'table',
+                data: rows,
+                fields: console.log(await BarChartPayload(rows, "THIS IS THE TITLE"))
+            }
+        }
+    // res.status(200).json({ rows, fields, chartType });
 });
 
 // WebSocket connection handling 😎😎the websocket is closed for now
