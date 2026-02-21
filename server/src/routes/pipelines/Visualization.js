@@ -42,18 +42,18 @@ async function AnalyticsQueryHandler(Query) {
                     type: 'pie',
                     shivam: "correctly reached the pie chart case",
                     // Passing the values and the title to the PieChartPayloadd function to get the ECharts configuration for a pie chart
-                    data: console.log(await PieChartPayloadd(rows, "THIS IS THE TITLE"))
+                    data: console.log(await PieChartPayloadd(rows, QueryResponse.title || "Pie Chart Title")) // Ensure QueryResponse has a title property or provide a default title
                 }
             break;
             case 'bar':
                 return {
                     type: 'bar',
-                    data: rows, 
+                    data: console.log(await BarChartPayload(rows, QueryResponse.title || "Bar Chart Title"))
                 }
             default:return{
                 type: 'table',
                 data: rows,
-                fields: console.log(await BarChartPayload(rows, "THIS IS THE TITLE"))
+                fields: fields
             }
         }
                 
@@ -64,8 +64,9 @@ async function AnalyticsQueryHandler(Query) {
         // 4. Response  not   needed as this this is the chartonly  option
         // const response = await Reponse(Query, dataString, ChartType);
         // console.log("Generated Response:", response);
-
-        return response;
+        
+        
+        // return response;
 
     } catch (error) {
         // Log the full stack trace for the engineer, return a polite error to the user
