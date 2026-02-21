@@ -1,4 +1,5 @@
 const mysql = require('mysql2/promise');
+const SQLinjectionCheck = require('./../Modules/SQLinjection'); // Note: Unused in this snippet, consider removing if unnecessary
 const ChartDeterminer = require('../Modules/ChartDeterminer'); // Note: Unused in this snippet, consider removing if unnecessary
 async function data_retrive(sql_query) {
   // Validate SQL query
@@ -22,6 +23,9 @@ async function data_retrive(sql_query) {
 
     // Execute the query
     console.log('Executing SQL Query:', sql_query);
+    console.log('Checking for SQL injection vulnerabilities in the query...');
+    // Perform SQL injection check before executing the query
+    await SQLinjectionCheck(sql_query);
     const [rows, fields] = await connection.execute(sql_query); 
     // Validate results
     if (!rows || rows.length === 0) {
