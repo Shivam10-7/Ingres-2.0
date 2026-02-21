@@ -1,6 +1,7 @@
 const  ApiCaller  = require("../../../API-Service");
 const parseLLMJsonString = require("../Modules/parseLLMJsonString");
 const ParseModelJson =  require("../Modules/parseLLMJsonString");
+const LocalModel = require("../../../LocalModel");
 async function SQLGen(userQuery) {
   const sqlGenerator = `
 You are an expert MySQL query generator for a groundwater assessment database.
@@ -126,14 +127,13 @@ User Query:
 `; 
 try {
   console.log("System Instruction for SQL Generation:");
-    const SQLJresponse = await ApiCaller(sqlGenerator.replace("{{USER_QUERY}}", userQuery));
+    const SQLJresponse = await LocalModel(sqlGenerator.replace("{{USER_QUERY}}", userQuery));
     
     const FinalResponse=parseLLMJsonString(SQLJresponse);
   
     if (!FinalResponse || FinalResponse.error) {
       console.warn(`[SQLGen] Model could not generate SQL for: "${userQuery}"`);
     }
-
     return FinalResponse;
 
 } catch (error) {
