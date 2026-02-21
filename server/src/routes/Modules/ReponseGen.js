@@ -1,4 +1,5 @@
 const  ApiCaller  = require("../../../API-Service");
+const LocalModel = require("../../../LocalModel");
 /**
  * Generates a concise, localized response for the Jal Sathi assistant.
  * @param {string} userQuery - The raw input from the user.
@@ -30,7 +31,7 @@ Now give a short, natural, and helpful response:
   `;
  try {
    console.log("Response Generator Prompt:", responseGenerator);
-   const response = await ApiCaller(responseGenerator);
+   const response = await LocalModel(responseGenerator);
  
    return response.trim();
  } catch (error) {
