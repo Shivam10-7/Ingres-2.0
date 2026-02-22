@@ -63,7 +63,7 @@ async function AnalyticsQueryHandler(Query) {
             };
     }
                 
-        // 3. Stringify data for the LLM
+        // 3. Stringify data for the LL
         // We use a fallback empty array string if data is null/undefined
         // const dataString = JSON.stringify(rows || []);
 
