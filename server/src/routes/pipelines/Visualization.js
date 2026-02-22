@@ -10,7 +10,7 @@ const BarChartPayload = require('../ChartData/BarChart'); // Ensure this is corr
  */
 async function AnalyticsQueryHandler(Query) {
     try {
-        console.log("Received query for analytics pipeline 📈📈📈:", Query);
+        console.log("Received query for visualization pipeline 📈📈📈:", Query);
         // 1. Generate SQL from User Query
         const QueryResponse = await SQLGen(Query);
         
@@ -30,32 +30,38 @@ async function AnalyticsQueryHandler(Query) {
         console.log("Fields retrieved from database:", fields);
         console.log("Chart Type:", ChartType);
 
-        switch (ChartType.chartType) {
-            case 'KPI':
-                return {
-                    type: 'KPI',
-                    data: rows
-                }
-            break;
-            case 'pie':
-                return {
-                    type: 'pie',
-                    shivam: "correctly reached the pie chart case",
-                    // Passing the values and the title to the PieChartPayloadd function to get the ECharts configuration for a pie chart
-                    data: console.log(await PieChartPayloadd(rows, QueryResponse.title || "Pie Chart Title")) // Ensure QueryResponse has a title property or provide a default title
-                }
-            break;
-            case 'bar':
-                return {
-                    type: 'bar',
-                    data: console.log(await BarChartPayload(rows, QueryResponse.title || "Bar Chart Title"))
-                }
-            default:return{
+       switch (ChartType.type) {
+        case 'KPI':
+            return {
+                type: 'KPI',
+                data: rows
+            };
+
+        case 'pie':
+            // Logic: Await the payload generator and assign the actual result, not the console.log
+            const pieData = await PieChartPayloadd(rows, chartTitle);
+            console.log("[Visualizer] Pie Chart Payload Generated");
+            return {
+                type: 'pie',
+                data: pieData
+            };
+
+        case 'bar':
+            const barData = await BarChartPayload(rows, chartTitle);
+            console.log("[Visualizer] Bar Chart Payload Generated");
+            return {
+                type: 'bar',
+                data: barData
+            };
+
+        default:
+            // Fallback: If no specific chart is requested, return the raw data as a table
+            console.log("[Visualizer] Defaulting to Table View");
+            return {
                 type: 'table',
-                data: rows,
-                fields: fields
-            }
-        }
+                data: rows 
+            };
+    }
                 
         // 3. Stringify data for the LLM
         // We use a fallback empty array string if data is null/undefined
