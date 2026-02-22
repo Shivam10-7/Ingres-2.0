@@ -13,8 +13,8 @@ async function selectPipeline(isDetailedResponseNeeded, isVisualizationNeeded , 
   }
 
   if (!isDetailedResponseNeeded && isVisualizationNeeded) {
-    console.log("Visualization pipeline selected");
-    return "VISUALIZATION_PIPELINE";//here the function would be called that would call the visualization pipeline and then return the response to the user
+   const VisualiizationPipeline = require('./pipelines/Visualization');
+   return await VisualiizationPipeline(query);
   }
     console.log("Analytics pipeline selected");
   return "ANALYTICS_PIPELINE";//here the function would be called that would call the analytics pipeline and then return the response to the user
