@@ -4,6 +4,7 @@ const SQLGen = require('../Modules/SQLGen');
 const database = require('../db/dataRetrive');
 const PieChartPayloadd = require('../ChartData/PieChart');
 const BarChartPayload = require('../ChartData/BarChart'); // Ensure this is correctly imported for use in the tester route
+const LineChartPayload = require('../ChartData/LineChart'); // Ensure this is correctly imported for use in the tester route
 /**
  * Orchestrates the full RAG (Retrieval-Augmented Generation) flow:
  * Natural Language -> SQL -> Database Data -> Natural Language Response
@@ -53,6 +54,14 @@ async function AnalyticsQueryHandler(Query) {
                 type: 'bar',
                 data: barData
             };
+        case 'line':
+            const lineData = await LineChartPayload(rows, chartTitle);
+            console.log("[Visualizer] Line Chart Payload Generated");
+            return {
+                type: 'line',
+                data: lineData
+            };
+
 
         default:
             // Fallback: If no specific chart is requested, return the raw data as a table
