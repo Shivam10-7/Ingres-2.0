@@ -1,6 +1,7 @@
 const  ApiCaller  = require("../../../API-Service");
 const parseLLMJsonString = require("../Modules/parseLLMJsonString");
 const ParseModelJson =  require("../Modules/parseLLMJsonString");
+const LocalModel = require("../../../LocalModel");
 async function SQLGen(userQuery) {
   const sqlGenerator = `
 You are an expert MySQL query generator for a groundwater assessment database.
@@ -95,11 +96,11 @@ If the question cannot be answered using the schema, return:
 EXAMPLES
 ==============================
 
-User: What is the stage of groundwater extraction in Maharashtra?
+User: What is the stage of groundwater extraction in Maharashtra in 2023?
 
 Output:
 {
-  "sql": "SELECT ROUND(AVG(\`Stage of Ground Water  Extraction (%)\`),2) AS \`Stage_of_Extraction\` FROM groundwater_data WHERE \`State\`='Maharashtra';",
+  "sql": "SELECT ROUND(AVG(\`Stage of Ground Water  Extraction (%)\`),2) AS \`Stage_of_Extraction\` FROM data2023final2 WHERE \`State\`='Maharashtra';",
   "title": "Average Stage of Groundwater Extraction in Maharashtra",
   "chart": "none",
   "aggregation": "avg"
@@ -107,11 +108,11 @@ Output:
 
 ---
 
-User: Compare stage of extraction for Maharashtra and Punjab
+User: Compare stage of extraction for Maharashtra and Punjab in 2024
 
 Output:
 {
-  "sql": "SELECT \`State\`, ROUND(AVG(\`Stage of Ground Water  Extraction (%)\`),2) AS \`Avg_Stage\` FROM groundwater_data WHERE \`State\` IN ('Maharashtra','Punjab') GROUP BY \`State\`;",
+  "sql": "SELECT \`State\`, ROUND(AVG(\`Stage of Ground Water  Extraction (%)\`),2) AS \`Avg_Stage\` FROM data2024final2 WHERE \`State\` IN ('Maharashtra','Punjab') GROUP BY \`State\`;",
   "title": "Comparison of Groundwater Extraction Stage: Maharashtra vs Punjab",
   "chart": "bar",
   "aggregation": "avg"
@@ -126,14 +127,13 @@ User Query:
 `; 
 try {
   console.log("System Instruction for SQL Generation:");
-    const SQLJresponse = await ApiCaller(sqlGenerator.replace("{{USER_QUERY}}", userQuery));
+    const SQLJresponse = await LocalModel(sqlGenerator.replace("{{USER_QUERY}}", userQuery));
     
     const FinalResponse=parseLLMJsonString(SQLJresponse);
   
     if (!FinalResponse || FinalResponse.error) {
       console.warn(`[SQLGen] Model could not generate SQL for: "${userQuery}"`);
     }
-
     return FinalResponse;
 
 } catch (error) {

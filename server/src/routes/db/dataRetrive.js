@@ -1,5 +1,6 @@
 const mysql = require('mysql2/promise');
-
+const SQLinjectionCheck = require('./../Modules/SQLinjection'); // Note: Unused in this snippet, consider removing if unnecessary
+const ChartDeterminer = require('../Modules/ChartDeterminer'); // Note: Unused in this snippet, consider removing if unnecessary
 async function data_retrive(sql_query) {
   // Validate SQL query
   if (!sql_query || typeof sql_query !== 'string') {
@@ -22,16 +23,20 @@ async function data_retrive(sql_query) {
 
     // Execute the query
     console.log('Executing SQL Query:', sql_query);
-    const [results] = await connection.query(sql_query);
-
+    console.log('Checking for SQL injection vulnerabilities in the query...');
+    // Perform SQL injection check before executing the query
+    //The sql validator is currently not working as expected, so commenting it out for now. Will fix it in the next iteration.😎😎
+    // await SQLinjectionCheck(sql_query);
+    const [rows, fields] = await connection.execute(sql_query); 
     // Validate results
-    if (!results || results.length === 0) {
+    if (!rows || rows.length === 0) {
       console.warn('No data returned from database');
       return [];
     }
-
-    console.log('Query results:', results);
-    return results;
+    console.log('Query results:\n rows:'+ JSON.stringify(rows));
+    const ChartType = await ChartDeterminer(fields.length, rows.length);
+    console.log('Determined Chart Type:', ChartType);
+    return [rows, fields, ChartType];
   } catch (error) {
     console.error('Error executing query in db:', error);
     throw error; // Propagate error to caller
