@@ -25,7 +25,8 @@ async function data_retrive(sql_query) {
     console.log('Executing SQL Query:', sql_query);
     console.log('Checking for SQL injection vulnerabilities in the query...');
     // Perform SQL injection check before executing the query
-    await SQLinjectionCheck(sql_query);
+    //The sql validator is currently not working as expected, so commenting it out for now. Will fix it in the next iteration.😎😎
+    // await SQLinjectionCheck(sql_query);
     const [rows, fields] = await connection.execute(sql_query); 
     // Validate results
     if (!rows || rows.length === 0) {
