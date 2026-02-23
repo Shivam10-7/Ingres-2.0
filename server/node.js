@@ -57,8 +57,13 @@ app.post('/chat', async (req, res) => {
     }
 
     console.log(`[Chat Route] Processing query: "${query.substring(0, 50)}..."`);
-
+    //Normalizd the query by removing punctuation and extra spaces to help the classifier make better decisions. This is a simple form of preprocessing that can improve the accuracy of the classifier.
+    let NormalizedQuery = query.toLowerCase()
+    .replace(/[^\w\s]/g, "")   // remove punctuation
+    .replace(/\s+/g, " ")     // collapse spaces
+    .trim();
     try {
+
         /**
          * 2. Orchestration:
          * The classifier acts as the router for different logic pipelines.
@@ -67,7 +72,7 @@ app.post('/chat', async (req, res) => {
         const response = await classifier(
             isDetailedResponseNeeded, 
             isVisualizationNeeded, 
-            query
+            NormalizedQuery
         );
 
         // 3. Success Response: Send back the structured JSON
