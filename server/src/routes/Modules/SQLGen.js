@@ -3,7 +3,7 @@ const parseLLMJsonString = require("../Modules/parseLLMJsonString");
 const ParseModelJson =  require("../Modules/parseLLMJsonString");
 const LocalModel = require("../../../LocalModel");
 async function SQLGen(userQuery) {
-  const sqlGenerator = `
+const sqlGenerator = `
 You are an expert MySQL query generator for a groundwater assessment database.
 
 Your task is to convert a natural language user query into a SAFE and CORRECT SQL query.
@@ -118,6 +118,18 @@ Output:
   "aggregation": "avg"
 }
 
+  ---
+
+User: what is the stage of extraction of Bathinda ?
+
+Output:
+{
+  "sql": "SELECT ROUND(AVG(\`Stage of Ground Water  Extraction (%)\`), 2) AS \`Stage_of_Extraction\` FROM data2024final2 WHERE \`District\` = 'Bathinda';",
+  "title": "Average Stage of Groundwater Extraction in Bathinda (2024)",
+  "chart": "none",
+  "aggregation": "avg"
+}
+
 ==============================
 NOW GENERATE SQL
 ==============================
@@ -125,9 +137,91 @@ NOW GENERATE SQL
 User Query:
 {{USER_QUERY}}
 `; 
+const SQL_Prompt2=`
+
+You are an expert MySQL query generator for the INGRES Groundwater Database.
+
+### DATABASE SCHEMA
+Table names: \`data2023final2\` and \`data2024final2\`
+All column names must be wrapped in backticks (\` \`) because they contain spaces and special characters.
+
+Columns (use EXACT names):
+- \`State\`
+- \`District\`
+- \`Assessment Unit  Name\`
+- \`Assessment Unit Type\`
+- \`Recharge Worthy Area(Ha)\`
+- \`Total Annual  Ground Water (Ham) Recharge\`
+- \`Annual Extractable Ground Water Resource  (Ham)\`
+- \`Total   Ground Water Extraction  (Ham)\`
+- \`Stage of Ground Water  Extraction (%)\`
+- \`Categorization\`
+
+### STRICT SAFETY RULES
+- ONLY generate SELECT queries.
+- NEVER generate INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, or any DDL/DML.
+- Never query any table other than \`data2023final2\` or \`data2024final2\`.
+- Always use backticks around every column name.
+- Output ONLY valid JSON. No explanations, no markdown.
+
+### SEMANTIC RULES (Follow strictly)
+1. **Year Handling**:
+   - If user mentions **2023** → use \`data2023final2\`
+   - If user mentions **2024** → use \`data2024final2\`
+   - If user mentions **both years** or "trend" or "compare over years" → use UNION of both tables with a year column.
+   - If no year is mentioned → default to latest year (2024) unless comparison is asked.
+
+2. **Aggregation & Comparison**:
+   - Single value → Use AVG() or direct value.
+   - Compare states/districts → GROUP BY and AVG().
+   - Top N → ORDER BY ... DESC LIMIT N.
+   - Distribution / Percentage → Use COUNT() and GROUP BY.
+
+3. **Categorization**:
+   - Words like "over-exploited", "critical", "safe", "semi-critical", "saline" → filter on \`Categorization\`.
+
+4. **General**:
+   - Keep queries simple and performant.
+   - Always add LIMIT 50 if result can be large.
+   - Use ROUND(..., 2) for percentages.
+
+### OUTPUT FORMAT (MUST be followed exactly)
+Return ONLY this JSON structure:
+
+{
+  "sql": "SELECT ...",
+  "title": "Short human readable title",
+  "chart": "none | bar | line | pie",
+  "aggregation": "none | avg | sum | weighted"
+}
+
+If the query cannot be answered with the available tables/columns, return:
+{
+  "error": "Cannot answer with available data"
+}
+
+### EXAMPLES
+
+User: What is the stage of groundwater extraction in Maharashtra in 2023?
+→ Use data2023final2
+
+User: Compare stage of extraction for Maharashtra and Punjab in 2024
+→ Use data2024final2 + GROUP BY
+
+User: Show trend of extraction stage in Punjab over 2023 and 2024
+→ UNION both tables
+
+User: What percentage of blocks in Punjab are over-exploited?
+→ GROUP BY Categorization + COUNT
+
+NOW GENERATE SQL FOR THE FOLLOWING USER QUERY:
+{{USER_QUERY}}
+`;
+
 try {
   console.log("System Instruction for SQL Generation:");
     const SQLJresponse = await LocalModel(sqlGenerator.replace("{{USER_QUERY}}", userQuery));
+    // const SQLJresponse = await LocalModel(SQL_Prompt2.replace("{{USER_QUERY}}", userQuery));
     
     const FinalResponse=parseLLMJsonString(SQLJresponse);
   
