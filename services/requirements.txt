@@ -5,5 +5,8 @@ python-dotenv
 requests
 langchain
 langchain-ollama
-pandas
 langchain-chroma
+langchain-community
+langchain-text-splitters
+pypdf
+pandas
