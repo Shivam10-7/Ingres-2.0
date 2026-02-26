@@ -1,47 +1,25 @@
-from fastapi import FastAPI, Query
+# api.py
+
+from fastapi import FastAPI
 from pydantic import BaseModel
-import ollama
+from rag import rag
+import json
 
-from rag import rag_chat
-from vector import ingest_pdfs_to_chroma
+app = FastAPI(title="JalSathi RAG API")
 
-app = FastAPI()
-
-
-class ChatRequest(BaseModel):
-    prompt: str
-
-
-@app.on_event("startup")
-def _startup_ingest():
-    # Build the Chroma DB once when the API starts (if not already built).
-    ingest_pdfs_to_chroma()
-
-
-@app.get("/rag-chat")
-def rag_chat_get(query: str = Query(..., min_length=1)):
-    response = rag_chat(query)
-    return {"query": query, "response": response}
-
+class QueryRequest(BaseModel):
+    user_query: str
+    sql_response: dict
 
 @app.post("/rag-chat")
-def rag_chat_endpoint(request: ChatRequest):
-    """RAG-based chat: retrieves relevant context from vector store and generates response."""
-    response = rag_chat(request.prompt)
-    return {"response": response}
+def ask_jalsathi(request: QueryRequest):
+    
+    result = rag(
+        user_query=request.user_query,
+        sql_result=request.sql_response
+    )
 
-
-@app.post("/generate")
-def generate(prompt: str):
-    response = ollama.chat(model="llama3.2",messages =[{"role":"user","content": prompt}])
-    return{"response": response["message"]["content"]}
-
-@app.post("/chat")
-def generate(prompt: str):
-    response = ollama.chat(model="deepseek-r1",messages =[{"role":"user","content": prompt}])
-    return{"response": response["message"]["content"]}
-
-@app.post("/gen")
-def generate(prompt: str):
-    response = ollama.chat(model ="llama3.2",messages=[{"role":"user" ,"content":prompt}])
-    return {"response":response["message"]["content"]}
+    return {
+        "success": True,
+        "markdown_json": f"```json\n{result}\n```"
+    }

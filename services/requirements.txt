@@ -1,12 +1,9 @@
 fastapi
 uvicorn
-ollama
-python-dotenv
-requests
 langchain
-langchain-ollama
-langchain-chroma
 langchain-community
 langchain-text-splitters
+chromadb
 pypdf
-pandas
+ollama
+python-dotenv
