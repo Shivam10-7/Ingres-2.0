@@ -28,10 +28,14 @@ def rag(user_query: str, sql_result: dict):
 
     template = """
 You are JalSathi AI – a groundwater assessment expert.
+Your are Supposed to help Policymakers, farmers, experts and groundwater analysists .
 
 STRICT RULES:
-- Use ONLY the provided context.
+- Use  the provided context for grounding the response .
 - Do NOT hallucinate.
+- give short response and  respond as per the returned sql.
+
+
 
 
 User Question:
