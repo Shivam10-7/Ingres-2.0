@@ -13,7 +13,7 @@ import Footer from "@/components/Footer";
 
 const Index = () => {
   return (
-    <div className="relative min-h-screen overflow-hidden scroll-smooth">
+    <div className="relative min-h-screen scroll-smooth">
       <WaveBackground />
       <Navbar />
 

@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 
 const LoginCard = () => {
+  const navigate = useNavigate();
   const [showPw, setShowPw] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,7 +28,11 @@ const LoginCard = () => {
       </p>
 
       <form
-        onSubmit={(e) => e.preventDefault()}
+        onSubmit={(e) => {
+          e.preventDefault();
+          // fake login then redirect to chat
+          navigate('/chat');
+        }}
         className="space-y-5"
       >
         {/* Name (signup only) */}
