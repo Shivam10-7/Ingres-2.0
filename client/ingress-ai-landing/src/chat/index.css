@@ -50,6 +50,15 @@ body {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
+/* Dark mode input bar & controls - darker glass for better contrast */
+.glass-card-dark {
+  background: rgba(15, 23, 42, 0.9);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
 .glass-panel {
   background: rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(16px);
@@ -57,14 +66,44 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* Quick mode side window - stronger glass border */
+/* Quick mode side window - base layout */
 .quick-mode-panel {
-  background: rgba(255, 255, 255, 0.10);
+  border-radius: 1.2rem 0 0 1.2rem;
+}
+
+/* Quick mode - light mode (subtle white glass) */
+.quick-mode-panel-light {
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(28px);
   -webkit-backdrop-filter: blur(28px);
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.35);
-  border-radius: 1.2rem 0 0 1.2rem;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.08);
+}
+
+/* Quick mode - dark mode (dark slate, inspired by reference) */
+.quick-mode-panel-dark {
+  background: #262a39;
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.4);
+}
+
+/* Dark mode inputs inside Quick Chat panel - match panel background */
+.glass-input-quick-dark {
+  background: rgba(45, 55, 72, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.glass-input-quick-dark:focus {
+  background: rgba(55, 65, 82, 0.9);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+/* Dark mode data table inside Quick Chat panel */
+.quick-mode-table-dark {
+  background: rgba(38, 42, 57, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .glass-input {
@@ -76,6 +115,17 @@ body {
 
 .glass-input:focus {
   background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+/* Light mode select/dropdown - light background, dark text */
+.glass-input-light {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.5);
+}
+
+.glass-input-light:focus {
+  background: white;
   border-color: rgba(59, 130, 246, 0.5);
 }
 
@@ -159,6 +209,22 @@ body {
   border-radius: 20px 20px 20px 4px;
 }
 
+/* Dark mode bot response - darker block to blend with theme */
+.message-bot-dark {
+  background: rgba(30, 41, 59, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px 20px 20px 4px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+.message-bot-light {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 20px 20px 20px 4px;
+}
+
 /* Loading dots */
 .loading-dots {
   display: flex;
@@ -184,6 +250,7 @@ body {
 /* Checkbox custom styles */
 .custom-checkbox {
   appearance: none;
+  -webkit-appearance: none;
   width: 18px;
   height: 18px;
   border: 2px solid rgba(255, 255, 255, 0.3);
@@ -196,4 +263,30 @@ body {
 .custom-checkbox:checked {
   background: #3b82f6;
   border-color: #3b82f6;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+  background-size: 12px 12px;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Light mode checkbox - dark border, white tick on blue when checked */
+.custom-checkbox-light {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgb(148 163 184);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.custom-checkbox-light:checked {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+  background-size: 12px 12px;
+  background-position: center;
+  background-repeat: no-repeat;
 }

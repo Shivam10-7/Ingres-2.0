@@ -25,7 +25,8 @@ import {
   Sun,
   Moon,
 } from 'lucide-react';
-import logo from '/logo.svg';
+const logoLight = '/logo_LIGHT.png';
+const logoDark = '/logo_DARK.png';
 import '@/chat/index.css';
 
 // Mode options
@@ -226,7 +227,7 @@ function ChatPage() {
         {/* Logo */}
         <div className="p-4 flex items-center gap-3">
           <div className="w-10 h-10 flex items-center justify-center">
-              <img src={logo} alt="INGRES" className="w-6 h-6 object-contain" />
+              <img src={isLightMode ? logoLight : logoDark} alt="INGRES" className="w-6 h-6 object-contain" />
           </div>
           <span className="text-xl font-semibold text-white tracking-tight">INGRES</span>
         </div>
@@ -235,9 +236,13 @@ function ChatPage() {
         <div className="px-4 pb-3">
           <button 
             onClick={() => { setMessages([]); setShowResults(false); }}
-            className="w-full glass-card rounded-xl px-4 py-3 flex items-center gap-3 text-white hover:bg-white/10 transition-all duration-200 group"
+            className={`w-full rounded-xl px-4 py-3 flex items-center gap-3 transition-all duration-200 group ${
+              isLightMode
+                ? 'glass-card text-slate-800 hover:bg-white/20'
+                : 'glass-card-dark text-white hover:bg-white/10'
+            }`}
           >
-            <Plus className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />
+            <Plus className={`w-5 h-5 group-hover:scale-110 transition-transform ${isLightMode ? 'text-blue-600' : 'text-blue-400'}`} />
             <span className="font-medium">New chat</span>
           </button>
         </div>
@@ -400,7 +405,7 @@ function ChatPage() {
                 <div className="h-full flex flex-col items-center justify-center">
                   {/* Logo */}
                     <div className="mb-8">
-                      <img src={logo} alt="INGRES" className="w-16 h-16 object-contain" />
+                      <img src={isLightMode ? logoLight : logoDark} alt="INGRES" className="w-16 h-16 object-contain" />
                     </div>
                   
                   <h2
@@ -427,16 +432,16 @@ function ChatPage() {
                     >
                       {message.sender === 'bot' && (
                         <div className="w-8 h-8 flex items-center justify-center mr-3 shrink-0">
-                            <img src={logo} alt="bot" className="w-4 h-4 object-contain" />
+                            <img src={isLightMode ? logoLight : logoDark} alt="bot" className="w-4 h-4 object-contain" />
                         </div>
                       )}
                       <div
                         className={`max-w-[80%] px-5 py-3 ${
-                          message.sender === 'user' ? 'message-user' : 'message-bot glass-card'
+                          message.sender === 'user' ? 'message-user' : isLightMode ? 'message-bot-light' : 'message-bot-dark'
                         }`}
                       >
-                        <p className="text-white text-sm leading-relaxed">{message.text}</p>
-                        <span className="text-xs text-white/40 mt-2 block">
+                        <p className={`text-sm leading-relaxed ${isLightMode ? 'text-slate-900' : 'text-white'}`}>{message.text}</p>
+                        <span className={`text-xs mt-2 block ${isLightMode ? 'text-slate-500' : 'text-white/40'}`}>
                           {formatTime(message.timestamp)}
                         </span>
                       </div>
@@ -446,9 +451,9 @@ function ChatPage() {
                   {isTyping && (
                     <div className="flex justify-start animate-fadeIn">
                       <div className="w-8 h-8 flex items-center justify-center mr-3 shrink-0">
-                        <img src={logo} alt="bot-typing" className="w-4 h-4 object-contain" />
+                        <img src={isLightMode ? logoLight : logoDark} alt="bot-typing" className="w-4 h-4 object-contain" />
                       </div>
-                      <div className="glass-card px-5 py-4 rounded-2xl rounded-tl-sm">
+                      <div className={`px-5 py-4 rounded-2xl rounded-tl-sm ${isLightMode ? 'message-bot-light' : 'message-bot-dark'}`}>
                         <div className="loading-dots">
                           <span></span>
                           <span></span>
@@ -468,7 +473,7 @@ function ChatPage() {
               style={{ bottom: keyboardHeight ? `${keyboardHeight + 16}px` : '16px', paddingBottom: 'calc(env(safe-area-inset-bottom, 12px) + 8px)' }}
             >
               <div className="max-w-3xl mx-auto px-2">
-                <div className="glass-card rounded-2xl p-2 flex items-center gap-2">
+                <div className={`rounded-2xl p-2 flex items-center gap-2 ${isLightMode ? 'glass-card' : 'glass-card-dark'}`}>
                   {/* Plus Button with Mode Dropdown */}
                   <div className="relative" ref={modeDropdownRef}>
                     <button 
@@ -580,7 +585,9 @@ function ChatPage() {
 
           {/* Data Query Panel - for Quick Chat mode */}
           {showDataPanel && (
-            <div className="w-96 quick-mode-panel flex flex-col animate-slideIn">
+            <div className={`w-96 quick-mode-panel flex flex-col animate-slideIn ${
+                isLightMode ? 'quick-mode-panel-light' : 'quick-mode-panel-dark'
+              }`}>
               <div className="p-4 border-b border-white/5">
                 <h3
                   className={`text-sm font-semibold uppercase tracking-wider ${
@@ -605,12 +612,12 @@ function ChatPage() {
                     <select
                       value={selectedState}
                       onChange={(e) => setSelectedState(e.target.value)}
-                      className={`w-full glass-input rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
-                        isLightMode ? 'text-slate-800' : 'text-white'
+                      className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
+                        isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
                       }`}
                     >
                       {STATES.map((state) => (
-                        <option key={state} value={state} className="bg-slate-900">{state}</option>
+                        <option key={state} value={state} className={isLightMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{state}</option>
                       ))}
                     </select>
                     <ChevronDown
@@ -634,12 +641,12 @@ function ChatPage() {
                     <select
                       value={selectedDistrict}
                       onChange={(e) => setSelectedDistrict(e.target.value)}
-                      className={`w-full glass-input rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
-                        isLightMode ? 'text-slate-800' : 'text-white'
+                      className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
+                        isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
                       }`}
                     >
                       {DISTRICTS.map((district) => (
-                        <option key={district} value={district} className="bg-slate-900">{district}</option>
+                        <option key={district} value={district} className={isLightMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{district}</option>
                       ))}
                     </select>
                     <ChevronDown
@@ -663,12 +670,12 @@ function ChatPage() {
                     <select
                       value={selectedBlock}
                       onChange={(e) => setSelectedBlock(e.target.value)}
-                      className={`w-full glass-input rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
-                        isLightMode ? 'text-slate-800' : 'text-white'
+                      className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
+                        isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
                       }`}
                     >
                       {BLOCKS.map((block) => (
-                        <option key={block} value={block} className="bg-slate-900">{block}</option>
+                        <option key={block} value={block} className={isLightMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{block}</option>
                       ))}
                     </select>
                     <ChevronDown
@@ -694,7 +701,7 @@ function ChatPage() {
                         type="checkbox"
                         checked={year2023}
                         onChange={(e) => setYear2023(e.target.checked)}
-                        className="custom-checkbox"
+                        className={isLightMode ? 'custom-checkbox-light' : 'custom-checkbox'}
                       />
                       <span
                         className={`text-sm ${
@@ -709,7 +716,7 @@ function ChatPage() {
                         type="checkbox"
                         checked={year2024}
                         onChange={(e) => setYear2024(e.target.checked)}
-                        className="custom-checkbox"
+                        className={isLightMode ? 'custom-checkbox-light' : 'custom-checkbox'}
                       />
                       <span
                         className={`text-sm ${
@@ -750,7 +757,7 @@ function ChatPage() {
                     </div>
 
                     {/* Data Table */}
-                    <div className="glass-card rounded-xl overflow-hidden">
+                    <div className={`rounded-xl overflow-hidden ${isLightMode ? 'glass-card' : 'quick-mode-table-dark'}`}>
                       <table className="data-table text-sm">
                         <thead>
                           <tr>
@@ -792,7 +799,9 @@ function ChatPage() {
           {showQuickModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
               <div className="absolute inset-0 bg-black/50" onClick={() => setShowQuickModal(false)} />
-              <div className="relative w-full max-w-md mx-auto glass-panel rounded-xl p-4 z-10 max-h-[90vh] overflow-auto">
+              <div className={`relative w-full max-w-md mx-auto rounded-xl p-4 z-10 max-h-[90vh] overflow-auto ${
+                isLightMode ? 'quick-mode-panel-light' : 'quick-mode-panel-dark'
+              }`}>
                 <div className="flex items-start justify-between">
                   <h3 className="text-sm font-semibold text-white/80 uppercase tracking-wider">Quick Chat - Data Query</h3>
                   <button onClick={() => setShowQuickModal(false)} className="p-2 rounded-lg hover:bg-white/5">
@@ -807,10 +816,12 @@ function ChatPage() {
                       <select
                         value={selectedState}
                         onChange={(e) => setSelectedState(e.target.value)}
-                        className="w-full glass-input rounded-xl px-4 py-3 text-sm text-white appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                        className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
+                          isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
+                        }`}
                       >
                         {STATES.map((state) => (
-                          <option key={state} value={state} className="bg-slate-900">{state}</option>
+                          <option key={state} value={state} className={isLightMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{state}</option>
                         ))}
                       </select>
                       <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none" />
@@ -823,10 +834,12 @@ function ChatPage() {
                       <select
                         value={selectedDistrict}
                         onChange={(e) => setSelectedDistrict(e.target.value)}
-                        className="w-full glass-input rounded-xl px-4 py-3 text-sm text-white appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                        className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
+                          isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
+                        }`}
                       >
                         {DISTRICTS.map((district) => (
-                          <option key={district} value={district} className="bg-slate-900">{district}</option>
+                          <option key={district} value={district} className={isLightMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{district}</option>
                         ))}
                       </select>
                       <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none" />
@@ -839,10 +852,12 @@ function ChatPage() {
                       <select
                         value={selectedBlock}
                         onChange={(e) => setSelectedBlock(e.target.value)}
-                        className="w-full glass-input rounded-xl px-4 py-3 text-sm text-white appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                        className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
+                          isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
+                        }`}
                       >
                         {BLOCKS.map((block) => (
-                          <option key={block} value={block} className="bg-slate-900">{block}</option>
+                          <option key={block} value={block} className={isLightMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{block}</option>
                         ))}
                       </select>
                       <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none" />
@@ -857,7 +872,7 @@ function ChatPage() {
                           type="checkbox"
                           checked={year2023}
                           onChange={(e) => setYear2023(e.target.checked)}
-                          className="custom-checkbox"
+                          className={isLightMode ? 'custom-checkbox-light' : 'custom-checkbox'}
                         />
                         <span className="text-sm text-white/80">2023</span>
                       </label>
@@ -866,7 +881,7 @@ function ChatPage() {
                           type="checkbox"
                           checked={year2024}
                           onChange={(e) => setYear2024(e.target.checked)}
-                          className="custom-checkbox"
+                          className={isLightMode ? 'custom-checkbox-light' : 'custom-checkbox'}
                         />
                         <span className="text-sm text-white/80">2024</span>
                       </label>
@@ -891,7 +906,7 @@ function ChatPage() {
                         <span>{selectedBlock}</span>
                       </div>
 
-                      <div className="glass-card rounded-xl overflow-hidden">
+                      <div className={`rounded-xl overflow-hidden ${isLightMode ? 'glass-card' : 'quick-mode-table-dark'}`}>
                         <table className="data-table text-sm">
                           <thead>
                             <tr>
