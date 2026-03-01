@@ -803,7 +803,7 @@ function ChatPage() {
                 isLightMode ? 'quick-mode-panel-light' : 'quick-mode-panel-dark'
               }`}>
                 <div className="flex items-start justify-between">
-                  <h3 className="text-sm font-semibold text-white/80 uppercase tracking-wider">Quick Chat - Data Query</h3>
+                  <h3 className={`text-sm font-semibold uppercase tracking-wider ${isLightMode ? 'text-slate-800' : 'text-white/80'}`}>Quick Chat - Data Query</h3>
                   <button onClick={() => setShowQuickModal(false)} className="p-2 rounded-lg hover:bg-white/5">
                     <X className="w-4 h-4 text-white/60" />
                   </button>
@@ -811,7 +811,7 @@ function ChatPage() {
 
                 <div className="mt-4 space-y-4">
                   <div>
-                    <label className="text-sm text-white/60 mb-2 block">State</label>
+                    <label className={`text-sm mb-2 block ${isLightMode ? 'text-slate-700' : 'text-white/60'}`}>State</label>
                     <div className="relative">
                       <select
                         value={selectedState}
@@ -824,12 +824,12 @@ function ChatPage() {
                           <option key={state} value={state} className={isLightMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{state}</option>
                         ))}
                       </select>
-                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none" />
+                      <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none ${isLightMode ? 'text-slate-400' : 'text-white/40'}`} />
                     </div>
                   </div>
 
                   <div>
-                    <label className="text-sm text-white/60 mb-2 block">District</label>
+                    <label className={`text-sm mb-2 block ${isLightMode ? 'text-slate-700' : 'text-white/60'}`}>District</label>
                     <div className="relative">
                       <select
                         value={selectedDistrict}
@@ -842,12 +842,12 @@ function ChatPage() {
                           <option key={district} value={district} className={isLightMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{district}</option>
                         ))}
                       </select>
-                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none" />
+                      <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none ${isLightMode ? 'text-slate-400' : 'text-white/40'}`} />
                     </div>
                   </div>
 
                   <div>
-                    <label className="text-sm text-white/60 mb-2 block">Block / Assessment Unit</label>
+                    <label className={`text-sm mb-2 block ${isLightMode ? 'text-slate-700' : 'text-white/60'}`}>Block / Assessment Unit</label>
                     <div className="relative">
                       <select
                         value={selectedBlock}
@@ -860,12 +860,12 @@ function ChatPage() {
                           <option key={block} value={block} className={isLightMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{block}</option>
                         ))}
                       </select>
-                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none" />
+                      <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none ${isLightMode ? 'text-slate-400' : 'text-white/40'}`} />
                     </div>
                   </div>
 
                   <div>
-                    <label className="text-sm text-white/60 mb-2 block">Years</label>
+                    <label className={`text-sm mb-2 block ${isLightMode ? 'text-slate-700' : 'text-white/60'}`}>Years</label>
                     <div className="flex gap-4">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -874,7 +874,7 @@ function ChatPage() {
                           onChange={(e) => setYear2023(e.target.checked)}
                           className={isLightMode ? 'custom-checkbox-light' : 'custom-checkbox'}
                         />
-                        <span className="text-sm text-white/80">2023</span>
+                        <span className={`text-sm ${isLightMode ? 'text-slate-800' : 'text-white/80'}`}>2023</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -883,10 +883,10 @@ function ChatPage() {
                           onChange={(e) => setYear2024(e.target.checked)}
                           className={isLightMode ? 'custom-checkbox-light' : 'custom-checkbox'}
                         />
-                        <span className="text-sm text-white/80">2024</span>
+                        <span className={`text-sm ${isLightMode ? 'text-slate-800' : 'text-white/80'}`}>2024</span>
                       </label>
                     </div>
-                    <p className="text-xs text-white/40 mt-2">Select none to use the latest year.</p>
+                    <p className={`text-xs mt-2 ${isLightMode ? 'text-slate-500' : 'text-white/40'}`}>Select none to use the latest year.</p>
                   </div>
 
                   <button
