@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Search,
@@ -60,6 +61,7 @@ const SAMPLE_DATA = [
 ];
 
 function ChatPage() {
+  const navigate = useNavigate();
   const [selectedMode, setSelectedMode] = useState(MODES[0]);
   const [showModeDropdown, setShowModeDropdown] = useState(false);
   const [isLightMode, setIsLightMode] = useState(false);
@@ -160,32 +162,65 @@ function ChatPage() {
     setShowResults(false);
   };
 
-  // Handle send message
-  const handleSend = () => {
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      await fetch('/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch {}
+    navigate('/landing');
+  };
+
+  // Handle send message - actually call server
+  const handleSend = async () => {
     if (!inputValue.trim()) return;
-    
-    const newMessage = {
+
+    const userMsg = {
       id: Date.now(),
       text: inputValue,
       sender: 'user',
       timestamp: new Date(),
     };
-    
-    setMessages([...messages, newMessage]);
+
+    setMessages(prev => [...prev, userMsg]);
     setInputValue('');
     setIsTyping(true);
-    
-    // Simulate bot response
-    setTimeout(() => {
-      setIsTyping(false);
+
+    try {
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          query: inputValue,
+          isDetailedResponseNeeded: selectedMode.id === 'deep',
+          isVisualizationNeeded: selectedMode.id === 'visualizer',
+        }),
+      });
+
+      if (res.status === 401) {
+        // not authorized, go back to landing
+        navigate('/landing');
+        return;
+      }
+
+      const data = await res.json();
+      const text = data?.response?.text || JSON.stringify(data?.response);
       const botResponse = {
         id: Date.now() + 1,
-        text: "Hello! I'm your AI assistant. I can help you with information about groundwater resources, water conservation, and environmental data analysis. How can I assist you today?",
+        text,
         sender: 'bot',
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, botResponse]);
-    }, 2000);
+    } catch (err) {
+      console.error(err);
+      setMessages(prev => [
+        ...prev,
+        { id: Date.now() + 2, text: 'Server error', sender: 'bot', timestamp: new Date() },
+      ]);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   // Handle get data
@@ -312,6 +347,13 @@ function ChatPage() {
             </div>
             <button className="p-2 rounded-lg hover:bg-white/5 transition-colors">
               <MoreHorizontal className="w-5 h-5 text-white/50" />
+            </button>
+            <button
+              onClick={handleLogout}
+              title="Log out"
+              className="p-2 rounded-lg hover:bg-white/5 transition-colors"
+            >
+              <User className="w-5 h-5 text-white/50" />
             </button>
           </div>
         </div>

@@ -3,18 +3,25 @@ const jwt = require("jsonwebtoken");
 const router = express.Router();
 const User = require("./models/User");
 const bcrypt = require("bcryptjs");
+const AuthJwt = require("./AuthJWT");
 
 router.post("/login-email", async (req, res) => {
     console.log("Login request received with body:", req.body);
     try {
-        const { email } = req.body;
+        const { email, password } = req.body;
 
-        if (!email)
-            return res.status(400).json({ error: "Email is required" });
+        if (!email || !password)
+            return res.status(400).json({ error: "Email and password are required" });
 
         const user = await User.findOne({ email });
         if (!user)
             return res.status(404).json({ error: "User not found" });
+
+        // verify password
+        const match = await bcrypt.compare(password, user.password);
+        if (!match) {
+            return res.status(401).json({ error: "Invalid credentials" });
+        }
 
         // update last verification/login time
         user.time_of_ver = new Date();
@@ -100,6 +107,21 @@ router.post("/signup-email", async (req, res) => {
         console.error("SIGNUP ERROR:", err);
         return res.status(500).json({ error: "Server error during signup" });
     }
+});
+
+// verification endpoint – ensures token valid and returns decoded user
+router.get("/verify", AuthJwt, (req, res) => {
+    return res.status(200).json({ user: req.user });
+});
+
+// logout route clears cookie
+router.post("/logout", (req, res) => {
+    res.clearCookie("jwt", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "Lax",
+    });
+    return res.json({ message: "Logged out" });
 });
 
 module.exports = router;

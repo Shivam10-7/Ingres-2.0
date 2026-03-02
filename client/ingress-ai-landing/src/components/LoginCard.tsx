@@ -28,10 +28,26 @@ const LoginCard = () => {
       </p>
 
       <form
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
-          // fake login then redirect to chat
-          navigate('/chat');
+          const endpoint = isSignUp ? "/auth/signup-email" : "/auth/login-email";
+          try {
+            const res = await fetch(endpoint, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ email, password, name }),
+            });
+            if (!res.ok) {
+              const err = await res.json();
+              throw new Error(err.error || "Authentication failed");
+            }
+            // on success the JWT cookie will be set automatically
+            navigate('/chat');
+          } catch (err) {
+            console.error("auth error", err);
+            alert(err.message);
+          }
         }}
         className="space-y-5"
       >
