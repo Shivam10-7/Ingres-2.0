@@ -1,6 +1,8 @@
 require('dotenv').config(); // Injected the .env file
 const express = require('express');
 const app = express()
+const cors = require('cors');
+const AuthJwt = require('./src/routes/middleware/AuthJWT');
 const PieChartPayloadd = require('./src/routes/ChartData/PieChart');
 const BarChartPayload = require('./src/routes/ChartData/BarChart'); // Ensure this is correctly imported for use in the tester route
 const mongoose = require('mongoose');
@@ -35,6 +37,8 @@ const wss = new WebSocket.Server({ server });
 
 app.use(express.json());
 app.use(cookieParser());
+// allow cross‑origin requests from client (with credentials for cookies)
+app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }));
 
 // mongodb connection
 console.log("This is the mongo url node "+process.env.MONGO_URI)
@@ -50,7 +54,7 @@ app.get('/', (req, res) => {
 app.use('/auth', require('./src/routes/middleware/auth'));
 
 // these are the routes that we get form the chat
-app.post('/chat', async (req, res) => { 
+app.post('/chat', AuthJwt, async (req, res) => { 
     // 1. Input Validation: Ensure 'query' actually exists before processing
     const { query, isDetailedResponseNeeded, isVisualizationNeeded } = req.body;
 

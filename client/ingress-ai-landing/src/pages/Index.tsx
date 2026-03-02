@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import LoginCard from "@/components/LoginCard";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import HeroIllustration from "@/components/HeroIllustration";
 import WaveBackground from "@/components/WaveBackground";
 import WaveDivider from "@/components/WaveDivider";
@@ -12,6 +14,17 @@ import FaqSection from "@/components/FaqSection";
 import Footer from "@/components/Footer";
 
 const Index = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // if already authenticated, skip landing
+    fetch('/auth/verify', { credentials: 'include' })
+      .then(r => {
+        if (r.ok) navigate('/chat');
+      })
+      .catch(() => {});
+  }, [navigate]);
+
   return (
     <div className="relative min-h-screen scroll-smooth">
       <WaveBackground />
