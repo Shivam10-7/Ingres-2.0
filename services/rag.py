@@ -96,21 +96,16 @@ def rag_gemini(user_query: str, sql_result: dict):
     retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
     docs = retriever.invoke(user_query)
 
-    context = "\n\n".join([doc.page_content for doc in docs])
+    # context = "\n\n".join([doc.page_content for doc in docs])
 
-    # Load Gemini LLM via LangChain Google GenAI integration
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
     )
 
     template = """
-You are JalSathi AI – a groundwater assessment expert.
-Your are Supposed to help Policymakers, farmers, experts and groundwater analysists .
-
-STRICT RULES:
-- Use  the provided context for grounding the response .
-- Do NOT hallucinate.
-- give short response and  respond as per the returned sql.
+you are JalSathi chatbot , a ground water virtual assistant . Respond based on teh user
+question and sql result.
+draft a proper formatted response in given format 
 
 
 
@@ -120,9 +115,6 @@ User Question:
 
 SQL Result:
 {sql_result}
-
-Context:
-{context}
 
 Return ONLY valid JSON:
 
@@ -140,7 +132,7 @@ Return ONLY valid JSON:
         {
             "question": user_query,
             "sql_result": sql_result,
-            "context": context,
+            # "context": context,
         }
     )
 
