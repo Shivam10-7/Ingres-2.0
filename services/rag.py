@@ -1,5 +1,7 @@
 # rag.py
 
+import os
+from dotenv import load_dotenv
 from langchain_core.prompts import PromptTemplate
 from langchain_ollama import OllamaEmbeddings, OllamaLLM
 from langchain_community.vectorstores import Chroma
@@ -7,6 +9,9 @@ from langchain_chroma import Chroma
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 CHROMA_PATH = "chroma_db"
+
+# Load environment variables from .env (if present)
+load_dotenv()
 
 
 def rag(user_query: str, sql_result: dict):
@@ -95,7 +100,7 @@ def rag_gemini(user_query: str, sql_result: dict):
 
     # Load Gemini LLM via LangChain Google GenAI integration
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+        model="gemini-2.0-flash",
     )
 
     template = """
