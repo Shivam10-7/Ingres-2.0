@@ -7,3 +7,4 @@ chromadb
 pypdf
 ollama
 python-dotenv
+langchain-google-genai
