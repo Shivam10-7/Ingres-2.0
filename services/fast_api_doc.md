@@ -2,7 +2,7 @@
 
 ### 1. Prerequisites
 - **Python**: 3.11 (recommended, to match `myvenv`)
-- **Ollama**: Installed and running locally (for embeddings and the Ollama LLM)
+- **Ollama**: Installed and running locally (for embeddings and the Ollama LLM). Make sure the embedding model is pulled (e.g. `ollama pull mxbai-embed-large` or set `OLLAMA_EMBED_MODEL` to a model you have).
 - **Google Gemini API key** (for the Gemini RAG endpoint)
 - **Git** and **pip**
 
@@ -16,8 +16,7 @@ cd INGRES2.0/Ingres-2.0/services
 If you want to recreate the existing `myvenv`:
 
 ```bash
-python -m venv myvenv
-myvenv\Scripts\activate
+c
 ```
 
 You should see `(myvenv)` in your terminal prompt.

@@ -204,6 +204,16 @@ body {
   border-radius: 20px 20px 4px 20px;
 }
 
+/* code / pre blocks inside bot messages */
+.message-bot pre {
+  background: rgba(0, 0, 0, 0.15);
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  overflow-x: auto;
+  font-size: 0.875rem;
+  color: inherit;
+}
+
 .message-bot {
   background: rgba(255, 255, 255, 0.08);
   border-radius: 20px 20px 20px 4px;

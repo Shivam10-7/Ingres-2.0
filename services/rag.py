@@ -16,8 +16,16 @@ load_dotenv()
 
 def rag(user_query: str, sql_result: dict):
 
-    # Load embeddings
-    embedding = OllamaEmbeddings(model="mxbai-embed-large")
+    # Load embeddings (model name can be overridden by OLLAMA_EMBED_MODEL env var)
+    emb_model = os.getenv("OLLAMA_EMBED_MODEL", "mxbai-embed-large")
+    try:
+        embedding = OllamaEmbeddings(model=emb_model)
+    except Exception as e:
+        # let the caller see a clearer message
+        raise RuntimeError(
+            f"failed to load Ollama embedding model '{emb_model}': {e}. \n"
+            "make sure the model is pulled (`ollama pull {emb_model}`) or set a different OLLAMA_EMBED_MODEL"
+        )
 
     # Load vector store
     vectorstore = Chroma(
@@ -94,7 +102,14 @@ def rag_gemini(user_query: str, sql_result: dict):
     )
 
     retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
-    docs = retriever.invoke(user_query)
+    try:
+        docs = retriever.invoke(user_query)
+    except Exception as exc:
+        # likely an embedding or vectorstore issue
+        raise RuntimeError(
+            f"failed to retrieve documents for query ('{user_query}'): {exc}.\n"
+            "Check that your embedding model is available and the chroma_db is populated."
+        )
 
     # context = "\n\n".join([doc.page_content for doc in docs])
 

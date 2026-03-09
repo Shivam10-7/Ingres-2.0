@@ -42,8 +42,8 @@ chroma_db/
 Thumbs.db
 
 # Model files (optional - uncomment if you don't want to track model files)
-# *.gguf
-# models/
+*.gguf
+models/
 
 # Environment variables
 .env

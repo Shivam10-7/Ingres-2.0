@@ -26,6 +26,8 @@ import {
   Sun,
   Moon,
 } from 'lucide-react';
+
+import { sendGeminiRagRequest } from '@/lib/api';
 const logoLight = '/logo_LIGHT.png';
 const logoDark = '/logo_DARK.png';
 import '@/chat/index.css';
@@ -171,6 +173,19 @@ function ChatPage() {
   };
 
   // Handle send message - actually call server
+  // build a lightweight sql payload from the quick‑chat panel selections
+  const buildSqlResponse = () => {
+    return {
+      state: selectedState,
+      district: selectedDistrict,
+      block: selectedBlock,
+      years: [
+        ...(year2023 ? ['2023'] : []),
+        ...(year2024 ? ['2024'] : []),
+      ],
+    };
+  };
+
   const handleSend = async () => {
     if (!inputValue.trim()) return;
 
@@ -186,28 +201,32 @@ function ChatPage() {
     setIsTyping(true);
 
     try {
-      const res = await fetch('/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          query: inputValue,
-          isDetailedResponseNeeded: selectedMode.id === 'deep',
-          isVisualizationNeeded: selectedMode.id === 'visualizer',
-        }),
-      });
+      const data = await sendGeminiRagRequest(inputValue, buildSqlResponse());
 
-      if (res.status === 401) {
-        // not authorized, go back to landing
-        navigate('/landing');
-        return;
+      if (!data.success) {
+        throw new Error(data.error || data.message || 'unknown error');
       }
 
-      const data = await res.json();
-      const text = data?.response?.text || JSON.stringify(data?.response);
+      let answerText = '';
+      if (data?.markdown_json) {
+        const m = data.markdown_json.match(/```json\n([\s\S]*)\n```/);
+        if (m) {
+          try {
+            const parsed = JSON.parse(m[1]);
+            answerText = parsed.answer || JSON.stringify(parsed);
+          } catch (_e) {
+            answerText = m[1].trim();
+          }
+        } else {
+          answerText = data.markdown_json;
+        }
+      } else {
+        answerText = JSON.stringify(data);
+      }
+
       const botResponse = {
         id: Date.now() + 1,
-        text,
+        text: answerText,
         sender: 'bot',
         timestamp: new Date(),
       };
@@ -216,7 +235,12 @@ function ChatPage() {
       console.error(err);
       setMessages(prev => [
         ...prev,
-        { id: Date.now() + 2, text: 'Server error', sender: 'bot', timestamp: new Date() },
+        {
+          id: Date.now() + 2,
+          text: `Server error: ${err instanceof Error ? err.message : err}`,
+          sender: 'bot',
+          timestamp: new Date(),
+        },
       ]);
     } finally {
       setIsTyping(false);
@@ -390,6 +414,7 @@ function ChatPage() {
               }`}
             >
               INGRES ChatBOT
+              <span className="ml-2 text-xs font-normal text-blue-400">(Gemini RAG)</span>
             </h1>
           </div>
 
@@ -482,7 +507,13 @@ function ChatPage() {
                           message.sender === 'user' ? 'message-user' : isLightMode ? 'message-bot-light' : 'message-bot-dark'
                         }`}
                       >
-                        <p className={`text-sm leading-relaxed ${isLightMode ? 'text-slate-900' : 'text-white'}`}>{message.text}</p>
+                        {message.text.includes('```') ? (
+                          <pre className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${isLightMode ? 'text-slate-900' : 'text-white'} bg-transparent`}> 
+                            {message.text}
+                          </pre>
+                        ) : (
+                          <p className={`text-sm leading-relaxed ${isLightMode ? 'text-slate-900' : 'text-white'}`}>{message.text}</p>
+                        )}
                         <span className={`text-xs mt-2 block ${isLightMode ? 'text-slate-500' : 'text-white/40'}`}>
                           {formatTime(message.timestamp)}
                         </span>
