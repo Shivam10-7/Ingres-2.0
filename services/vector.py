@@ -21,10 +21,17 @@ def ingest_pdf():
     )
     chunks = splitter.split_documents(documents)
 
-    print("🧠 Creating embeddings using mxbai-embed-large...")
-    embedding = OllamaEmbeddings(
-        model="mxbai-embed-large"
-    )
+    emb_model = os.getenv("OLLAMA_EMBED_MODEL", "mxbai-embed-large")
+    print(f"🧠 Creating embeddings using {emb_model}...")
+    try:
+        embedding = OllamaEmbeddings(
+            model=emb_model
+        )
+    except Exception as e:
+        raise RuntimeError(
+            f"unable to load Ollama embedding model '{emb_model}': {e}.\n"
+            "pull the model with `ollama pull {emb_model}` or set OLLAMA_EMBED_MODEL to an installed name."
+        )
 
     print("💾 Storing in ChromaDB...")
     vectorstore = Chroma.from_documents(
