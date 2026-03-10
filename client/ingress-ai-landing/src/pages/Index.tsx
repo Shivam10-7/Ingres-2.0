@@ -18,7 +18,7 @@ const Index = () => {
 
   useEffect(() => {
     // if already authenticated, skip landing
-    fetch('/auth/verify', { credentials: 'include' })
+    fetch('http://localhost:8081/auth/verify', { credentials: 'include' })
       .then(r => {
         if (r.ok) navigate('/chat');
       })

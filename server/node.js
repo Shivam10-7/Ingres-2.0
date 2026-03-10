@@ -16,6 +16,15 @@ const server = http.createServer(app);
 const mysql = require("mysql2"); // Keep the import for the connection block
 const classifier = require('./src/routes/classifier');
 const { stat } = require('fs');
+
+mongoose.connect(process.env.MONGO_URI)
+.then(() => {
+    console.log("✅ MongoDB connected");
+})
+.catch((err) => {
+    console.log("MongoDB connection error:", err);
+});
+
 // connection with the MYSQL
 const con = mysql.createConnection({
     host: process.env.DB_HOST,
@@ -37,8 +46,26 @@ const wss = new WebSocket.Server({ server });
 
 app.use(express.json());
 app.use(cookieParser());
-// allow cross‑origin requests from client (with credentials for cookies)
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }));
+
+// allow cross-origin requests from client (with credentials for cookies)
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:8080',
+  'http://localhost:8082',
+  'http://10.212.167.242:8080',
+  'http://10.212.167.242:8082'
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
 
 // mongodb connection
 console.log("This is the mongo url node "+process.env.MONGO_URI)
