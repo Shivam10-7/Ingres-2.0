@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 
 import { sendGeminiRagRequest } from '@/lib/api';
+import UserProfile from '@/components/UserProfile';
 const logoLight = '/logo_LIGHT.png';
 const logoDark = '/logo_DARK.png';
 import '@/chat/index.css';
@@ -395,8 +396,8 @@ function ChatPage() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-full relative">
-        {/* Header with theme toggle */}
-        <header className="h-16 glass-panel border-b-0 flex items-center justify-between px-6 shrink-0">
+        {/* Header with user profile and theme toggle */}
+        <header className="h-auto glass-panel border-b-0 flex items-center justify-between px-6 py-4 shrink-0">
           <div className="flex items-center">
             {!sidebarOpen && (
               <button
@@ -418,12 +419,17 @@ function ChatPage() {
             </h1>
           </div>
 
-          {/* Light / Dark mode toggle (top-right) - inspired by reference design */}
-          <button
-            onClick={() => setIsLightMode((prev) => !prev)}
-            className="inline-flex items-center gap-3 px-2 py-1 rounded-full bg-transparent hover:bg-white/10 transition-colors text-xs font-medium"
-            aria-label="Toggle light mode"
-          >
+          {/* Right side: User Profile and Theme Toggle */}
+          <div className="flex items-center gap-4">
+            {/* User Profile */}
+            <UserProfile />
+
+            {/* Light / Dark mode toggle */}
+            <button
+              onClick={() => setIsLightMode((prev) => !prev)}
+              className="inline-flex items-center gap-3 px-2 py-1 rounded-full bg-transparent hover:bg-white/10 transition-colors text-xs font-medium"
+              aria-label="Toggle light mode"
+            >
             {/* Track */}
             <span
               className={`relative w-11 h-6 rounded-full transition-colors duration-300 ${
@@ -453,6 +459,7 @@ function ChatPage() {
               {isLightMode ? 'Light Mode' : 'Dark Mode'}
             </span>
           </button>
+          </div>
         </header>
 
         {/* Chat Area */}
