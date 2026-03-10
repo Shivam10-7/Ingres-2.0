@@ -11,6 +11,8 @@ const LoginCard = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [name, setName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   return (
     <motion.div
@@ -30,7 +32,27 @@ const LoginCard = () => {
       <form
         onSubmit={async (e) => {
           e.preventDefault();
-          const endpoint = isSignUp ? "/auth/signup-email" : "/auth/login-email";
+          setError("");
+          
+          // Validate signup password match
+          if (isSignUp && password !== confirmPassword) {
+            setError("Passwords do not match");
+            return;
+          }
+
+          // Validate required fields
+          if (isSignUp && !name) {
+            setError("Name is required");
+            return;
+          }
+
+          if (!email || !password) {
+            setError("Email and password are required");
+            return;
+          }
+
+          setLoading(true);
+          const endpoint = isSignUp ? "http://localhost:8081/auth/signup-email" : "http://localhost:8081/auth/login-email";
           try {
             const res = await fetch(endpoint, {
               method: "POST",
@@ -42,11 +64,13 @@ const LoginCard = () => {
               const err = await res.json();
               throw new Error(err.error || "Authentication failed");
             }
-            // on success the JWT cookie will be set automatically
+            // on success the JWT cookie will be set automatically and user data stored in MongoDB
             navigate('/chat');
           } catch (err) {
             console.error("auth error", err);
-            alert(err.message);
+            setError(err instanceof Error ? err.message : "Authentication failed");
+          } finally {
+            setLoading(false);
           }
         }}
         className="space-y-5"
@@ -110,15 +134,11 @@ const LoginCard = () => {
           </div>
         )}
 
-        {/* Remember me (login only) */}
-        {!isSignUp && (
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border-border accent-primary"
-            />
-            <span className="text-sm text-muted-foreground">Remember me</span>
-          </label>
+        {/* Error message */}
+        {error && (
+          <div className="p-3 rounded-lg bg-red-100/10 border border-red-500/30 text-red-500 text-sm">
+            {error}
+          </div>
         )}
 
         {/* Submit */}
@@ -126,9 +146,10 @@ const LoginCard = () => {
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.98 }}
           type="submit"
-          className="btn-glow w-full rounded-xl py-3 text-sm font-semibold text-primary-foreground"
+          disabled={loading}
+          className="btn-glow w-full rounded-xl py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isSignUp ? "Sign Up" : "Login"}
+          {loading ? "Loading..." : isSignUp ? "Sign Up" : "Login"}
         </motion.button>
       </form>
 
@@ -140,6 +161,8 @@ const LoginCard = () => {
             setIsSignUp(!isSignUp);
             setPassword("");
             setConfirmPassword("");
+            setError("");
+            setName("");
           }}
           className="font-medium text-secondary hover:underline"
         >

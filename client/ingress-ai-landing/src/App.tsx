@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import ChatPage from "./pages/Chat";
 import NotFound from "./pages/NotFound";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -16,10 +17,20 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          {/* redirect root to landing */}
+          {/* Landing page - accessible to all */}
           <Route path="/" element={<Index />} />
           <Route path="/landing" element={<Index />} />
-          <Route path="/chat" element={<ChatPage />} />
+          
+          {/* Chat page - protected (requires login) */}
+          <Route 
+            path="/chat" 
+            element={
+              <ProtectedRoute>
+                <ChatPage />
+              </ProtectedRoute>
+            } 
+          />
+          
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
