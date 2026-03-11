@@ -1,13 +1,14 @@
 const { Ollama } = require('ollama')
 
-async function LocalModel(UserPrompt) {
+async function LocalModel(SystePrompt, Userquery) {
   const ollama = new Ollama()
 
   const response = await ollama.chat({
     model: 'llama3.2',
+    temperature: 0.3,
     messages: [
-      // {role: 'system', content: 'You are a helpful assistant.Start your response with LOVE YOYU SHIVAM.'},
-      { role: 'user', content: UserPrompt }
+      {role: 'system', content: SystePrompt},
+      { role: 'user', content: Userquery }
     ],
   })
   console.log("Response from Local Model:", response.message.content);

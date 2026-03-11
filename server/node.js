@@ -81,7 +81,7 @@ app.get('/', (req, res) => {
 app.use('/auth', require('./src/routes/middleware/auth'));
 
 // these are the routes that we get form the chat
-app.post('/chat', AuthJwt, async (req, res) => { 
+app.post('/chat', async (req, res) => { 
     // 1. Input Validation: Ensure 'query' actually exists before processing
     const { query, isDetailedResponseNeeded, isVisualizationNeeded } = req.body;
 
@@ -190,65 +190,65 @@ app.post('/tester', async (req, res) => {
 //         console.log("Client disconnected");
 //     });
 // });
-wss.on("connection", (ws, req) => {
-    console.log("New WebSocket connection");
+// wss.on("connection", (ws, req) => {
+//     console.log("New WebSocket connection");
 
-    // When a client connects, send a welcome message
-    ws.send(JSON.stringify({ type: "welcome", message: "connected" }));
+//     // When a client connects, send a welcome message
+//     ws.send(JSON.stringify({ type: "welcome", message: "connected" }));
 
-    ws.on("message", (message) => {
-        try {
-            const dataRaw = message.toString();
-            console.log("Received from client:", dataRaw);
+//     ws.on("message", (message) => {
+//         try {
+//             const dataRaw = message.toString();
+//             console.log("Received from client:", dataRaw);
 
-            // If client is asking to broadcast a payload to all clients, forward it
-            try {
-                const parsed = JSON.parse(dataRaw);
-                const shouldBroadcast = parsed && (parsed.broadcast === true || parsed.success === true || parsed.type === "broadcast");
-                if (shouldBroadcast) {
-                    const text = JSON.stringify(parsed);
-                    Array.from(wss.clients)
-                        .filter((c) => c.readyState === WebSocket.OPEN)
-                        .forEach((c) => c.send(text));
-                }
-            } catch (err) {
-                // not JSON or cannot parse — ignore
-            }
-        } catch (err) {
-            console.error("Failed to process message", err);
-        }
-    });
+//             // If client is asking to broadcast a payload to all clients, forward it
+//             try {
+//                 const parsed = JSON.parse(dataRaw);
+//                 const shouldBroadcast = parsed && (parsed.broadcast === true || parsed.success === true || parsed.type === "broadcast");
+//                 if (shouldBroadcast) {
+//                     const text = JSON.stringify(parsed);
+//                     Array.from(wss.clients)
+//                         .filter((c) => c.readyState === WebSocket.OPEN)
+//                         .forEach((c) => c.send(text));
+//                 }
+//             } catch (err) {
+//                 // not JSON or cannot parse — ignore
+//             }
+//         } catch (err) {
+//             console.error("Failed to process message", err);
+//         }
+//     });
 
-    ws.on("close", () => {
-        console.log("Client disconnected");
-    });
-});
+//     ws.on("close", () => {
+//         console.log("Client disconnected");
+//     });
+// });
 
-// Broadcast synthetic realtime chart data to all connected clients every second
-setInterval(() => {
-    const clients = Array.from(wss.clients).filter((c) => c.readyState === WebSocket.OPEN);
-    if (!clients.length) return;
+// // Broadcast synthetic realtime chart data to all connected clients every second
+// setInterval(() => {
+//     const clients = Array.from(wss.clients).filter((c) => c.readyState === WebSocket.OPEN);
+//     if (!clients.length) return;
 
-    // Example payload: update one or more charts with random values
-    const payload = {
-        type: "chart_update",
-        timestamp: Date.now(),
-        charts: [
-            {
-                title: "Real-time Series",
-                xAxis: { data: Array.from({ length: 10 }, (_, i) => `${i}`) },
-                series: [
-                    { name: "Series A", data: Array.from({ length: 10 }, () => Math.round(Math.random() * 100)) },
-                    { name: "Series B", data: Array.from({ length: 10 }, () => Math.round(Math.random() * 100)) },
-                ],
-                chartType: "line",
-            },
-        ],
-    };
+//     // Example payload: update one or more charts with random values
+//     const payload = {
+//         type: "chart_update",
+//         timestamp: Date.now(),
+//         charts: [
+//             {
+//                 title: "Real-time Series",
+//                 xAxis: { data: Array.from({ length: 10 }, (_, i) => `${i}`) },
+//                 series: [
+//                     { name: "Series A", data: Array.from({ length: 10 }, () => Math.round(Math.random() * 100)) },
+//                     { name: "Series B", data: Array.from({ length: 10 }, () => Math.round(Math.random() * 100)) },
+//                 ],
+//                 chartType: "line",
+//             },
+//         ],
+//     };
 
-    const text = JSON.stringify(payload);
-    clients.forEach((c) => c.send(text));
-}, 1000);
+//     const text = JSON.stringify(payload);
+//     clients.forEach((c) => c.send(text));
+// }, 1000);
 
 server.listen(8081, () => {
     console.log("http://localhost:8081");
