@@ -12,7 +12,6 @@ import {
   Search as SearchIcon,
   BarChart3,
   Send,
-  MoreHorizontal,
   Database,
   X,
   ChevronRight,
@@ -283,7 +282,7 @@ function ChatPage() {
       {sidebarOpen && (
         <>
           <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setSidebarOpen(false)} />
-          <aside className="fixed inset-y-0 left-0 w-72 glass-panel flex flex-col h-full shrink-0 z-50" style={{ maxHeight: '100vh' }}>
+          <aside className="fixed inset-y-0 left-0 w-auto min-w-[20rem] max-w-[28rem] glass-panel flex flex-col h-full shrink-0 z-50" style={{ maxHeight: '100vh' }}>
         {/* Logo */}
         <div className="p-4 flex items-center gap-3">
           <div className="w-10 h-10 flex items-center justify-center">
@@ -360,28 +359,8 @@ function ChatPage() {
           </div>
         </div>
 
-        {/* User Profile */}
-        <div className="p-4 border-t border-white/5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-600 to-gray-800 flex items-center justify-center">
-              <span className="text-sm font-medium text-white">N</span>
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-white">User</p>
-              <p className="text-xs text-white/50">Free plan</p>
-            </div>
-            <button className="p-2 rounded-lg hover:bg-white/5 transition-colors">
-              <MoreHorizontal className="w-5 h-5 text-white/50" />
-            </button>
-            <button
-              onClick={handleLogout}
-              title="Log out"
-              className="p-2 rounded-lg hover:bg-white/5 transition-colors"
-            >
-              <User className="w-5 h-5 text-white/50" />
-            </button>
-          </div>
-        </div>
+        {/* User Profile (real data) */}
+        <UserProfile />
           {/* Close Sidebar Button */}
           <button
             onClick={() => setSidebarOpen(false)}
@@ -412,9 +391,6 @@ function ChatPage() {
 
           {/* Right side: User Profile and Theme Toggle */}
           <div className="flex items-center gap-4">
-            {/* User Profile */}
-            <UserProfile />
-
             {/* Light / Dark mode toggle */}
             <button
               onClick={() => setIsLightMode((prev) => !prev)}
