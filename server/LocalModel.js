@@ -10,6 +10,9 @@ async function LocalModel(SystePrompt, Userquery) {
       {role: 'system', content: SystePrompt},
       { role: 'user', content: Userquery }
     ],
+    options: {
+        temperature: 0.1
+      }
   })
   console.log("Response from Local Model:", response.message.content);
   return response.message.content;
