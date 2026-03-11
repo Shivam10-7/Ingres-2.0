@@ -29,39 +29,54 @@ async function AnalyticsQueryHandler(Query) {
         
         console.log("Data retrieved from database:", rows);
         console.log("Fields retrieved from database:", fields);
-        console.log("Chart Type:", ChartType);
+        console.log("Chart Type (raw object):", ChartType);
 
-       switch (ChartType.type) {
+        // `ChartDeterminer` returns an object with a `chartType` property
+        // (e.g. `{ chartType: 'pie', ... }`). Older code was inspecting
+        // `ChartType.type`, which is undefined and therefore the switch
+        // always hit the default case, forcing a table response.
+        //
+        // Normalize the value here and fall back to 'table' if nothing
+        // sensible is provided.
+        const chartType = (ChartType && ChartType.chartType) || (ChartType && ChartType.type) || 'table';
+
+       switch (chartType) {
         case 'KPI':
             return {
                 type: 'KPI',
                 data: rows
             };
 
-        case 'pie':
-            // Logic: Await the payload generator and assign the actual result, not the console.log
-            const pieData = await PieChartPayloadd(rows, chartTitle);
+        case 'pie': {
+            // chartTitle isn't defined anywhere; use a sensible default or
+            // provide it via the ChartType object in the future.
+            const title = ChartType.title || 'Chart';
+            const pieData = await PieChartPayloadd(rows, title);
             console.log("[Visualizer] Pie Chart Payload Generated");
             return {
                 type: 'pie',
                 data: pieData
             };
+        }
 
-        case 'bar':
-            const barData = await BarChartPayload(rows, chartTitle);
+        case 'bar': {
+            const title = ChartType.title || 'Chart';
+            const barData = await BarChartPayload(rows, title);
             console.log("[Visualizer] Bar Chart Payload Generated");
             return {
                 type: 'bar',
                 data: barData
             };
-        case 'line':
-            const lineData = await LineChartPayload(rows, chartTitle);
+        }
+        case 'line': {
+            const title = ChartType.title || 'Chart';
+            const lineData = await LineChartPayload(rows, title);
             console.log("[Visualizer] Line Chart Payload Generated");
             return {
                 type: 'line',
                 data: lineData
             };
-
+        }
 
         default:
             // Fallback: If no specific chart is requested, return the raw data as a table

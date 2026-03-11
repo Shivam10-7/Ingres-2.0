@@ -12,25 +12,57 @@ Your task is to convert a natural language user query into a SAFE and CORRECT SQ
 DATABASE TABLE
 ==============================
 
-Table name: **data2023final2** AND **data2024final2**
+Table name: **ingresdata2025 **
 
 Columns (use EXACT names with backticks):
 
-- \`State\`
-- \`District\`
-- \`Assessment Unit  Name\`
-- \`Assessment Unit Type\`
-- \`Recharge Worthy Area(Ha)\`
-- \`Total Annual  Ground Water (Ham) Recharge\`
-- \`Annual Extractable Ground Water Resource  (Ham)\`
-- \`Total   Ground Water Extraction  (Ham)\`
-- \`Stage of Ground Water  Extraction (%)\`
-- \`Categorization\`
+- \`state\`
+- \`district\`
+- \`assessment unit name\`
+- \`assessment unit type\`
+- \`recharge worthy area (ha)\`
+- \`total annual ground water (ham) recharge\`
+- \`annual extractable ground water resource (ham)\`
+- \`total ground water extraction (ham)\`
+- \`stage of ground water extraction (%)\`
+- \`categorization\`
 
 NOTE:
 Column names contain spaces and special characters.
 Always wrap column names in BACKTICKS (\`).
 Never rename columns.
+
+Column Descriptions
+
+    state: The name of the Indian State or Union Territory where the assessment unit is located (e.g., 'andhra pradesh', 'uttar pradesh').
+
+    district: The name of the district within the state.
+
+    assessment unit name: The specific administrative or geographical unit being evaluated (e.g., a specific block, taluk, or tehsil name).
+
+    assessment unit type: The administrative classification of the unit. Common types include block, district, tehsil, or taluk.
+
+    recharge worthy area (ha): The total area of the assessment unit (in hectares) that is physically capable of recharging groundwater.
+
+    total annual ground water (ham) recharge: The total volume of water that recharges the groundwater table annually from all sources (rainfall and other sources like canals, tanks, etc.), measured in Hectare-Metre (ham).
+
+    annual extractable ground water resource (ham): The volume of groundwater available for extraction after accounting for natural discharges, representing the "safe" limit for usage in Hectare-Metre (ham).
+
+    total ground water extraction (ham): The actual total volume of groundwater extracted annually for all purposes (irrigation, industrial, and domestic), measured in Hectare-Metre (ham). (Mapped from 'total extraction (ham)' in the dataset).
+
+    stage of ground water extraction (%): The ratio of annual groundwater extraction to the annual extractable groundwater resource, expressed as a percentage. It indicates the level of groundwater utilization.
+
+    categorization: The groundwater development status assigned to the unit based on the stage of extraction and long-term water level trends. Categories include:
+
+        safe: Extraction is within sustainable limits.
+
+        semi_critical: Extraction is reaching higher levels; caution is needed.
+
+        critical: Extraction is very high, approaching the limit of recharge.
+
+        over_exploited: Extraction exceeds the annual replenishable recharge.
+
+        salinity: Primarily affected by poor water quality (brackish/saline groundwater).
 
 ==============================
 STRICT SAFETY RULES
@@ -52,13 +84,26 @@ STRICT SAFETY RULES
 SEMANTIC RULES
 ==============================
 
+rules:
+
+1.	if the query mentions a specific assessment unit or block name, classify the entity type as block.
+2.	if the query mentions a district name, classify the entity type as district.
+3.	if the query mentions a state name, classify the entity type as state.
+4.	if multiple entities appear, always choose the most specific entity using the priority:
+    block > district > state.
+5.	words like "block", "assessment unit", or "taluka" indicate block.
+6.	words like "district" indicate district.
+7.	words like "state" indicate state.
+8.	ignore unrelated words such as "groundwater", "status", "level", "data", etc.
+
+
 Interpret user intent carefully:
 
 • If user asks for a SINGLE VALUE of a state:
-  → Use AVG(\`Stage of Ground Water  Extraction (%)\`)
+  → Use AVG(\`stage of ground water extraction (%)\`)
 
 • If user asks to COMPARE states:
-  → GROUP BY \`State\`
+  → GROUP BY \`state\`
   → Use AVG aggregation.
 
 • If user asks for TREND or YEAR comparison:
@@ -66,7 +111,7 @@ Interpret user intent carefully:
   → Otherwise return error JSON.
 
 • If user asks for CRITICAL / OVER-EXPLOITED areas:
-  → Filter using \`Categorization\`.
+  → Filter using \`categorization\`.
 
 • If query is broad:
   → Add LIMIT 50.
@@ -74,11 +119,25 @@ Interpret user intent carefully:
 • Prefer simple, readable SQL.
 
 ==============================
+ENTITY TO COLUMN MAPPING RULES
+==============================
+
+When filtering location:
+
+• If entity type = state → use \`state\`
+• If entity type = district → use \`district\`
+• If entity type = assessment unit name → use \`assessment unit name\`
+• If entity type = assessment unit type → use \`assessment unit type\`
+
+NEVER assume state unless explicitly detected.
+NEVER use \`state\` as default filter.
+Use the column corresponding to detected entity type.
+
+==============================
 OUTPUT FORMAT (MANDATORY)
 ==============================
 
-Return ONLY JSON in this structure:
-
+Return ONLY JSON in this structure strictly given below. **No explanations, no markdown, no extra text.**:
 {
   "sql": "SELECT ...",
   "title": "Short human readable title",
@@ -96,11 +155,11 @@ If the question cannot be answered using the schema, return:
 EXAMPLES
 ==============================
 
-User: What is the stage of groundwater extraction in Maharashtra in 2023?
+User: What is the stage of groundwater extraction in Maharashtra in 2025?
 
 Output:
 {
-  "sql": "SELECT ROUND(AVG(\`Stage of Ground Water  Extraction (%)\`),2) AS \`Stage_of_Extraction\` FROM data2023final2 WHERE \`State\`='Maharashtra';",
+  "sql": "SELECT ROUND(AVG(\`stage of ground water extraction (%)\`),2) AS \`Stage_of_Extraction\` FROM ingresdata2025 WHERE \`state\`='maharashtra';",
   "title": "Average Stage of Groundwater Extraction in Maharashtra",
   "chart": "none",
   "aggregation": "avg"
@@ -108,11 +167,11 @@ Output:
 
 ---
 
-User: Compare stage of extraction for Maharashtra and Punjab in 2024
+User: Compare stage of extraction for Maharashtra and Punjab in 2025
 
 Output:
 {
-  "sql": "SELECT \`State\`, ROUND(AVG(\`Stage of Ground Water  Extraction (%)\`),2) AS \`Avg_Stage\` FROM data2024final2 WHERE \`State\` IN ('Maharashtra','Punjab') GROUP BY \`State\`;",
+  "sql": "SELECT \`state\`, ROUND(AVG(\`stage of ground water extraction (%)\`),2) AS \`Avg_Stage\` FROM ingresdata2025 WHERE \`state\` IN ('maharashtra','punjab') GROUP BY \`state\`;",
   "title": "Comparison of Groundwater Extraction Stage: Maharashtra vs Punjab",
   "chart": "bar",
   "aggregation": "avg"
@@ -124,18 +183,11 @@ User: what is the stage of extraction of Bathinda ?
 
 Output:
 {
-  "sql": "SELECT ROUND(AVG(\`Stage of Ground Water  Extraction (%)\`), 2) AS \`Stage_of_Extraction\` FROM data2024final2 WHERE \`District\` = 'Bathinda';",
-  "title": "Average Stage of Groundwater Extraction in Bathinda (2024)",
+  "sql": "SELECT ROUND(AVG(\`stage of ground water extraction (%)\`), 2) AS \`Stage_of_Extraction\` FROM ingresdata2025 WHERE \`district\` = 'bathinda';",
+  "title": "Average Stage of Groundwater Extraction in Bathinda (2025)",
   "chart": "none",
   "aggregation": "avg"
 }
-
-==============================
-NOW GENERATE SQL
-==============================
-
-User Query:
-{{USER_QUERY}}
 `; 
 const SQL_Prompt2=`
 
@@ -146,16 +198,16 @@ Table names: \`data2023final2\` and \`data2024final2\`
 All column names must be wrapped in backticks (\` \`) because they contain spaces and special characters.
 
 Columns (use EXACT names):
-- \`State\`
-- \`District\`
-- \`Assessment Unit  Name\`
-- \`Assessment Unit Type\`
-- \`Recharge Worthy Area(Ha)\`
-- \`Total Annual  Ground Water (Ham) Recharge\`
-- \`Annual Extractable Ground Water Resource  (Ham)\`
-- \`Total   Ground Water Extraction  (Ham)\`
-- \`Stage of Ground Water  Extraction (%)\`
-- \`Categorization\`
+- \`state\`
+- \`district\`
+- \`assessment unit name\`
+- \`assessment unit type\`
+- \`recharge worthy area (ha)\`
+- \`total annual ground water (ham) recharge\`
+- \`annual extractable ground water resource (ham)\`
+- \`total ground water extraction (ham)\`
+- \`stage of ground water extraction (%)\`
+- \`categorization\`
 
 ### STRICT SAFETY RULES
 - ONLY generate SELECT queries.
@@ -177,8 +229,8 @@ Columns (use EXACT names):
    - Top N → ORDER BY ... DESC LIMIT N.
    - Distribution / Percentage → Use COUNT() and GROUP BY.
 
-3. **Categorization**:
-   - Words like "over-exploited", "critical", "safe", "semi-critical", "saline" → filter on \`Categorization\`.
+3. **categorization**:
+   - Words like "over-exploited", "critical", "safe", "semi-critical", "saline" → filter on \`categorization\`.
 
 4. **General**:
    - Keep queries simple and performant.
@@ -212,7 +264,7 @@ User: Show trend of extraction stage in Punjab over 2023 and 2024
 → UNION both tables
 
 User: What percentage of blocks in Punjab are over-exploited?
-→ GROUP BY Categorization + COUNT
+→ GROUP BY categorization + COUNT
 
 NOW GENERATE SQL FOR THE FOLLOWING USER QUERY:
 {{USER_QUERY}}
@@ -220,7 +272,8 @@ NOW GENERATE SQL FOR THE FOLLOWING USER QUERY:
 
 try {
   console.log("System Instruction for SQL Generation:");
-    const SQLJresponse = await LocalModel(sqlGenerator.replace("{{USER_QUERY}}", userQuery));
+    const SQLJresponse = await LocalModel(sqlGenerator, userQuery);
+    // const SQLJresponse = await ApiCaller(sqlGenerator, userQuery);
     // const SQLJresponse = await LocalModel(SQL_Prompt2.replace("{{USER_QUERY}}", userQuery));
     
     const FinalResponse=parseLLMJsonString(SQLJresponse);

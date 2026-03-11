@@ -32,6 +32,7 @@ Now give a short, natural, and helpful response:
  try {
    console.log("Response Generator Prompt:", responseGenerator);
    const response = await LocalModel(responseGenerator);
+  //  const response = await ApiCaller(responseGenerator);
  
    return response.trim();
  } catch (error) {
