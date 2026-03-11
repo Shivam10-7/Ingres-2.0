@@ -397,18 +397,9 @@ function ChatPage() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-full relative">
         {/* Header with user profile and theme toggle */}
-        <header className="h-auto glass-panel border-b-0 flex items-center justify-between px-6 py-4 shrink-0">
+        <header className="h-auto glass-panel border-b-0 flex items-center justify-between pl-16 pr-6 py-4 shrink-0">
           <div className="flex items-center">
-            {!sidebarOpen && (
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="mr-3 p-2 rounded-lg hover:bg-white/5 transition-colors"
-                aria-label="Open sidebar"
-                style={{ zIndex: 9999, pointerEvents: 'auto' }}
-              >
-                <Menu className="w-5 h-5 text-white/70" />
-              </button>
-            )}
+  
             <h1
               className={`text-lg font-semibold ${
                 isLightMode ? 'text-slate-800' : 'text-white'
