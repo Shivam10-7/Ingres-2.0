@@ -80,6 +80,9 @@ app.get('/', (req, res) => {
 // this is the route for the authorization
 app.use('/auth', require('./src/routes/middleware/auth'));
 
+// routes for chat history
+app.use('/api/chats', require('./src/routes/chatRoutes'));
+
 // these are the routes that we get form the chat
 app.post('/chat', AuthJwt, async (req, res) => { 
     // 1. Input Validation: Ensure 'query' actually exists before processing

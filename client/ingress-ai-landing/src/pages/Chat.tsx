@@ -26,7 +26,14 @@ import {
   Moon,
 } from 'lucide-react';
 
-import { sendGeminiRagRequest } from '@/lib/api';
+import { 
+  sendGeminiRagRequest,
+  getUserChatSessions,
+  createNewChatSession,
+  getChatSessionHistory,
+  saveChatMessage,
+  ChatSession
+} from '@/lib/api';
 import UserProfile from '@/components/UserProfile';
 const logoLight = '/logo_LIGHT.png';
 const logoDark = '/logo_DARK.png';
@@ -38,13 +45,6 @@ const MODES = [
   { id: 'quick', label: 'Quick Chat', description: 'Fast data lookup', icon: Zap },
   { id: 'deep', label: 'Deep Search', description: 'Detailed analysis', icon: SearchIcon },
   { id: 'visualizer', label: 'Visualizer', description: 'Charts & graphs', icon: BarChart3 },
-];
-
-// Sample chat history
-const RECENT_CHATS = [
-  { id: 1, title: 'Groundwater levels query', date: '2 hours ago' },
-  { id: 2, title: 'Water conservation tips', date: 'Yesterday' },
-  { id: 3, title: 'Maharashtra water data', date: '3 days ago' },
 ];
 
 const PROJECTS = [
@@ -70,6 +70,56 @@ function ChatPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [inputValue, setInputValue] = useState<string>('');
   const [isTyping, setIsTyping] = useState(false);
+  
+  // Chat History States
+  const [chats, setChats] = useState<ChatSession[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // Fetch user and chats on mount
+  useEffect(() => {
+    const fetchUserAndChats = async () => {
+      try {
+        const res = await fetch("http://localhost:8081/auth/verify", {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const uid = data.user?.userId || data.user?._id || data.user?.id;
+          setUserId(uid);
+          if (uid) {
+            const userChats = await getUserChatSessions(uid);
+            setChats(userChats);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching user or chats:", error);
+      }
+    };
+    fetchUserAndChats();
+  }, []);
+
+  const loadChat = async (chatId: string) => {
+    setCurrentChatId(chatId);
+    setMessages([]); // clear current ui
+    setShowResults(false);
+    const history = await getChatSessionHistory(chatId);
+    if (history && history.messages) {
+      const formattedMessages = history.messages.map((m: any, i: number) => ({
+        id: m._id || i,
+        text: m.content,
+        sender: m.role === 'user' ? 'user' : 'bot',
+        timestamp: new Date(m.timestamp || Date.now())
+      }));
+      setMessages(formattedMessages);
+    }
+  };
+
+  const handleNewChatClick = () => {
+    setCurrentChatId(null);
+    setMessages([]);
+    setShowResults(false);
+  };
   const [showDataPanel, setShowDataPanel] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [selectedState, setSelectedState] = useState(STATES[0]);
@@ -189,6 +239,19 @@ function ChatPage() {
   const handleSend = async () => {
     if (!inputValue.trim()) return;
 
+    let activeChatId = currentChatId;
+    
+    // Create new chat session if none is active
+    if (!activeChatId && userId) {
+      const newChat = await createNewChatSession(userId, inputValue.substring(0, 30));
+      if (newChat) {
+        activeChatId = newChat.chatId;
+        setCurrentChatId(activeChatId);
+        // add to sidebar temporarily until refresh
+        setChats(prev => [newChat, ...prev]);
+      }
+    }
+
     const userMsg = {
       id: Date.now(),
       text: inputValue,
@@ -200,8 +263,13 @@ function ChatPage() {
     setInputValue('');
     setIsTyping(true);
 
+    // Save message to mongo if we have active chat
+    if (activeChatId) {
+       await saveChatMessage(activeChatId, 'user', userMsg.text);
+    }
+
     try {
-      const data = await sendGeminiRagRequest(inputValue, buildSqlResponse());
+      const data = await sendGeminiRagRequest(userMsg.text, buildSqlResponse());
 
       if (!data.success) {
         throw new Error(data.error || data.message || 'unknown error');
@@ -231,17 +299,36 @@ function ChatPage() {
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, botResponse]);
+
+      // Save bot response to mongo
+      if (activeChatId) {
+        await saveChatMessage(activeChatId, 'assistant', botResponse.text);
+        
+        // Refresh sidebar after full exchange
+        if (userId) {
+          const updatedChats = await getUserChatSessions(userId);
+          setChats(updatedChats);
+        }
+      }
+
     } catch (err) {
       console.error(err);
+      const errorMsgText = `Server error: ${err instanceof Error ? err.message : err}`;
+      
       setMessages(prev => [
         ...prev,
         {
           id: Date.now() + 2,
-          text: `Server error: ${err instanceof Error ? err.message : err}`,
+          text: errorMsgText,
           sender: 'bot',
           timestamp: new Date(),
         },
       ]);
+      
+      // Save error response to mongo too
+      if (activeChatId) {
+        await saveChatMessage(activeChatId, 'assistant', errorMsgText);
+      }
     } finally {
       setIsTyping(false);
     }
@@ -294,7 +381,7 @@ function ChatPage() {
         {/* New Chat Button */}
         <div className="px-4 pb-3">
           <button 
-            onClick={() => { setMessages([]); setShowResults(false); }}
+            onClick={handleNewChatClick}
             className={`w-full rounded-xl px-4 py-3 flex items-center gap-3 transition-all duration-200 group ${
               isLightMode
                 ? 'glass-card text-slate-800 hover:bg-white/20'
@@ -331,13 +418,22 @@ function ChatPage() {
             <span className="text-xs font-medium text-white/40 uppercase tracking-wider">Recent</span>
           </div>
           <div className="space-y-1">
-            {RECENT_CHATS.map((chat) => (
+            {chats.map((chat) => (
               <button
-                key={chat.id}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-white/70 hover:text-white hover:bg-white/5 transition-all duration-200 group"
+                key={chat._id}
+                onClick={() => loadChat(chat.chatId)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
+                  currentChatId === chat.chatId 
+                    ? 'bg-blue-500/20 text-white' 
+                    : 'text-white/70 hover:text-white hover:bg-white/5'
+                }`}
               >
-                <MessageSquare className="w-4 h-4 text-white/40 group-hover:text-blue-400 transition-colors" />
-                <span className="text-sm truncate flex-1 text-left">{chat.title}</span>
+                <MessageSquare className={`w-4 h-4 transition-colors ${
+                  currentChatId === chat.chatId 
+                    ? 'text-blue-400' 
+                    : 'text-white/40 group-hover:text-blue-400'
+                }`} />
+                <span className="text-sm truncate flex-1 text-left">{chat.chatName}</span>
               </button>
             ))}
           </div>
