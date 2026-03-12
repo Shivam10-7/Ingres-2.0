@@ -26,7 +26,14 @@ import {
   Moon,
 } from 'lucide-react';
 
-import { sendGeminiRagRequest } from '@/lib/api';
+import {
+  sendGeminiRagRequest,
+  getUserChatSessions,
+  createNewChatSession,
+  getChatSessionHistory,
+  saveChatMessage,
+  ChatSession
+} from '@/lib/api';
 import UserProfile from '@/components/UserProfile';
 const logoLight = '/logo_LIGHT.png';
 const logoDark = '/logo_DARK.png';
@@ -38,13 +45,6 @@ const MODES = [
   { id: 'quick', label: 'Quick Chat', description: 'Fast data lookup', icon: Zap },
   { id: 'deep', label: 'Deep Search', description: 'Detailed analysis', icon: SearchIcon },
   { id: 'visualizer', label: 'Visualizer', description: 'Charts & graphs', icon: BarChart3 },
-];
-
-// Sample chat history
-const RECENT_CHATS = [
-  { id: 1, title: 'Groundwater levels query', date: '2 hours ago' },
-  { id: 2, title: 'Water conservation tips', date: 'Yesterday' },
-  { id: 3, title: 'Maharashtra water data', date: '3 days ago' },
 ];
 
 const PROJECTS = [
@@ -70,6 +70,56 @@ function ChatPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [inputValue, setInputValue] = useState<string>('');
   const [isTyping, setIsTyping] = useState(false);
+
+  // Chat History States
+  const [chats, setChats] = useState<ChatSession[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // Fetch user and chats on mount
+  useEffect(() => {
+    const fetchUserAndChats = async () => {
+      try {
+        const res = await fetch("http://localhost:8081/auth/verify", {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const uid = data.user?.userId || data.user?._id || data.user?.id;
+          setUserId(uid);
+          if (uid) {
+            const userChats = await getUserChatSessions(uid);
+            setChats(userChats);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching user or chats:", error);
+      }
+    };
+    fetchUserAndChats();
+  }, []);
+
+  const loadChat = async (chatId: string) => {
+    setCurrentChatId(chatId);
+    setMessages([]); // clear current ui
+    setShowResults(false);
+    const history = await getChatSessionHistory(chatId);
+    if (history && history.messages) {
+      const formattedMessages = history.messages.map((m: any, i: number) => ({
+        id: m._id || i,
+        text: m.content,
+        sender: m.role === 'user' ? 'user' : 'bot',
+        timestamp: new Date(m.timestamp || Date.now())
+      }));
+      setMessages(formattedMessages);
+    }
+  };
+
+  const handleNewChatClick = () => {
+    setCurrentChatId(null);
+    setMessages([]);
+    setShowResults(false);
+  };
   const [showDataPanel, setShowDataPanel] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [selectedState, setSelectedState] = useState(STATES[0]);
@@ -168,7 +218,7 @@ function ChatPage() {
   const handleLogout = async () => {
     try {
       await fetch('/auth/logout', { method: 'POST', credentials: 'include' });
-    } catch {}
+    } catch { }
     navigate('/landing');
   };
 
@@ -189,6 +239,19 @@ function ChatPage() {
   const handleSend = async () => {
     if (!inputValue.trim()) return;
 
+    let activeChatId = currentChatId;
+
+    // Create new chat session if none is active
+    if (!activeChatId && userId) {
+      const newChat = await createNewChatSession(userId, inputValue.substring(0, 30));
+      if (newChat) {
+        activeChatId = newChat.chatId;
+        setCurrentChatId(activeChatId);
+        // add to sidebar temporarily until refresh
+        setChats(prev => [newChat, ...prev]);
+      }
+    }
+
     const userMsg = {
       id: Date.now(),
       text: inputValue,
@@ -200,8 +263,13 @@ function ChatPage() {
     setInputValue('');
     setIsTyping(true);
 
+    // Save message to mongo if we have active chat
+    if (activeChatId) {
+      await saveChatMessage(activeChatId, 'user', userMsg.text);
+    }
+
     try {
-      const data = await sendGeminiRagRequest(inputValue, buildSqlResponse());
+      const data = await sendGeminiRagRequest(userMsg.text, buildSqlResponse());
 
       if (!data.success) {
         throw new Error(data.error || data.message || 'unknown error');
@@ -231,17 +299,36 @@ function ChatPage() {
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, botResponse]);
+
+      // Save bot response to mongo
+      if (activeChatId) {
+        await saveChatMessage(activeChatId, 'assistant', botResponse.text);
+
+        // Refresh sidebar after full exchange
+        if (userId) {
+          const updatedChats = await getUserChatSessions(userId);
+          setChats(updatedChats);
+        }
+      }
+
     } catch (err) {
       console.error(err);
+      const errorMsgText = `Server error: ${err instanceof Error ? err.message : err}`;
+
       setMessages(prev => [
         ...prev,
         {
           id: Date.now() + 2,
-          text: `Server error: ${err instanceof Error ? err.message : err}`,
+          text: errorMsgText,
           sender: 'bot',
           timestamp: new Date(),
         },
       ]);
+
+      // Save error response to mongo too
+      if (activeChatId) {
+        await saveChatMessage(activeChatId, 'assistant', errorMsgText);
+      }
     } finally {
       setIsTyping(false);
     }
@@ -259,9 +346,8 @@ function ChatPage() {
 
   return (
     <div
-      className={`flex h-screen w-full overflow-hidden ${
-        isLightMode ? 'bg-gradient-radial-light' : 'bg-gradient-radial'
-      }`}>
+      className={`flex h-screen w-full overflow-hidden ${isLightMode ? 'bg-gradient-radial-light' : 'bg-gradient-radial'
+        }`}>
       {/* Floating open-sidebar button (top-left), appears when sidebar is closed */}
       {!sidebarOpen && (
         <button
@@ -283,93 +369,99 @@ function ChatPage() {
         <>
           <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setSidebarOpen(false)} />
           <aside className="fixed inset-y-0 left-0 w-auto min-w-[20rem] max-w-[28rem] glass-panel flex flex-col h-full shrink-0 z-50" style={{ maxHeight: '100vh' }}>
-        {/* Logo */}
-        <div className="p-4 flex items-center gap-3">
-          <div className="w-10 h-10 flex items-center justify-center">
-              <img src={isLightMode ? logoLight : logoDark} alt="INGRES" className="w-6 h-6 object-contain" />
-          </div>
-          <span className="text-xl font-semibold text-white tracking-tight">INGRES</span>
-        </div>
+            {/* Logo */}
+            <div className="p-4 flex items-center gap-3">
+              <div className="w-10 h-10 flex items-center justify-center">
+                <img src={isLightMode ? logoLight : logoDark} alt="INGRES" className="w-6 h-6 object-contain" />
+              </div>
+              <span className="text-xl font-semibold text-white tracking-tight">INGRES</span>
+            </div>
 
-        {/* New Chat Button */}
-        <div className="px-4 pb-3">
-          <button 
-            onClick={() => { setMessages([]); setShowResults(false); }}
-            className={`w-full rounded-xl px-4 py-3 flex items-center gap-3 transition-all duration-200 group ${
-              isLightMode
-                ? 'glass-card text-slate-800 hover:bg-white/20'
-                : 'glass-card-dark text-white hover:bg-white/10'
-            }`}
-          >
-            <Plus className={`w-5 h-5 group-hover:scale-110 transition-transform ${isLightMode ? 'text-blue-600' : 'text-blue-400'}`} />
-            <span className="font-medium">New chat</span>
-          </button>
-        </div>
-
-        {/* Search */}
-        <div className="px-4 pb-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
-            <input
-              type="text"
-              placeholder="Search chats..."
-              className="w-full glass-input rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-            />
-          </div>
-        </div>
-
-        {/* Recent Chats */}
-        <div
-          className="flex-1 overflow-y-auto px-2"
-          style={{
-            paddingBottom: keyboardHeight ? `${keyboardHeight + 120}px` : undefined,
-            WebkitOverflowScrolling: 'touch',
-            touchAction: 'pan-y',
-          }}
-        >
-          <div className="px-3 py-2">
-            <span className="text-xs font-medium text-white/40 uppercase tracking-wider">Recent</span>
-          </div>
-          <div className="space-y-1">
-            {RECENT_CHATS.map((chat) => (
+            {/* New Chat Button */}
+            <div className="px-4 pb-3">
               <button
-                key={chat.id}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-white/70 hover:text-white hover:bg-white/5 transition-all duration-200 group"
+                onClick={handleNewChatClick}
+                className={`w-full rounded-xl px-4 py-3 flex items-center gap-3 transition-all duration-200 group ${isLightMode
+                    ? 'glass-card text-slate-800 hover:bg-white/20'
+                    : 'glass-card-dark text-white hover:bg-white/10'
+                  }`}
               >
-                <MessageSquare className="w-4 h-4 text-white/40 group-hover:text-blue-400 transition-colors" />
-                <span className="text-sm truncate flex-1 text-left">{chat.title}</span>
+                <Plus className={`w-5 h-5 group-hover:scale-110 transition-transform ${isLightMode ? 'text-blue-600' : 'text-blue-400'}`} />
+                <span className="font-medium">New chat</span>
               </button>
-            ))}
-          </div>
+            </div>
 
-          {/* Projects */}
-          <div className="px-3 py-4">
-            <span className="text-xs font-medium text-white/40 uppercase tracking-wider">Projects</span>
-          </div>
-          <div className="space-y-1">
-            {PROJECTS.map((project) => (
-              <button
-                key={project.id}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-white/70 hover:text-white hover:bg-white/5 transition-all duration-200 group"
-              >
-                <Folder className="w-4 h-4 text-blue-400" />
-                <span className="text-sm">{project.name}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+            {/* Search */}
+            <div className="px-4 pb-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
+                <input
+                  type="text"
+                  placeholder="Search chats..."
+                  className="w-full glass-input rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                />
+              </div>
+            </div>
 
-        {/* User Profile (real data) */}
-        <UserProfile />
-          {/* Close Sidebar Button */}
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="absolute top-3 right-3 p-2 rounded-lg hover:bg-white/5 transition-colors"
-            aria-label="Close sidebar"
-          >
-            <X className="w-4 h-4 text-white/60" />
-          </button>
-        </aside>
+            {/* Recent Chats */}
+            <div
+              className="flex-1 overflow-y-auto px-2"
+              style={{
+                paddingBottom: keyboardHeight ? `${keyboardHeight + 120}px` : undefined,
+                WebkitOverflowScrolling: 'touch',
+                touchAction: 'pan-y',
+              }}
+            >
+              <div className="px-3 py-2">
+                <span className="text-xs font-medium text-white/40 uppercase tracking-wider">Recent</span>
+              </div>
+              <div className="space-y-1">
+                {chats.map((chat) => (
+                  <button
+                    key={chat._id}
+                    onClick={() => loadChat(chat.chatId)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${currentChatId === chat.chatId
+                        ? 'bg-blue-500/20 text-white'
+                        : 'text-white/70 hover:text-white hover:bg-white/5'
+                      }`}
+                  >
+                    <MessageSquare className={`w-4 h-4 transition-colors ${currentChatId === chat.chatId
+                        ? 'text-blue-400'
+                        : 'text-white/40 group-hover:text-blue-400'
+                      }`} />
+                    <span className="text-sm truncate flex-1 text-left">{chat.chatName}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Projects */}
+              <div className="px-3 py-4">
+                <span className="text-xs font-medium text-white/40 uppercase tracking-wider">Projects</span>
+              </div>
+              <div className="space-y-1">
+                {PROJECTS.map((project) => (
+                  <button
+                    key={project.id}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-white/70 hover:text-white hover:bg-white/5 transition-all duration-200 group"
+                  >
+                    <Folder className="w-4 h-4 text-blue-400" />
+                    <span className="text-sm">{project.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* User Profile (real data) */}
+            <UserProfile />
+            {/* Close Sidebar Button */}
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="absolute top-3 right-3 p-2 rounded-lg hover:bg-white/5 transition-colors"
+              aria-label="Close sidebar"
+            >
+              <X className="w-4 h-4 text-white/60" />
+            </button>
+          </aside>
         </>
       )}
 
@@ -378,14 +470,13 @@ function ChatPage() {
         {/* Header with user profile and theme toggle */}
         <header className="h-auto glass-panel border-b-0 flex items-center justify-between pl-16 pr-6 py-4 shrink-0">
           <div className="flex items-center">
-  
+
             <h1
-              className={`text-lg font-semibold ${
-                isLightMode ? 'text-slate-800' : 'text-white'
-              }`}
+              className={`text-lg font-semibold ${isLightMode ? 'text-slate-800' : 'text-white'
+                }`}
             >
               INGRES ChatBOT
-              <span className="ml-2 text-xs font-normal text-blue-400">(Gemini RAG)</span>
+              <span className="ml-2 text-xs font-normal text-blue-400">(Jal-Shakti RAG)</span>
             </h1>
           </div>
 
@@ -397,35 +488,32 @@ function ChatPage() {
               className="inline-flex items-center gap-3 px-2 py-1 rounded-full bg-transparent hover:bg-white/10 transition-colors text-xs font-medium"
               aria-label="Toggle light mode"
             >
-            {/* Track */}
-            <span
-              className={`relative w-11 h-6 rounded-full transition-colors duration-300 ${
-                isLightMode ? 'bg-slate-300/80' : 'bg-blue-600'
-              }`}
-            >
-              {/* Thumb */}
+              {/* Track */}
               <span
-                className={`absolute top-[2px] left-[2px] w-5 h-5 rounded-full bg-white shadow-md flex items-center justify-center transition-transform duration-300 ${
-                  isLightMode ? 'translate-x-0' : 'translate-x-5'
-                }`}
+                className={`relative w-11 h-6 rounded-full transition-colors duration-300 ${isLightMode ? 'bg-slate-300/80' : 'bg-blue-600'
+                  }`}
               >
-                {isLightMode ? (
-                  <Moon className="w-3 h-3 text-slate-500" />
-                ) : (
-                  <Sun className="w-3 h-3 text-blue-500" />
-                )}
+                {/* Thumb */}
+                <span
+                  className={`absolute top-[2px] left-[2px] w-5 h-5 rounded-full bg-white shadow-md flex items-center justify-center transition-transform duration-300 ${isLightMode ? 'translate-x-0' : 'translate-x-5'
+                    }`}
+                >
+                  {isLightMode ? (
+                    <Moon className="w-3 h-3 text-slate-500" />
+                  ) : (
+                    <Sun className="w-3 h-3 text-blue-500" />
+                  )}
+                </span>
               </span>
-            </span>
 
-            {/* Label */}
-            <span
-              className={`whitespace-nowrap ${
-                isLightMode ? 'text-slate-600' : 'text-white/70'
-              }`}
-            >
-              {isLightMode ? 'Light Mode' : 'Dark Mode'}
-            </span>
-          </button>
+              {/* Label */}
+              <span
+                className={`whitespace-nowrap ${isLightMode ? 'text-slate-600' : 'text-white/70'
+                  }`}
+              >
+                {isLightMode ? 'Light Mode' : 'Dark Mode'}
+              </span>
+            </button>
           </div>
         </header>
 
@@ -445,21 +533,19 @@ function ChatPage() {
               {messages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center">
                   {/* Logo */}
-                    <div className="mb-8">
-                      <img src={isLightMode ? logoLight : logoDark} alt="INGRES" className="w-16 h-16 object-contain" />
-                    </div>
-                  
+                  <div className="mb-8">
+                    <img src={isLightMode ? logoLight : logoDark} alt="INGRES" className="w-16 h-16 object-contain" />
+                  </div>
+
                   <h2
-                    className={`text-3xl font-bold mb-3 text-center ${
-                      isLightMode ? 'text-slate-900' : 'text-white'
-                    }`}
+                    className={`text-3xl font-bold mb-3 text-center ${isLightMode ? 'text-slate-900' : 'text-white'
+                      }`}
                   >
                     How can I help you today?
                   </h2>
                   <p
-                    className={`text-center max-w-md ${
-                      isLightMode ? 'text-slate-500' : 'text-white/50'
-                    }`}
+                    className={`text-center max-w-md ${isLightMode ? 'text-slate-500' : 'text-white/50'
+                      }`}
                   >
                     Ask me anything about India's groundwater resources.
                   </p>
@@ -473,28 +559,27 @@ function ChatPage() {
                     >
                       {message.sender === 'bot' && (
                         <div className="w-8 h-8 flex items-center justify-center mr-3 shrink-0">
-                            <img src={isLightMode ? logoLight : logoDark} alt="bot" className="w-4 h-4 object-contain" />
+                          <img src={isLightMode ? logoLight : logoDark} alt="bot" className="w-4 h-4 object-contain" />
                         </div>
                       )}
                       <div
-                        className={`max-w-[80%] px-5 py-3 ${
-                          message.sender === 'user' ? 'message-user' : isLightMode ? 'message-bot-light' : 'message-bot-dark'
-                        }`}
+                        className={`max-w-[80%] px-5 py-3 ${message.sender === 'user' ? 'message-user' : isLightMode ? 'message-bot-light' : 'message-bot-dark'
+                          }`}
                       >
                         {message.text.includes('```') ? (
-                          <pre className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${isLightMode ? 'text-slate-900' : 'text-white'} bg-transparent`}> 
+                          <pre className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'} bg-transparent`}>
                             {message.text}
                           </pre>
                         ) : (
-                          <p className={`text-sm leading-relaxed ${isLightMode ? 'text-slate-900' : 'text-white'}`}>{message.text}</p>
+                          <p className={`text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'}`}>{message.text}</p>
                         )}
-                        <span className={`text-xs mt-2 block ${isLightMode ? 'text-slate-500' : 'text-white/40'}`}>
+                        <span className={`text-xs mt-2 block ${message.sender === 'user' ? 'text-white/70' : isLightMode ? 'text-slate-500' : 'text-white/40'}`}>
                           {formatTime(message.timestamp)}
                         </span>
                       </div>
                     </div>
                   ))}
-                   
+
                   {isTyping && (
                     <div className="flex justify-start animate-fadeIn">
                       <div className="w-8 h-8 flex items-center justify-center mr-3 shrink-0">
@@ -523,21 +608,18 @@ function ChatPage() {
                 <div className={`rounded-2xl p-2 flex items-center gap-2 ${isLightMode ? 'glass-card' : 'glass-card-dark'}`}>
                   {/* Plus Button with Mode Dropdown */}
                   <div className="relative" ref={modeDropdownRef}>
-                    <button 
+                    <button
                       onClick={() => setShowModeDropdown(!showModeDropdown)}
-                      className={`p-2.5 rounded-xl transition-colors flex items-center gap-1 ${
-                        isLightMode ? 'hover:bg-slate-200/80' : 'hover:bg-white/10'
-                      }`}
+                      className={`p-2.5 rounded-xl transition-colors flex items-center gap-1 ${isLightMode ? 'hover:bg-slate-200/80' : 'hover:bg-white/10'
+                        }`}
                     >
                       <Plus
-                        className={`w-5 h-5 ${
-                          isLightMode ? 'text-slate-500' : 'text-white/60'
-                        }`}
+                        className={`w-5 h-5 ${isLightMode ? 'text-slate-500' : 'text-white/60'
+                          }`}
                       />
                       <ChevronDown
-                        className={`w-3 h-3 transition-transform ${
-                          isLightMode ? 'text-slate-400' : 'text-white/40'
-                        } ${showModeDropdown ? 'rotate-180' : ''}`}
+                        className={`w-3 h-3 transition-transform ${isLightMode ? 'text-slate-400' : 'text-white/40'
+                          } ${showModeDropdown ? 'rotate-180' : ''}`}
                       />
                     </button>
 
@@ -551,15 +633,13 @@ function ChatPage() {
                           <button
                             key={mode.id}
                             onClick={() => handleModeSelect(mode)}
-                            className={`w-full flex items-start gap-3 px-3 py-3 rounded-xl transition-all duration-200 ${
-                              selectedMode.id === mode.id 
-                                ? 'bg-blue-500/20 border border-blue-500/30' 
+                            className={`w-full flex items-start gap-3 px-3 py-3 rounded-xl transition-all duration-200 ${selectedMode.id === mode.id
+                                ? 'bg-blue-500/20 border border-blue-500/30'
                                 : 'hover:bg-white/5'
-                            }`}
+                              }`}
                           >
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                              selectedMode.id === mode.id ? 'bg-blue-500' : 'bg-white/10'
-                            }`}>
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${selectedMode.id === mode.id ? 'bg-blue-500' : 'bg-white/10'
+                              }`}>
                               <mode.icon className="w-4 h-4 text-white" />
                             </div>
                             <div className="text-left">
@@ -573,27 +653,24 @@ function ChatPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Current Mode Indicator */}
                   <div
-                    className={`flex items-center gap-2 px-2 py-1 rounded-lg ${
-                      isLightMode ? 'bg-white/80 shadow-sm' : 'bg-white/5'
-                    }`}
+                    className={`flex items-center gap-2 px-2 py-1 rounded-lg ${isLightMode ? 'bg-white/80 shadow-sm' : 'bg-white/5'
+                      }`}
                   >
                     <selectedMode.icon
-                      className={`w-4 h-4 ${
-                        isLightMode ? 'text-blue-500' : 'text-blue-400'
-                      }`}
+                      className={`w-4 h-4 ${isLightMode ? 'text-blue-500' : 'text-blue-400'
+                        }`}
                     />
                     <span
-                      className={`text-xs ${
-                        isLightMode ? 'text-slate-600' : 'text-white/60'
-                      }`}
+                      className={`text-xs ${isLightMode ? 'text-slate-600' : 'text-white/60'
+                        }`}
                     >
                       {selectedMode.label}
                     </span>
                   </div>
-                  
+
                   {/* Input */}
                   <input
                     ref={inputRef}
@@ -606,22 +683,20 @@ function ChatPage() {
                       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
                     }}
                     placeholder="Type your message..."
-                    className={`flex-1 bg-transparent text-sm py-3 px-2 focus:outline-none ${
-                      isLightMode
+                    className={`flex-1 bg-transparent text-sm py-3 px-2 focus:outline-none ${isLightMode
                         ? 'text-slate-800 placeholder:text-slate-400'
                         : 'text-white placeholder:text-white/40'
-                    }`}
+                      }`}
                   />
-                  
+
                   {/* Send Button */}
                   <button
                     onClick={handleSend}
                     disabled={!inputValue.trim()}
-                    className={`px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
-                      inputValue.trim()
+                    className={`px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${inputValue.trim()
                         ? 'bg-blue-600 hover:bg-blue-500 text-white'
                         : 'bg-white/5 text-white/30 cursor-not-allowed'
-                    }`}
+                      }`}
                   >
                     Send
                   </button>
@@ -632,26 +707,23 @@ function ChatPage() {
 
           {/* Data Query Panel - for Quick Chat mode */}
           {showDataPanel && (
-            <div className={`w-96 quick-mode-panel flex flex-col animate-slideIn ${
-                isLightMode ? 'quick-mode-panel-light' : 'quick-mode-panel-dark'
+            <div className={`w-96 quick-mode-panel flex flex-col animate-slideIn ${isLightMode ? 'quick-mode-panel-light' : 'quick-mode-panel-dark'
               }`}>
               <div className="p-4 border-b border-white/5">
                 <h3
-                  className={`text-sm font-semibold uppercase tracking-wider ${
-                    isLightMode ? 'text-slate-700' : 'text-white/80'
-                  }`}
+                  className={`text-sm font-semibold uppercase tracking-wider ${isLightMode ? 'text-slate-700' : 'text-white/80'
+                    }`}
                 >
                   Data Query
                 </h3>
               </div>
-              
+
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {/* State Dropdown */}
                 <div>
                   <label
-                    className={`text-sm mb-2 block ${
-                      isLightMode ? 'text-slate-600' : 'text-white/60'
-                    }`}
+                    className={`text-sm mb-2 block ${isLightMode ? 'text-slate-600' : 'text-white/60'
+                      }`}
                   >
                     State
                   </label>
@@ -659,18 +731,16 @@ function ChatPage() {
                     <select
                       value={selectedState}
                       onChange={(e) => setSelectedState(e.target.value)}
-                      className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
-                        isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
-                      }`}
+                      className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
+                        }`}
                     >
                       {STATES.map((state) => (
                         <option key={state} value={state} className={isLightMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{state}</option>
                       ))}
                     </select>
                     <ChevronDown
-                      className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none ${
-                        isLightMode ? 'text-slate-400' : 'text-white/40'
-                      }`}
+                      className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none ${isLightMode ? 'text-slate-400' : 'text-white/40'
+                        }`}
                     />
                   </div>
                 </div>
@@ -678,9 +748,8 @@ function ChatPage() {
                 {/* District Dropdown */}
                 <div>
                   <label
-                    className={`text-sm mb-2 block ${
-                      isLightMode ? 'text-slate-600' : 'text-white/60'
-                    }`}
+                    className={`text-sm mb-2 block ${isLightMode ? 'text-slate-600' : 'text-white/60'
+                      }`}
                   >
                     District
                   </label>
@@ -688,18 +757,16 @@ function ChatPage() {
                     <select
                       value={selectedDistrict}
                       onChange={(e) => setSelectedDistrict(e.target.value)}
-                      className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
-                        isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
-                      }`}
+                      className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
+                        }`}
                     >
                       {DISTRICTS.map((district) => (
                         <option key={district} value={district} className={isLightMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{district}</option>
                       ))}
                     </select>
                     <ChevronDown
-                      className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none ${
-                        isLightMode ? 'text-slate-400' : 'text-white/40'
-                      }`}
+                      className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none ${isLightMode ? 'text-slate-400' : 'text-white/40'
+                        }`}
                     />
                   </div>
                 </div>
@@ -707,9 +774,8 @@ function ChatPage() {
                 {/* Block Dropdown */}
                 <div>
                   <label
-                    className={`text-sm mb-2 block ${
-                      isLightMode ? 'text-slate-600' : 'text-white/60'
-                    }`}
+                    className={`text-sm mb-2 block ${isLightMode ? 'text-slate-600' : 'text-white/60'
+                      }`}
                   >
                     Block / Assessment Unit
                   </label>
@@ -717,18 +783,16 @@ function ChatPage() {
                     <select
                       value={selectedBlock}
                       onChange={(e) => setSelectedBlock(e.target.value)}
-                      className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
-                        isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
-                      }`}
+                      className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
+                        }`}
                     >
                       {BLOCKS.map((block) => (
                         <option key={block} value={block} className={isLightMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{block}</option>
                       ))}
                     </select>
                     <ChevronDown
-                      className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none ${
-                        isLightMode ? 'text-slate-400' : 'text-white/40'
-                      }`}
+                      className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none ${isLightMode ? 'text-slate-400' : 'text-white/40'
+                        }`}
                     />
                   </div>
                 </div>
@@ -736,9 +800,8 @@ function ChatPage() {
                 {/* Years */}
                 <div>
                   <label
-                    className={`text-sm mb-2 block ${
-                      isLightMode ? 'text-slate-600' : 'text-white/60'
-                    }`}
+                    className={`text-sm mb-2 block ${isLightMode ? 'text-slate-600' : 'text-white/60'
+                      }`}
                   >
                     Years
                   </label>
@@ -751,9 +814,8 @@ function ChatPage() {
                         className={isLightMode ? 'custom-checkbox-light' : 'custom-checkbox'}
                       />
                       <span
-                        className={`text-sm ${
-                          isLightMode ? 'text-slate-700' : 'text-white/80'
-                        }`}
+                        className={`text-sm ${isLightMode ? 'text-slate-700' : 'text-white/80'
+                          }`}
                       >
                         2023
                       </span>
@@ -766,18 +828,16 @@ function ChatPage() {
                         className={isLightMode ? 'custom-checkbox-light' : 'custom-checkbox'}
                       />
                       <span
-                        className={`text-sm ${
-                          isLightMode ? 'text-slate-700' : 'text-white/80'
-                        }`}
+                        className={`text-sm ${isLightMode ? 'text-slate-700' : 'text-white/80'
+                          }`}
                       >
                         2024
                       </span>
                     </label>
                   </div>
                   <p
-                    className={`text-xs mt-2 ${
-                      isLightMode ? 'text-slate-400' : 'text-white/40'
-                    }`}
+                    className={`text-xs mt-2 ${isLightMode ? 'text-slate-400' : 'text-white/40'
+                      }`}
                   >
                     Select none to use the latest year.
                   </p>
@@ -823,11 +883,10 @@ function ChatPage() {
                               <td className={isLightMode ? 'text-slate-600' : 'text-white/60'}>{row.extraction}</td>
                               <td className={isLightMode ? 'text-slate-600' : 'text-white/60'}>{row.stage}</td>
                               <td>
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                  row.category === 'Safe' 
-                                    ? 'bg-green-500/20 text-green-400' 
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${row.category === 'Safe'
+                                    ? 'bg-green-500/20 text-green-400'
                                     : 'bg-yellow-500/20 text-yellow-400'
-                                }`}>
+                                  }`}>
                                   {row.category}
                                 </span>
                               </td>
@@ -846,9 +905,8 @@ function ChatPage() {
           {showQuickModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
               <div className="absolute inset-0 bg-black/50" onClick={() => setShowQuickModal(false)} />
-              <div className={`relative w-full max-w-md mx-auto rounded-xl p-4 z-10 max-h-[90vh] overflow-auto ${
-                isLightMode ? 'quick-mode-panel-light' : 'quick-mode-panel-dark'
-              }`}>
+              <div className={`relative w-full max-w-md mx-auto rounded-xl p-4 z-10 max-h-[90vh] overflow-auto ${isLightMode ? 'quick-mode-panel-light' : 'quick-mode-panel-dark'
+                }`}>
                 <div className="flex items-start justify-between">
                   <h3 className={`text-sm font-semibold uppercase tracking-wider ${isLightMode ? 'text-slate-800' : 'text-white/80'}`}>Quick Chat - Data Query</h3>
                   <button onClick={() => setShowQuickModal(false)} className="p-2 rounded-lg hover:bg-white/5">
@@ -863,9 +921,8 @@ function ChatPage() {
                       <select
                         value={selectedState}
                         onChange={(e) => setSelectedState(e.target.value)}
-                        className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
-                          isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
-                        }`}
+                        className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
+                          }`}
                       >
                         {STATES.map((state) => (
                           <option key={state} value={state} className={isLightMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{state}</option>
@@ -881,9 +938,8 @@ function ChatPage() {
                       <select
                         value={selectedDistrict}
                         onChange={(e) => setSelectedDistrict(e.target.value)}
-                        className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
-                          isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
-                        }`}
+                        className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
+                          }`}
                       >
                         {DISTRICTS.map((district) => (
                           <option key={district} value={district} className={isLightMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{district}</option>
@@ -899,9 +955,8 @@ function ChatPage() {
                       <select
                         value={selectedBlock}
                         onChange={(e) => setSelectedBlock(e.target.value)}
-                        className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
-                          isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
-                        }`}
+                        className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
+                          }`}
                       >
                         {BLOCKS.map((block) => (
                           <option key={block} value={block} className={isLightMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{block}</option>
@@ -972,11 +1027,10 @@ function ChatPage() {
                                 <td className={isLightMode ? 'text-slate-600' : 'text-white/60'}>{row.extraction}</td>
                                 <td className={isLightMode ? 'text-slate-600' : 'text-white/60'}>{row.stage}</td>
                                 <td>
-                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                    row.category === 'Safe' 
-                                      ? 'bg-green-500/20 text-green-400' 
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${row.category === 'Safe'
+                                      ? 'bg-green-500/20 text-green-400'
                                       : 'bg-yellow-500/20 text-yellow-400'
-                                  }`}>
+                                    }`}>
                                     {row.category}
                                   </span>
                                 </td>
