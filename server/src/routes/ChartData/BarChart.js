@@ -1,7 +1,15 @@
-function buildBarChartOption(rows, title) {
-  const categories = rows.map(row => row.label);
-  const values = rows.map(row => row.value);
+async function buildBarChartOption(rows, title) {
+  if (!rows || rows.length === 0) return {};
 
+  // Dynamically identify keys: 
+  // We assume the first column is the category (district) 
+  // and the second is the numeric value.
+  const keys = Object.keys(rows[0]);
+  const labelKey = keys[0];
+  const valueKey = keys[1];
+
+  const categories = rows.map(row => row[labelKey]);
+  const values = rows.map(row => row[valueKey]);
   return {
     title: {
       text: title
@@ -42,3 +50,5 @@ function buildBarChartOption(rows, title) {
     ]
   };
 }
+
+module.exports = buildBarChartOption ;

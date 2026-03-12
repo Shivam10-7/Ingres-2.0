@@ -1,4 +1,4 @@
-function buildLineChart(data, title) {
+async function buildLineChart(data, title) {
   return {
     title: { text: title },
     tooltip: { trigger: "axis" },

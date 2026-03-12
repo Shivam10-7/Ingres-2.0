@@ -148,7 +148,7 @@ app.post('/tester', async (req, res) => {
     // This makes Pieechart
     // const sql = "SELECT Categorization, COUNT(*) AS Count FROM data2023final2 WHERE District = 'Bathinda' GROUP BY Categorization;";
     // this is for the bar chart
-    const sql = "SELECT state, ROUND(AVG(`stage of ground water extraction (%)`), 2) AS Avg_Stage_of_Extraction FROM ingresdata2025 GROUP BY state LIMIT 50;";
+    const sql = "SELECT `district`, ROUND(AVG(`stage of ground water extraction (%)`), 2) AS `Avg_Extraction_Stage` FROM ingresdata2025 WHERE `state` = 'rajasthan' GROUP BY `district` LIMIT 25;";
     const [rows, fields, ChartType] = await Database(sql);
     let result ='';
     const chartType = (ChartType && ChartType.chartType) || (ChartType && ChartType.type) || 'table';
@@ -181,7 +181,7 @@ app.post('/tester', async (req, res) => {
         result = {
             type: 'bar',
             // Suggestion: Use your BarChartPayload here similar to the pie chart
-            data: await BarChartPayload(rows, "THIS IS THE TITLE") 
+            data: await BarChartPayload(rows, "THIS IS THE TITLE")
         };
         break;
 
@@ -195,7 +195,15 @@ app.post('/tester', async (req, res) => {
         break; // Technically optional for default, but good practice
 }
 
-res.status(200).json(result);
+// Use a comma instead of '+' to see the actual object structure in terminal
+console.log("Final result being sent to client:", result);
+
+// Explicitly ensure result is an object before sending
+if (result && typeof result === 'object') {
+    return res.status(200).json(result);
+} else {
+    return res.status(500).json({ error: "Result is not a valid object", received: result });
+}
 });
 
 // WebSocket connection handling 😎😎the websocket is closed for now
