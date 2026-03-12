@@ -136,3 +136,80 @@ export async function sendQuickChatRequest(
     };
   }
 }
+
+// ============== CHAT HISTORY API ==============
+
+export interface ChatSession {
+  _id: string; // The mongodb ObjectId
+  chatId: string;
+  chatName: string;
+  updatedAt: string;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp?: string;
+}
+
+export interface ChatHistoryResponse {
+  _id: string;
+  userId: string;
+  chatId: string;
+  chatName: string;
+  messages: ChatMessage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function createNewChatSession(userId: string, chatName: string = "New Chat"): Promise<ChatSession | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/chats`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, chatName }),
+    });
+    if (!res.ok) throw new Error('Failed to create new chat');
+    return await res.json();
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+}
+
+export async function getUserChatSessions(userId: string): Promise<ChatSession[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/chats/${userId}`);
+    if (!res.ok) throw new Error('Failed to fetch user chats');
+    return await res.json();
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
+}
+
+export async function getChatSessionHistory(chatId: string): Promise<ChatHistoryResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/chats/messages/${chatId}`);
+    if (!res.ok) throw new Error('Failed to fetch chat history');
+    return await res.json();
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+}
+
+export async function saveChatMessage(chatId: string, role: string, content: string) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/chats/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chatId, role, content }),
+    });
+    if (!res.ok) throw new Error('Failed to save message');
+    return await res.json();
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+}
