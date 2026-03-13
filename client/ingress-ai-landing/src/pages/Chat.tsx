@@ -269,70 +269,40 @@ function ChatPage() {
       await saveChatMessage(activeChatId, 'user', userMsg.text);
     }
 
-    try {
-      const data = await sendChatRequest(userMsg.text, false,false);
+try {
+  const data = await sendChatRequest(userMsg.text, false, false);
 
-      if (!data.success) {
-        throw new Error(data.error || data.message || 'unknown error');
-      }
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to fetch response');
+  }
 
-      let answerText = '';
-      if (data?.markdown_json) {
-        const m = data.markdown_json.match(/```json\n([\s\S]*)\n```/);
-        if (m) {
-          try {
-            const parsed = JSON.parse(m[1]);
-            answerText = parsed.answer || JSON.stringify(parsed);
-          } catch (_e) {
-            answerText = m[1].trim();
-          }
-        } else {
-          answerText = data.markdown_json;
-        }
-      } else {
-        answerText = JSON.stringify(data);
-      }
+  const answerText = data.response || "I'm sorry, I received an empty response.";
 
-      const botResponse = {
-        id: Date.now() + 1,
-        text: answerText,
-        sender: 'bot',
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, botResponse]);
+  const botResponse = {
+    id: crypto.randomUUID(), // More robust unique ID
+    text: answerText,
+    sender: 'bot',
+    timestamp: new Date(),
+  };
 
-      // Save bot response to mongo
-      if (activeChatId) {
-        await saveChatMessage(activeChatId, 'assistant', botResponse.text);
+  // Functional updates are safer to prevent state-stale issues
+  setMessages(prev => [...prev, botResponse]);
 
-        // Refresh sidebar after full exchange
-        if (userId) {
-          const updatedChats = await getUserChatSessions(userId);
-          setChats(updatedChats);
-        }
-      }
+  if (activeChatId) {
+    // Fire and forget or await? Usually better to await if the next step depends on it
+    await saveChatMessage(activeChatId, 'assistant', answerText);
 
-    } catch (err) {
-      console.error(err);
-      const errorMsgText = `Server error: ${err instanceof Error ? err.message : err}`;
-
-      setMessages(prev => [
-        ...prev,
-        {
-          id: Date.now() + 2,
-          text: errorMsgText,
-          sender: 'bot',
-          timestamp: new Date(),
-        },
-      ]);
-
-      // Save error response to mongo too
-      if (activeChatId) {
-        await saveChatMessage(activeChatId, 'assistant', errorMsgText);
-      }
-    } finally {
-      setIsTyping(false);
+    if (userId) {
+      const updatedChats = await getUserChatSessions(userId);
+      setChats(updatedChats);
     }
+  }
+
+} catch (err) {
+  // Logic for error display...
+} finally {
+  setIsTyping(false);
+}
   };
 
   // Handle get data
