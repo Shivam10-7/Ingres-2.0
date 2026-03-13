@@ -4,7 +4,8 @@ const app = express()
 const cors = require('cors');
 const AuthJwt = require('./src/routes/middleware/AuthJWT');
 const PieChartPayloadd = require('./src/routes/ChartData/PieChart');
-const BarChartPayload = require('./src/routes/ChartData/BarChart'); // Ensure this is correctly imported for use in the tester route
+const BarChartPayload = require('./src/routes/ChartData/BarChart');
+const LineChart  = require('./src/routes/ChartData/LineChart');// Ensure this is correctly imported for use in the tester route
 const mongoose = require('mongoose');
 const WebSocket = require('ws');
 const Database = require('./src/routes/db/dataRetrive');
@@ -146,36 +147,65 @@ app.post('/tester', async (req, res) => {
     // const sql ='SELECT ROUND((COUNT(CASE WHEN `Categorization` = \'Safe\' THEN 1 END) * 100.0 / COUNT(*)), 2) AS `Percentage_Safe_Units` FROM data2024final2 WHERE `State` = \'Maharashtra\';'
     // This makes Pieechart
     // const sql = "SELECT Categorization, COUNT(*) AS Count FROM data2023final2 WHERE District = 'Bathinda' GROUP BY Categorization;";
+    
     // this is for the bar chart
-    const sql  = "SELECT District, AVG(`Stage of Ground Water  Extraction (%)`) AS Avg_Stage FROM data2024final2 WHERE State = 'Punjab' GROUP BY District ORDER BY Avg_Stage DESC LIMIT 5;";
+    // const sql = "SELECT `district`, ROUND(AVG(`stage of ground water extraction (%)`), 2) AS `Avg_Extraction_Stage` FROM ingresdata2025 WHERE `state` = 'rajasthan' GROUP BY `district` LIMIT 25;";
+    // // this is for pie chart
+    const sql ="SELECT categorization, COUNT(*) AS Total_Assessment_Units FROM ingresdata2025 GROUP BY categorization;"
     const [rows, fields, ChartType] = await Database(sql);
-    switch (ChartType.chartType) {
-            case 'KPI':
-                return {
-                    type: 'KPI',
-                    data: rows
-                }
-            break;
-            case 'pie':
-                return {
-                    type: 'pie',
-                    shivam: "correctly reached the pie chart case",
-                    // Passing the values and the title to the PieChartPayloadd function to get the ECharts configuration for a pie chart
-                    data: console.log(await PieChartPayloadd(rows, "THIS IS THE TITLE"))
-                }
-            break;
-            case 'bar':
-                return {
-                    type: 'bar',
-                    data: rows, 
-                }
-            default:return{
-                type: 'table',
-                data: rows,
-                fields: console.log(await BarChartPayload(rows, "THIS IS THE TITLE"))
-            }
-        }
-    res.status(200).json({ rows, fields, chartType });
+    let result ='';
+    const chartType = (ChartType && ChartType.chartType) || (ChartType && ChartType.type) || 'table';
+    console.log("Determined chart type:", chartType);
+   switch (chartType) {
+    case 'KPI':
+        result = {
+            type: 'KPI',
+            data: rows
+        };
+        break;
+
+    case 'pie':
+        result = {
+            type: 'pie',
+            data: await PieChartPayloadd(rows, "THIS IS THE TITLE")
+        };
+        break;
+
+     case 'line':
+        result = {
+            type: 'line',
+            shivam: "correctly reached the line chart case",
+            data: await LineChart(rows, "THIS IS THE TITLE")
+        };
+        break;
+
+    case 'bar':
+        result = {
+            type: 'bar',
+            // Suggestion: Use your BarChartPayload here similar to the pie chart
+            data: await BarChartPayload(rows, "THIS IS THE TITLE")
+        };
+        break;
+
+    default:
+        result = {
+            type: 'table',
+            data: rows,
+         
+            
+        };
+        break; // Technically optional for default, but good practice
+}
+
+// Use a comma instead of '+' to see the actual object structure in terminal
+console.log("Final result being sent to client:", result);
+
+// Explicitly ensure result is an object before sending
+if (result && typeof result === 'object') {
+    return res.status(200).json(result);
+} else {
+    return res.status(500).json({ error: "Result is not a valid object", received: result });
+}
 });
 
 // WebSocket connection handling 😎😎the websocket is closed for now
