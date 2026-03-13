@@ -6,7 +6,7 @@ const RAG_API_BASE_URL = 'http://127.0.0.1:8000';
 
 export interface ChatResponse {
   success: boolean;
-  response?: unknown;
+  response?: string;
   markdown_json?: string;
   error?: string;
   message?: string;
