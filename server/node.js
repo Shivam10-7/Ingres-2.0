@@ -147,8 +147,11 @@ app.post('/tester', async (req, res) => {
     // const sql ='SELECT ROUND((COUNT(CASE WHEN `Categorization` = \'Safe\' THEN 1 END) * 100.0 / COUNT(*)), 2) AS `Percentage_Safe_Units` FROM data2024final2 WHERE `State` = \'Maharashtra\';'
     // This makes Pieechart
     // const sql = "SELECT Categorization, COUNT(*) AS Count FROM data2023final2 WHERE District = 'Bathinda' GROUP BY Categorization;";
+    
     // this is for the bar chart
-    const sql = "SELECT `district`, ROUND(AVG(`stage of ground water extraction (%)`), 2) AS `Avg_Extraction_Stage` FROM ingresdata2025 WHERE `state` = 'rajasthan' GROUP BY `district` LIMIT 25;";
+    // const sql = "SELECT `district`, ROUND(AVG(`stage of ground water extraction (%)`), 2) AS `Avg_Extraction_Stage` FROM ingresdata2025 WHERE `state` = 'rajasthan' GROUP BY `district` LIMIT 25;";
+    // // this is for pie chart
+    const sql ="SELECT categorization, COUNT(*) AS Total_Assessment_Units FROM ingresdata2025 GROUP BY categorization;"
     const [rows, fields, ChartType] = await Database(sql);
     let result ='';
     const chartType = (ChartType && ChartType.chartType) || (ChartType && ChartType.type) || 'table';
@@ -164,7 +167,6 @@ app.post('/tester', async (req, res) => {
     case 'pie':
         result = {
             type: 'pie',
-            shivam: "correctly reached the pie chart case",
             data: await PieChartPayloadd(rows, "THIS IS THE TITLE")
         };
         break;
