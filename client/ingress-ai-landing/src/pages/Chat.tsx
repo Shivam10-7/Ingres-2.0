@@ -63,6 +63,30 @@ const SAMPLE_DATA = [
   { year: '2024', extractable: '--', extraction: '--', stage: '--', category: 'Unknown' },
 ];
 
+const formatMessageText = (text: string) => {
+  if (!text) return null;
+  
+  // Split by literal \n or actual newline
+  const lines = text.split(/(?:\\n|\n)/);
+  
+  return lines.map((line, lineIndex) => {
+    // Split by **text**
+    const parts = line.split(/\*\*(.*?)\*\*/g);
+    
+    return (
+      <React.Fragment key={lineIndex}>
+        {parts.map((part, partIndex) => {
+          if (partIndex % 2 === 1) {
+            return <strong key={partIndex} className="font-bold">{part}</strong>;
+          }
+          return part ? <span key={partIndex}>{part}</span> : null;
+        })}
+        {lineIndex < lines.length - 1 && <br />}
+      </React.Fragment>
+    );
+  });
+};
+
 function ChatPage() {
   const navigate = useNavigate();
   const [selectedMode, setSelectedMode] = useState(MODES[0]);
@@ -539,10 +563,12 @@ try {
                       >
                         {message.text.includes('```') ? (
                           <pre className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'} bg-transparent`}>
-                            {message.text}
+                            {formatMessageText(message.text)}
                           </pre>
                         ) : (
-                          <p className={`text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'}`}>{message.text}</p>
+                          <p className={`text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'}`}>
+                            {formatMessageText(message.text)}
+                          </p>
                         )}
                         <span className={`text-xs mt-2 block ${message.sender === 'user' ? 'text-white/70' : isLightMode ? 'text-slate-500' : 'text-white/40'}`}>
                           {formatTime(message.timestamp)}
