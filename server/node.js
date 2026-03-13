@@ -189,8 +189,8 @@ app.post('/tester', async (req, res) => {
         result = {
             type: 'table',
             data: rows,
-            // Only include fields if you actually need the metadata
-            fields: [] 
+         
+            
         };
         break; // Technically optional for default, but good practice
 }
