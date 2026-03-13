@@ -28,6 +28,7 @@ import {
 
 import {
   sendGeminiRagRequest,
+  sendChatRequest,
   getUserChatSessions,
   createNewChatSession,
   getChatSessionHistory,
@@ -269,7 +270,7 @@ function ChatPage() {
     }
 
     try {
-      const data = await sendGeminiRagRequest(userMsg.text, buildSqlResponse());
+      const data = await sendChatRequest(userMsg.text, false,false);
 
       if (!data.success) {
         throw new Error(data.error || data.message || 'unknown error');
