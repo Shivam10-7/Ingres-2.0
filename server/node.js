@@ -151,7 +151,9 @@ app.post('/tester', async (req, res) => {
     // this is for the bar chart
     // const sql = "SELECT `district`, ROUND(AVG(`stage of ground water extraction (%)`), 2) AS `Avg_Extraction_Stage` FROM ingresdata2025 WHERE `state` = 'rajasthan' GROUP BY `district` LIMIT 25;";
     // // this is for pie chart
-    const sql ="SELECT categorization, COUNT(*) AS Total_Assessment_Units FROM ingresdata2025 GROUP BY categorization;"
+    // const sql ="SELECT categorization, COUNT(*) AS Total_Assessment_Units FROM ingresdata2025 GROUP BY categorization;"
+    // this is for line chart
+    const sql ="SELECT district, ROUND(AVG(`stage of ground water extraction (%)`), 2) AS Avg_Extraction_Stage FROM ingresdata2025 GROUP BY district LIMIT 100;"
     const [rows, fields, ChartType] = await Database(sql);
     let result ='';
     const chartType = (ChartType && ChartType.chartType) || (ChartType && ChartType.type) || 'table';
