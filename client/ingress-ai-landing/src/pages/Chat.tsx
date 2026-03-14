@@ -535,7 +535,13 @@ try {
 
                     {/* Dropdown menu */}
                     {menuOpenChatId === chat.chatId && (
-                      <div className="absolute right-2 top-8 bg-black border border-white/10 rounded-lg shadow-lg z-50">
+                      <div
+                        className={`absolute right-2 top-8 rounded-lg shadow-lg z-50 border
+                        ${isLightMode
+                          ? "bg-white border-slate-200 text-slate-800"
+                          : "bg-black border-white/10 text-white"
+                        }`}
+                      >
 
                         <button
                           onClick={() => {
@@ -543,14 +549,18 @@ try {
                             setEditedName(chat.chatName)
                             setMenuOpenChatId(null)
                           }}
-                          className="block w-full text-left px-4 py-2 text-sm hover:bg-white/10"
+                          className={`block w-full text-left px-4 py-2 text-sm ${isLightMode ? "hover:bg-slate-100" : "hover:bg-white/10"}`}
                         >
                           Rename
                         </button>
 
                         <button
                           onClick={() => setDeleteChatId(chat.chatId)}
-                          className="block w-full text-left px-4 py-2 text-sm hover:bg-red-500/20 text-red-400"
+                          className={`block w-full text-left px-4 py-2 text-sm
+                          ${isLightMode
+                            ? "hover:bg-red-100 text-red-600"
+                            : "hover:bg-red-500/20 text-red-400"
+                          }`}
                         >
                           Delete
                         </button>
@@ -1227,17 +1237,22 @@ try {
           )}
         </div>
 
-          // Delete Chat Confirmation Modal
           {deleteChatId && (
     <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
 
-      <div className="bg-[#0f172a] rounded-xl p-6 w-80 shadow-xl">
+      <div
+          className={`rounded-xl p-6 w-80 shadow-xl
+          ${isLightMode
+            ? "bg-white text-slate-800"
+            : "bg-[#0f172a] text-white"
+          }`}
+        >
 
         <h2 className="text-lg font-semibold mb-4">
           Delete Chat?
         </h2>
 
-        <p className="text-sm text-white/70 mb-6">
+        <p className="text-sm font-semi mb-6">
           This action cannot be undone.
         </p>
 
@@ -1245,7 +1260,11 @@ try {
 
           <button
             onClick={() => setDeleteChatId(null)}
-            className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20"
+            className={`px-4 py-2 rounded-lg
+              ${isLightMode
+                ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                : "bg-white/10 hover:bg-white/20 text-white"
+              }`}
           >
             Cancel
           </button>
@@ -1255,7 +1274,11 @@ try {
               handleDeleteChat(deleteChatId)
               setDeleteChatId(null)
             }}
-            className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600"
+            className={`px-4 py-2 rounded-lg
+              ${isLightMode
+                ? "bg-red-500 hover:bg-red-600 text-white"
+                : "bg-red-500 hover:bg-red-600 text-white"
+              }`}
           >
             Delete
           </button>
