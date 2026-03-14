@@ -24,6 +24,7 @@ import {
   Mic,
   Sun,
   Moon,
+  MoreVertical
 } from 'lucide-react';
 
 import {
@@ -33,7 +34,8 @@ import {
   createNewChatSession,
   getChatSessionHistory,
   saveChatMessage,
-  ChatSession
+  ChatSession,
+  renameChatSession
 } from '@/lib/api';
 import UserProfile from '@/components/UserProfile';
 const logoLight = '/logo_LIGHT.png';
@@ -88,6 +90,7 @@ const formatMessageText = (text: string) => {
 };
 
 function ChatPage() {
+  
   const navigate = useNavigate();
   const [selectedMode, setSelectedMode] = useState(MODES[0]);
   const [showModeDropdown, setShowModeDropdown] = useState(false);
@@ -104,6 +107,12 @@ function ChatPage() {
   //Toogle Button
   const [isVisualizationNeeded, setIsVisualizationNeeded] = useState(false);
   const [isDetailedResponseNeeded, setIsDetailedResponseNeeded] = useState(false);
+
+  //For Renaming & Deleting the ChatNames
+  const [editingChatId, setEditingChatId] = useState<string | null>(null)
+  const [editedName, setEditedName] = useState("")
+  const [menuOpenChatId, setMenuOpenChatId] = useState<string | null>(null)
+  const [deleteChatId, setDeleteChatId] = useState<string | null>(null)
 
   // Fetch user and chats on mount
   useEffect(() => {
@@ -359,6 +368,26 @@ try {
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   };
 
+  //For Deleting Chat
+  const handleDeleteChat = async (chatId: string) => {
+    try {
+
+      await fetch(`http://localhost:8081/api/chats/${chatId}`, {
+        method: "DELETE"
+      })
+
+      setChats(prev => prev.filter(chat => chat.chatId !== chatId))
+
+      if (currentChatId === chatId) {
+        setCurrentChatId(null)
+        setMessages([])
+      }
+
+    } catch (err) {
+      console.error("Delete chat failed", err)
+    }
+  }
+
   return (
     <div
       className={`flex h-screen w-full overflow-hidden ${isLightMode ? 'bg-gradient-radial-light' : 'bg-gradient-radial'
@@ -436,20 +465,100 @@ try {
               </div>
               <div className="space-y-1">
                 {chats.map((chat) => (
-                  <button
+                  <div
                     key={chat._id}
-                    onClick={() => loadChat(chat.chatId)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${currentChatId === chat.chatId
-                        ? (isLightMode ? 'bg-blue-100 text-blue-700' : 'bg-blue-500/20 text-white')
-                        : (isLightMode ? 'text-slate-600 hover:text-slate-900 hover:bg-black/5' : 'text-white/70 hover:text-white hover:bg-white/5')
-                      }`}
+                    className="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 hover:bg-white/5"
                   >
-                    <MessageSquare className={`w-4 h-4 transition-colors ${currentChatId === chat.chatId
-                        ? (isLightMode ? 'text-blue-600' : 'text-blue-400')
-                        : (isLightMode ? 'text-slate-400 group-hover:text-blue-500' : 'text-white/40 group-hover:text-blue-400')
-                      }`} />
-                    <span className="text-sm truncate flex-1 text-left">{chat.chatName}</span>
-                  </button>
+
+                    <button
+                      onClick={() => loadChat(chat.chatId)}
+                      className="flex items-center gap-3 flex-1 text-left"
+                    >
+                      <MessageSquare className="w-4 h-4 text-white/40 group-hover:text-blue-400" />
+
+                      {editingChatId === chat.chatId ? (
+                        <div className="flex items-center gap-2 flex-1">
+
+                          <input
+                            value={editedName}
+                            autoFocus
+                            onChange={(e) => setEditedName(e.target.value)}
+                            className="bg-transparent border-b border-blue-400 outline-none text-sm flex-1"
+                          />
+
+                          {/* SAVE */}
+                          <button
+                            onClick={async () => {
+                              await renameChatSession(chat.chatId, editedName)
+
+                              setChats(prev =>
+                                prev.map(c =>
+                                  c.chatId === chat.chatId
+                                    ? { ...c, chatName: editedName }
+                                    : c
+                                )
+                              )
+
+                              setEditingChatId(null)
+                            }}
+                            className="text-green-400 hover:text-green-300 text-sm"
+                          >
+                            ✓
+                          </button>
+
+                          {/* CANCEL */}
+                          <button
+                            onClick={() => setEditingChatId(null)}
+                            className="text-red-400 hover:text-red-300 text-sm"
+                          >
+                            ✕
+                          </button>
+
+                        </div>
+                      ) : (
+                        <span className="text-sm truncate flex-1">
+                          {chat.chatName}
+                        </span>
+                      )}
+                    </button>
+
+                    {/* Three dots */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setMenuOpenChatId(menuOpenChatId === chat.chatId ? null : chat.chatId)
+                      }}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <MoreVertical className="w-4 h-4 text-white/60 hover:text-white" />
+                    </button>
+
+                    {/* Dropdown menu */}
+                    {menuOpenChatId === chat.chatId && (
+                      <div className="absolute right-2 top-8 bg-black border border-white/10 rounded-lg shadow-lg z-50">
+
+                        <button
+                          onClick={() => {
+                            setEditingChatId(chat.chatId)
+                            setEditedName(chat.chatName)
+                            setMenuOpenChatId(null)
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm hover:bg-white/10"
+                        >
+                          Rename
+                        </button>
+
+                        <button
+                          onClick={() => setDeleteChatId(chat.chatId)}
+                          className="block w-full text-left px-4 py-2 text-sm hover:bg-red-500/20 text-red-400"
+                        >
+                          Delete
+                        </button>
+
+                      </div>
+                    )}
+
+                  </div>
                 ))}
               </div>
 
@@ -1117,9 +1226,47 @@ try {
             </div>
           )}
         </div>
+
+          // Delete Chat Confirmation Modal
+          {deleteChatId && (
+    <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+
+      <div className="bg-[#0f172a] rounded-xl p-6 w-80 shadow-xl">
+
+        <h2 className="text-lg font-semibold mb-4">
+          Delete Chat?
+        </h2>
+
+        <p className="text-sm text-white/70 mb-6">
+          This action cannot be undone.
+        </p>
+
+        <div className="flex justify-end gap-3">
+
+          <button
+            onClick={() => setDeleteChatId(null)}
+            className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20"
+          >
+            Cancel
+          </button>
+
+          <button
+            onClick={() => {
+              handleDeleteChat(deleteChatId)
+              setDeleteChatId(null)
+            }}
+            className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600"
+          >
+            Delete
+          </button>
+
+        </div>
+
+      </div>
+
+    </div>
+  )}
       </main>
     </div>
-  );
-}
-
+  )};
 export default ChatPage;
