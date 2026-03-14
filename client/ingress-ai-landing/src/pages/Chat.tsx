@@ -63,6 +63,30 @@ const SAMPLE_DATA = [
   { year: '2024', extractable: '--', extraction: '--', stage: '--', category: 'Unknown' },
 ];
 
+const formatMessageText = (text: string) => {
+  if (!text) return null;
+  
+  // Split by literal \n or actual newline
+  const lines = text.split(/(?:\\n|\n)/);
+  
+  return lines.map((line, lineIndex) => {
+    // Split by **text**
+    const parts = line.split(/\*\*(.*?)\*\*/g);
+    
+    return (
+      <React.Fragment key={lineIndex}>
+        {parts.map((part, partIndex) => {
+          if (partIndex % 2 === 1) {
+            return <strong key={partIndex} className="font-bold">{part}</strong>;
+          }
+          return part ? <span key={partIndex}>{part}</span> : null;
+        })}
+        {lineIndex < lines.length - 1 && <br />}
+      </React.Fragment>
+    );
+  });
+};
+
 function ChatPage() {
   const navigate = useNavigate();
   const [selectedMode, setSelectedMode] = useState(MODES[0]);
@@ -339,13 +363,13 @@ try {
       {sidebarOpen && (
         <>
           <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setSidebarOpen(false)} />
-          <aside className="fixed inset-y-0 left-0 w-auto min-w-[20rem] max-w-[28rem] glass-panel flex flex-col h-full shrink-0 z-50" style={{ maxHeight: '100vh' }}>
+          <aside className={`fixed inset-y-0 left-0 w-auto min-w-[20rem] max-w-[28rem] ${isLightMode ? 'glass-panel-light' : 'glass-panel'} flex flex-col h-full shrink-0 z-50`} style={{ maxHeight: '100vh' }}>
             {/* Logo */}
             <div className="p-4 flex items-center gap-3">
               <div className="w-10 h-10 flex items-center justify-center">
                 <img src={isLightMode ? logoLight : logoDark} alt="INGRES" className="w-6 h-6 object-contain" />
               </div>
-              <span className="text-xl font-semibold text-white tracking-tight">INGRES</span>
+              <span className={`text-xl font-semibold tracking-tight ${isLightMode ? 'text-slate-800' : 'text-white'}`}>INGRES</span>
             </div>
 
             {/* New Chat Button */}
@@ -353,7 +377,7 @@ try {
               <button
                 onClick={handleNewChatClick}
                 className={`w-full rounded-xl px-4 py-3 flex items-center gap-3 transition-all duration-200 group ${isLightMode
-                    ? 'glass-card text-slate-800 hover:bg-white/20'
+                    ? 'glass-card-light text-slate-800 hover:bg-slate-50'
                     : 'glass-card-dark text-white hover:bg-white/10'
                   }`}
               >
@@ -365,11 +389,15 @@ try {
             {/* Search */}
             <div className="px-4 pb-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
+                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isLightMode ? 'text-slate-400' : 'text-white/50'}`} />
                 <input
                   type="text"
                   placeholder="Search chats..."
-                  className="w-full glass-input rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className={`w-full rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
+                    isLightMode 
+                      ? 'glass-input-light text-slate-800 placeholder:text-slate-400' 
+                      : 'glass-input text-white placeholder:text-white/40'
+                  }`}
                 />
               </div>
             </div>
@@ -384,7 +412,7 @@ try {
               }}
             >
               <div className="px-3 py-2">
-                <span className="text-xs font-medium text-white/40 uppercase tracking-wider">Recent</span>
+                <span className={`text-xs font-medium uppercase tracking-wider ${isLightMode ? 'text-slate-500' : 'text-white/40'}`}>Recent</span>
               </div>
               <div className="space-y-1">
                 {chats.map((chat) => (
@@ -392,13 +420,13 @@ try {
                     key={chat._id}
                     onClick={() => loadChat(chat.chatId)}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${currentChatId === chat.chatId
-                        ? 'bg-blue-500/20 text-white'
-                        : 'text-white/70 hover:text-white hover:bg-white/5'
+                        ? (isLightMode ? 'bg-blue-100 text-blue-700' : 'bg-blue-500/20 text-white')
+                        : (isLightMode ? 'text-slate-600 hover:text-slate-900 hover:bg-black/5' : 'text-white/70 hover:text-white hover:bg-white/5')
                       }`}
                   >
                     <MessageSquare className={`w-4 h-4 transition-colors ${currentChatId === chat.chatId
-                        ? 'text-blue-400'
-                        : 'text-white/40 group-hover:text-blue-400'
+                        ? (isLightMode ? 'text-blue-600' : 'text-blue-400')
+                        : (isLightMode ? 'text-slate-400 group-hover:text-blue-500' : 'text-white/40 group-hover:text-blue-400')
                       }`} />
                     <span className="text-sm truncate flex-1 text-left">{chat.chatName}</span>
                   </button>
@@ -407,15 +435,17 @@ try {
 
               {/* Projects */}
               <div className="px-3 py-4">
-                <span className="text-xs font-medium text-white/40 uppercase tracking-wider">Projects</span>
+                <span className={`text-xs font-medium uppercase tracking-wider ${isLightMode ? 'text-slate-500' : 'text-white/40'}`}>Projects</span>
               </div>
               <div className="space-y-1">
                 {PROJECTS.map((project) => (
                   <button
                     key={project.id}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-white/70 hover:text-white hover:bg-white/5 transition-all duration-200 group"
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
+                        isLightMode ? 'text-slate-600 hover:text-slate-900 hover:bg-black/5' : 'text-white/70 hover:text-white hover:bg-white/5'
+                    }`}
                   >
-                    <Folder className="w-4 h-4 text-blue-400" />
+                    <Folder className={`w-4 h-4 ${isLightMode ? 'text-blue-500' : 'text-blue-400'}`} />
                     <span className="text-sm">{project.name}</span>
                   </button>
                 ))}
@@ -427,10 +457,10 @@ try {
             {/* Close Sidebar Button */}
             <button
               onClick={() => setSidebarOpen(false)}
-              className="absolute top-3 right-3 p-2 rounded-lg hover:bg-white/5 transition-colors"
+              className={`absolute top-3 right-3 p-2 rounded-lg transition-colors ${isLightMode ? 'hover:bg-slate-200' : 'hover:bg-white/5'}`}
               aria-label="Close sidebar"
             >
-              <X className="w-4 h-4 text-white/60" />
+              <X className={`w-4 h-4 ${isLightMode ? 'text-slate-500' : 'text-white/60'}`} />
             </button>
           </aside>
         </>
@@ -539,10 +569,12 @@ try {
                       >
                         {message.text.includes('```') ? (
                           <pre className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'} bg-transparent`}>
-                            {message.text}
+                            {formatMessageText(message.text)}
                           </pre>
                         ) : (
-                          <p className={`text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'}`}>{message.text}</p>
+                          <p className={`text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'}`}>
+                            {formatMessageText(message.text)}
+                          </p>
                         )}
                         <span className={`text-xs mt-2 block ${message.sender === 'user' ? 'text-white/70' : isLightMode ? 'text-slate-500' : 'text-white/40'}`}>
                           {formatTime(message.timestamp)}
