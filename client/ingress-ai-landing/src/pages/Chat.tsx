@@ -51,9 +51,7 @@ const MODES = [
 const PROJECTS = [
   { id: 1, name: 'Water Analysis', icon: Folder },
 ];
-//Toogle Button
-let [isVisualizationNeeded, setIsVisualizationNeeded] = useState(false);
-let [isDetailedResponseNeeded, setIsDetailedResponseNeeded] = useState(false);
+
 // Sample data for dropdowns
 const STATES = ['ANDHRA PRADESH', 'MAHARASHTRA', 'KARNATAKA', 'TAMIL NADU'];
 const DISTRICTS = ['KURNOOL', 'MUMBAI', 'BANGALORE', 'CHENNAI'];
@@ -102,6 +100,10 @@ function ChatPage() {
   const [chats, setChats] = useState<ChatSession[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+
+  //Toogle Button
+  const [isVisualizationNeeded, setIsVisualizationNeeded] = useState(false);
+  const [isDetailedResponseNeeded, setIsDetailedResponseNeeded] = useState(false);
 
   // Fetch user and chats on mount
   useEffect(() => {
@@ -229,17 +231,33 @@ function ChatPage() {
 
   // Handle mode selection
   const handleModeSelect = (mode) => {
-    setSelectedMode(mode);
-    setShowModeDropdown(false);
-    // On mobile, show Quick Chat options in a centered modal
-    if (mode.id === 'quick' && isMobile) {
-      setShowQuickModal(true);
-      setShowDataPanel(false);
-    } else {
-      setShowDataPanel(mode.id === 'quick');
-    }
-    setShowResults(false);
-  };
+  setSelectedMode(mode);
+  setShowModeDropdown(false);
+
+  if (mode.id === "quick") {
+    setShowQuickModal(true);
+    setShowDataPanel(false);
+  } else {
+    setShowQuickModal(false);
+    setShowDataPanel(false);
+  }
+
+  // ⭐ AUTO should reset everything
+  if (mode.id === "auto") {
+    setIsDetailedResponseNeeded(false);
+    setIsVisualizationNeeded(false);
+  }
+
+  if (mode.id === "deep") {
+    setIsDetailedResponseNeeded(true);
+  }
+
+  if (mode.id === "visualizer") {
+    setIsVisualizationNeeded(true);
+  }
+
+  setShowResults(false);
+};
 
   // Handle logout
   const handleLogout = async () => {
@@ -638,43 +656,91 @@ try {
                           <button
                             key={mode.id}
                             onClick={() => handleModeSelect(mode)}
-                            className={`w-full flex items-start gap-3 px-3 py-3 rounded-xl transition-all duration-200 ${selectedMode.id === mode.id
+                            className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-200 ${
+                              selectedMode.id === mode.id
                                 ? 'bg-blue-500/20 border border-blue-500/30'
                                 : 'hover:bg-white/5'
-                              }`}
+                            }`}
                           >
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${selectedMode.id === mode.id ? 'bg-blue-500' : 'bg-white/10'
-                              }`}>
-                              <mode.icon className="w-4 h-4 text-white" />
-                            </div>
-                            <div className="text-left">
-                              <p className={`text-sm font-medium ${selectedMode.id === mode.id ? 'text-white' : 'text-white/80'}`}>
-                                {mode.label}
-                              </p>
-                              <p className="text-xs text-white/50">{mode.description}</p>
-                            </div>
+
+                          <div className="flex items-start gap-3">
+
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                            selectedMode.id === mode.id ? 'bg-blue-500' : 'bg-white/10'
+                          }`}>
+                            <mode.icon className="w-4 h-4 text-white" />
+                          </div>
+
+                          <div className="text-left">
+                            <p className={`text-sm font-medium ${
+                              selectedMode.id === mode.id ? 'text-white' : 'text-white/80'
+                            }`}>
+                              {mode.label}
+                            </p>
+
+                            <p className="text-xs text-white/50">{mode.description}</p>
+                          </div>
+
+                          </div>
+
+                          {/* Checkboxes only for specific modes */}
+                          {mode.id === "deep" && (
+                          <input
+                            type="checkbox"
+                            checked={isDetailedResponseNeeded}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              setIsDetailedResponseNeeded(e.target.checked)
+                            }}
+                            className="accent-blue-500"
+                          />
+                          )}
+
+                          {mode.id === "visualizer" && (
+                          <input
+                            type="checkbox"
+                            checked={isVisualizationNeeded}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              setIsVisualizationNeeded(e.target.checked)
+                            }}
+                            className="accent-blue-500"
+                          />
+                          )}
+
                           </button>
-                        ))}
+                          ))}
                       </div>
                     )}
                   </div>
 
-                  {/* Current Mode Indicator */}
-                  <div
-                    className={`flex items-center gap-2 px-2 py-1 rounded-lg ${isLightMode ? 'bg-white/80 shadow-sm' : 'bg-white/5'
-                      }`}
-                  >
-                    <selectedMode.icon
-                      className={`w-4 h-4 ${isLightMode ? 'text-blue-500' : 'text-blue-400'
-                        }`}
-                    />
-                    <span
-                      className={`text-xs ${isLightMode ? 'text-slate-600' : 'text-white/60'
-                        }`}
-                    >
-                      {selectedMode.label}
-                    </span>
-                  </div>
+                  <div className="flex items-center gap-2">
+
+                    {/* Show AUTO only when nothing else is selected */}
+                    {!isDetailedResponseNeeded && !isVisualizationNeeded && (
+                      <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 text-xs">
+                        <Sparkles className="w-4 h-4 text-blue-400" />
+                        Auto
+                      </div>
+                    )}
+
+                    {/* Deep Search badge */}
+                    {isDetailedResponseNeeded && (
+                      <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 text-xs">
+                        <SearchIcon className="w-4 h-4 text-blue-400" />
+                        Deep
+                      </div>
+                    )}
+
+                    {/* Visualization badge */}
+                    {isVisualizationNeeded && (
+                      <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 text-xs">
+                        <BarChart3 className="w-4 h-4 text-blue-400" />
+                        Charts
+                      </div>
+                    )}
+
+                    </div>
 
                   {/* Input */}
                   <input
