@@ -66,6 +66,22 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.glass-panel-light {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+}
+
+.glass-card-light {
+  background: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
 /* Quick mode side window - base layout */
 .quick-mode-panel {
   border-radius: 1.2rem 0 0 1.2rem;
@@ -120,12 +136,14 @@ body {
 
 /* Light mode select/dropdown - light background, dark text */
 .glass-input-light {
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(148, 163, 184, 0.5);
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.15);
 }
 
 .glass-input-light:focus {
-  background: white;
+  background: rgba(255, 255, 255, 0.6);
   border-color: rgba(59, 130, 246, 0.5);
 }
 
