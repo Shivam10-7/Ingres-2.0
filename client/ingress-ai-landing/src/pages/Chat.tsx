@@ -51,7 +51,9 @@ const MODES = [
 const PROJECTS = [
   { id: 1, name: 'Water Analysis', icon: Folder },
 ];
-
+//Toogle Button
+let [isVisualizationNeeded, setIsVisualizationNeeded] = useState(false);
+let [isDetailedResponseNeeded, setIsDetailedResponseNeeded] = useState(false);
 // Sample data for dropdowns
 const STATES = ['ANDHRA PRADESH', 'MAHARASHTRA', 'KARNATAKA', 'TAMIL NADU'];
 const DISTRICTS = ['KURNOOL', 'MUMBAI', 'BANGALORE', 'CHENNAI'];
@@ -294,7 +296,7 @@ function ChatPage() {
     }
 
 try {
-  const data = await sendChatRequest(userMsg.text, false, false);
+  const data = await sendChatRequest(userMsg.text, isDetailedResponseNeeded, isVisualizationNeeded);//manually passed charts and detailed reponse
 
   if (!data.success) {
     throw new Error(data.error || 'Failed to fetch response');
