@@ -24,6 +24,7 @@ import {
   Mic,
   Sun,
   Moon,
+  MoreVertical
 } from 'lucide-react';
 
 import {
@@ -33,7 +34,8 @@ import {
   createNewChatSession,
   getChatSessionHistory,
   saveChatMessage,
-  ChatSession
+  ChatSession,
+  renameChatSession
 } from '@/lib/api';
 import UserProfile from '@/components/UserProfile';
 const logoLight = '/logo_LIGHT.png';
@@ -88,6 +90,7 @@ const formatMessageText = (text: string) => {
 };
 
 function ChatPage() {
+  
   const navigate = useNavigate();
   const [selectedMode, setSelectedMode] = useState(MODES[0]);
   const [showModeDropdown, setShowModeDropdown] = useState(false);
@@ -100,6 +103,16 @@ function ChatPage() {
   const [chats, setChats] = useState<ChatSession[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+
+  //Toogle Button
+  const [isVisualizationNeeded, setIsVisualizationNeeded] = useState(false);
+  const [isDetailedResponseNeeded, setIsDetailedResponseNeeded] = useState(false);
+
+  //For Renaming & Deleting the ChatNames
+  const [editingChatId, setEditingChatId] = useState<string | null>(null)
+  const [editedName, setEditedName] = useState("")
+  const [menuOpenChatId, setMenuOpenChatId] = useState<string | null>(null)
+  const [deleteChatId, setDeleteChatId] = useState<string | null>(null)
 
   // Fetch user and chats on mount
   useEffect(() => {
@@ -227,17 +240,33 @@ function ChatPage() {
 
   // Handle mode selection
   const handleModeSelect = (mode) => {
-    setSelectedMode(mode);
-    setShowModeDropdown(false);
-    // On mobile, show Quick Chat options in a centered modal
-    if (mode.id === 'quick' && isMobile) {
-      setShowQuickModal(true);
-      setShowDataPanel(false);
-    } else {
-      setShowDataPanel(mode.id === 'quick');
-    }
-    setShowResults(false);
-  };
+  setSelectedMode(mode);
+  setShowModeDropdown(false);
+
+  if (mode.id === "quick") {
+    setShowQuickModal(true);
+    setShowDataPanel(false);
+  } else {
+    setShowQuickModal(false);
+    setShowDataPanel(false);
+  }
+
+  // ⭐ AUTO should reset everything
+  if (mode.id === "auto") {
+    setIsDetailedResponseNeeded(false);
+    setIsVisualizationNeeded(false);
+  }
+
+  if (mode.id === "deep") {
+    setIsDetailedResponseNeeded(true);
+  }
+
+  if (mode.id === "visualizer") {
+    setIsVisualizationNeeded(true);
+  }
+
+  setShowResults(false);
+};
 
   // Handle logout
   const handleLogout = async () => {
@@ -294,7 +323,7 @@ function ChatPage() {
     }
 
 try {
-  const data = await sendChatRequest(userMsg.text, false, false);
+  const data = await sendChatRequest(userMsg.text, isDetailedResponseNeeded, isVisualizationNeeded);//manually passed charts and detailed reponse
 
   if (!data.success) {
     throw new Error(data.error || 'Failed to fetch response');
@@ -338,6 +367,26 @@ try {
   const formatTime = (date) => {
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   };
+
+  //For Deleting Chat
+  const handleDeleteChat = async (chatId: string) => {
+    try {
+
+      await fetch(`http://localhost:8081/api/chats/${chatId}`, {
+        method: "DELETE"
+      })
+
+      setChats(prev => prev.filter(chat => chat.chatId !== chatId))
+
+      if (currentChatId === chatId) {
+        setCurrentChatId(null)
+        setMessages([])
+      }
+
+    } catch (err) {
+      console.error("Delete chat failed", err)
+    }
+  }
 
   return (
     <div
@@ -416,20 +465,110 @@ try {
               </div>
               <div className="space-y-1">
                 {chats.map((chat) => (
-                  <button
+                  <div
                     key={chat._id}
-                    onClick={() => loadChat(chat.chatId)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${currentChatId === chat.chatId
-                        ? (isLightMode ? 'bg-blue-100 text-blue-700' : 'bg-blue-500/20 text-white')
-                        : (isLightMode ? 'text-slate-600 hover:text-slate-900 hover:bg-black/5' : 'text-white/70 hover:text-white hover:bg-white/5')
-                      }`}
+                    className="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 hover:bg-white/5"
                   >
-                    <MessageSquare className={`w-4 h-4 transition-colors ${currentChatId === chat.chatId
-                        ? (isLightMode ? 'text-blue-600' : 'text-blue-400')
-                        : (isLightMode ? 'text-slate-400 group-hover:text-blue-500' : 'text-white/40 group-hover:text-blue-400')
-                      }`} />
-                    <span className="text-sm truncate flex-1 text-left">{chat.chatName}</span>
-                  </button>
+
+                    <button
+                      onClick={() => loadChat(chat.chatId)}
+                      className="flex items-center gap-3 flex-1 text-left"
+                    >
+                      <MessageSquare className="w-4 h-4 text-white/40 group-hover:text-blue-400" />
+
+                      {editingChatId === chat.chatId ? (
+                        <div className="flex items-center gap-2 flex-1">
+
+                          <input
+                            value={editedName}
+                            autoFocus
+                            onChange={(e) => setEditedName(e.target.value)}
+                            className="bg-transparent border-b border-blue-400 outline-none text-sm flex-1"
+                          />
+
+                          {/* SAVE */}
+                          <button
+                            onClick={async () => {
+                              await renameChatSession(chat.chatId, editedName)
+
+                              setChats(prev =>
+                                prev.map(c =>
+                                  c.chatId === chat.chatId
+                                    ? { ...c, chatName: editedName }
+                                    : c
+                                )
+                              )
+
+                              setEditingChatId(null)
+                            }}
+                            className="text-green-400 hover:text-green-300 text-sm"
+                          >
+                            ✓
+                          </button>
+
+                          {/* CANCEL */}
+                          <button
+                            onClick={() => setEditingChatId(null)}
+                            className="text-red-400 hover:text-red-300 text-sm"
+                          >
+                            ✕
+                          </button>
+
+                        </div>
+                      ) : (
+                        <span className="text-sm truncate flex-1">
+                          {chat.chatName}
+                        </span>
+                      )}
+                    </button>
+
+                    {/* Three dots */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setMenuOpenChatId(menuOpenChatId === chat.chatId ? null : chat.chatId)
+                      }}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <MoreVertical className="w-4 h-4 text-white/60 hover:text-white" />
+                    </button>
+
+                    {/* Dropdown menu */}
+                    {menuOpenChatId === chat.chatId && (
+                      <div
+                        className={`absolute right-2 top-8 rounded-lg shadow-lg z-50 border
+                        ${isLightMode
+                          ? "bg-white border-slate-200 text-slate-800"
+                          : "bg-black border-white/10 text-white"
+                        }`}
+                      >
+
+                        <button
+                          onClick={() => {
+                            setEditingChatId(chat.chatId)
+                            setEditedName(chat.chatName)
+                            setMenuOpenChatId(null)
+                          }}
+                          className={`block w-full text-left px-4 py-2 text-sm ${isLightMode ? "hover:bg-slate-100" : "hover:bg-white/10"}`}
+                        >
+                          Rename
+                        </button>
+
+                        <button
+                          onClick={() => setDeleteChatId(chat.chatId)}
+                          className={`block w-full text-left px-4 py-2 text-sm
+                          ${isLightMode
+                            ? "hover:bg-red-100 text-red-600"
+                            : "hover:bg-red-500/20 text-red-400"
+                          }`}
+                        >
+                          Delete
+                        </button>
+
+                      </div>
+                    )}
+
+                  </div>
                 ))}
               </div>
 
@@ -636,43 +775,91 @@ try {
                           <button
                             key={mode.id}
                             onClick={() => handleModeSelect(mode)}
-                            className={`w-full flex items-start gap-3 px-3 py-3 rounded-xl transition-all duration-200 ${selectedMode.id === mode.id
+                            className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-200 ${
+                              selectedMode.id === mode.id
                                 ? 'bg-blue-500/20 border border-blue-500/30'
                                 : 'hover:bg-white/5'
-                              }`}
+                            }`}
                           >
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${selectedMode.id === mode.id ? 'bg-blue-500' : 'bg-white/10'
-                              }`}>
-                              <mode.icon className="w-4 h-4 text-white" />
-                            </div>
-                            <div className="text-left">
-                              <p className={`text-sm font-medium ${selectedMode.id === mode.id ? 'text-white' : 'text-white/80'}`}>
-                                {mode.label}
-                              </p>
-                              <p className="text-xs text-white/50">{mode.description}</p>
-                            </div>
+
+                          <div className="flex items-start gap-3">
+
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                            selectedMode.id === mode.id ? 'bg-blue-500' : 'bg-white/10'
+                          }`}>
+                            <mode.icon className="w-4 h-4 text-white" />
+                          </div>
+
+                          <div className="text-left">
+                            <p className={`text-sm font-medium ${
+                              selectedMode.id === mode.id ? 'text-white' : 'text-white/80'
+                            }`}>
+                              {mode.label}
+                            </p>
+
+                            <p className="text-xs text-white/50">{mode.description}</p>
+                          </div>
+
+                          </div>
+
+                          {/* Checkboxes only for specific modes */}
+                          {mode.id === "deep" && (
+                          <input
+                            type="checkbox"
+                            checked={isDetailedResponseNeeded}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              setIsDetailedResponseNeeded(e.target.checked)
+                            }}
+                            className="accent-blue-500"
+                          />
+                          )}
+
+                          {mode.id === "visualizer" && (
+                          <input
+                            type="checkbox"
+                            checked={isVisualizationNeeded}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              setIsVisualizationNeeded(e.target.checked)
+                            }}
+                            className="accent-blue-500"
+                          />
+                          )}
+
                           </button>
-                        ))}
+                          ))}
                       </div>
                     )}
                   </div>
 
-                  {/* Current Mode Indicator */}
-                  <div
-                    className={`flex items-center gap-2 px-2 py-1 rounded-lg ${isLightMode ? 'bg-white/80 shadow-sm' : 'bg-white/5'
-                      }`}
-                  >
-                    <selectedMode.icon
-                      className={`w-4 h-4 ${isLightMode ? 'text-blue-500' : 'text-blue-400'
-                        }`}
-                    />
-                    <span
-                      className={`text-xs ${isLightMode ? 'text-slate-600' : 'text-white/60'
-                        }`}
-                    >
-                      {selectedMode.label}
-                    </span>
-                  </div>
+                  <div className="flex items-center gap-2">
+
+                    {/* Show AUTO only when nothing else is selected */}
+                    {!isDetailedResponseNeeded && !isVisualizationNeeded && (
+                      <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 text-xs">
+                        <Sparkles className="w-4 h-4 text-blue-400" />
+                        Auto
+                      </div>
+                    )}
+
+                    {/* Deep Search badge */}
+                    {isDetailedResponseNeeded && (
+                      <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 text-xs">
+                        <SearchIcon className="w-4 h-4 text-blue-400" />
+                        Deep
+                      </div>
+                    )}
+
+                    {/* Visualization badge */}
+                    {isVisualizationNeeded && (
+                      <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 text-xs">
+                        <BarChart3 className="w-4 h-4 text-blue-400" />
+                        Charts
+                      </div>
+                    )}
+
+                    </div>
 
                   {/* Input */}
                   <input
@@ -1049,9 +1236,60 @@ try {
             </div>
           )}
         </div>
+
+          {deleteChatId && (
+    <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+
+      <div
+          className={`rounded-xl p-6 w-80 shadow-xl
+          ${isLightMode
+            ? "bg-white text-slate-800"
+            : "bg-[#0f172a] text-white"
+          }`}
+        >
+
+        <h2 className="text-lg font-semibold mb-4">
+          Delete Chat?
+        </h2>
+
+        <p className="text-sm font-semi mb-6">
+          This action cannot be undone.
+        </p>
+
+        <div className="flex justify-end gap-3">
+
+          <button
+            onClick={() => setDeleteChatId(null)}
+            className={`px-4 py-2 rounded-lg
+              ${isLightMode
+                ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                : "bg-white/10 hover:bg-white/20 text-white"
+              }`}
+          >
+            Cancel
+          </button>
+
+          <button
+            onClick={() => {
+              handleDeleteChat(deleteChatId)
+              setDeleteChatId(null)
+            }}
+            className={`px-4 py-2 rounded-lg
+              ${isLightMode
+                ? "bg-red-500 hover:bg-red-600 text-white"
+                : "bg-red-500 hover:bg-red-600 text-white"
+              }`}
+          >
+            Delete
+          </button>
+
+        </div>
+
+      </div>
+
+    </div>
+  )}
       </main>
     </div>
-  );
-}
-
+  )};
 export default ChatPage;

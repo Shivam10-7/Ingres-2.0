@@ -213,3 +213,15 @@ export async function saveChatMessage(chatId: string, role: string, content: str
     return null;
   }
 }
+
+export const renameChatSession = async (chatId: string, chatName: string) => {
+  const res = await fetch(`${API_BASE_URL}/api/chats/rename/${chatId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ chatName })
+  });
+
+  return res.json();
+};

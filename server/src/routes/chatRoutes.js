@@ -107,4 +107,53 @@ router.post("/message", async (req, res) => {
   }
 });
 
+router.put("/rename/:chatId", async (req, res) => {
+  try {
+
+    const { chatId } = req.params;
+    const { chatName } = req.body;
+
+    const updatedChat = await Chat.findOneAndUpdate(
+      { chatId },
+      { chatName },
+      { new: true }
+    );
+
+    if (!updatedChat) {
+      return res.status(404).json({
+        success: false,
+        message: "Chat not found"
+      });
+    }
+
+    res.json({
+      success: true,
+      chat: updatedChat
+    });
+
+  } catch (err) {
+    console.error("Rename chat error:", err);
+    res.status(500).json({ success: false });
+  }
+});
+
+router.delete("/:chatId", async (req, res) => {
+  try {
+
+    const { chatId } = req.params;
+
+    const chat = await Chat.findOneAndDelete({ chatId });
+
+    if (!chat) {
+      return res.status(404).json({ success: false, message: "Chat not found" });
+    }
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("Delete chat error:", err);
+    res.status(500).json({ success: false });
+  }
+});
+
 module.exports = router;
