@@ -2,7 +2,11 @@ async function selectPipeline(isDetailedResponseNeeded, isVisualizationNeeded , 
   if (!isDetailedResponseNeeded && !isVisualizationNeeded) {
     console.log("Data query pipeline selected");
     const dataqueyryPipeline = require('./pipelines/dataquery');
-   return await dataqueyryPipeline(query);
+    let response = await dataqueyryPipeline(query);
+   return {
+    response: response,
+    chartData: null
+   }
    
     // return "DATA_QUERY_PIPELINE";//here the function would be called that would call the data query pipeline and then return the response to the user
   }

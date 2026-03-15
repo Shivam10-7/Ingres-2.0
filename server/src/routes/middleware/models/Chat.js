@@ -7,10 +7,18 @@ const MessageSchema = new mongoose.Schema(
       enum: ["user", "assistant"],
       required: true,
     },
-    content: {
-      type: String,
-      required: true,
-    },
+    content: [
+      {
+        response: {
+          type: mongoose.Schema.Types.Mixed,
+          required: false
+        },
+        chartData: {
+          type: mongoose.Schema.Types.Mixed,
+          required: false
+        }
+      }
+    ],
     timestamp: {
       type: Date,
       default: Date.now,

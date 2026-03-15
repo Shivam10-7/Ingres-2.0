@@ -6,7 +6,13 @@ const RAG_API_BASE_URL = 'http://127.0.0.1:8000';
 
 export interface ChatResponse {
   success: boolean;
-  response?: string;
+  // New API shape: response may be a plain string or an object containing both text and optional chart data.
+  response?:
+    | string
+    | {
+        response?: string;
+        chartData?: unknown;
+      };
   markdown_json?: string;
   error?: string;
   message?: string;
@@ -148,7 +154,8 @@ export interface ChatSession {
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
-  content: string;
+  // New message schema stores an array of objects `{ response, chartData }`.
+  content: any;
   timestamp?: string;
 }
 
@@ -199,7 +206,7 @@ export async function getChatSessionHistory(chatId: string): Promise<ChatHistory
   }
 }
 
-export async function saveChatMessage(chatId: string, role: string, content: string) {
+export async function saveChatMessage(chatId: string, role: string, content: any) {
   try {
     const res = await fetch(`${API_BASE_URL}/api/chats/message`, {
       method: 'POST',

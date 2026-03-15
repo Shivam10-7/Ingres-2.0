@@ -104,9 +104,10 @@ function ChatPage() {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
 
-  //Toogle Button
+  // Toggle buttons and output data
   const [isVisualizationNeeded, setIsVisualizationNeeded] = useState(false);
   const [isDetailedResponseNeeded, setIsDetailedResponseNeeded] = useState(false);
+  const [lastChartData, setLastChartData] = useState<any>(null);
 
   //For Renaming & Deleting the ChatNames
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
@@ -143,13 +144,37 @@ function ChatPage() {
     setShowResults(false);
     const history = await getChatSessionHistory(chatId);
     if (history && history.messages) {
-      const formattedMessages = history.messages.map((m: any, i: number) => ({
-        id: m._id || i,
-        text: m.content,
-        sender: m.role === 'user' ? 'user' : 'bot',
-        timestamp: new Date(m.timestamp || Date.now())
-      }));
+      const formattedMessages = history.messages.map((m: any, i: number) => {
+        const content = m.content;
+
+        let text = '';
+        let chartData: any;
+
+        if (typeof content === 'string') {
+          text = content;
+        } else if (Array.isArray(content)) {
+          const first = content[0] ?? {};
+          text = typeof first.response === 'string' ? first.response : JSON.stringify(first);
+          chartData = first.chartData ?? first.chartdata;
+        } else if (content && typeof content === 'object') {
+          text = typeof content.response === 'string' ? content.response : JSON.stringify(content);
+          chartData = content.chartData ?? content.chartdata;
+        }
+
+        return {
+          id: m._id || i,
+          text,
+          chartData,
+          sender: m.role === 'user' ? 'user' : 'bot',
+          timestamp: new Date(m.timestamp || Date.now()),
+        };
+      });
+
       setMessages(formattedMessages);
+      const lastBotChart = [...formattedMessages]
+        .reverse()
+        .find((msg: any) => msg.sender === 'bot' && msg.chartData);
+      setLastChartData(lastBotChart?.chartData ?? null);
     }
   };
 
@@ -319,21 +344,33 @@ function ChatPage() {
 
     // Save message to mongo if we have active chat
     if (activeChatId) {
-      await saveChatMessage(activeChatId, 'user', userMsg.text);
+      await saveChatMessage(activeChatId, 'user', [{ response: userMsg.text }]);
     }
 
 try {
-  const data = await sendChatRequest(userMsg.text, isDetailedResponseNeeded, isVisualizationNeeded);//manually passed charts and detailed reponse
+  const data = await sendChatRequest(userMsg.text, isDetailedResponseNeeded, isVisualizationNeeded); // manually passed charts and detailed response
 
   if (!data.success) {
     throw new Error(data.error || 'Failed to fetch response');
   }
 
-  const answerText = data.response || "I'm sorry, I received an empty response.";
+  const responsePayload = data.response;
+  const answerText =
+    typeof responsePayload === 'string'
+      ? responsePayload
+      : responsePayload?.response ?? "I'm sorry, I received an empty response.";
+
+  const chartData =
+    responsePayload && typeof responsePayload === 'object'
+      ? responsePayload.chartData ?? responsePayload.chartData
+      : undefined;
+
+  setLastChartData(chartData ?? null);
 
   const botResponse = {
     id: crypto.randomUUID(), // More robust unique ID
     text: answerText,
+    chartData,
     sender: 'bot',
     timestamp: new Date(),
   };
@@ -343,7 +380,12 @@ try {
 
   if (activeChatId) {
     // Fire and forget or await? Usually better to await if the next step depends on it
-    await saveChatMessage(activeChatId, 'assistant', answerText);
+    await saveChatMessage(activeChatId, 'assistant', [
+      {
+        response: answerText,
+        chartData,
+      },
+    ]);
 
     if (userId) {
       const updatedChats = await getUserChatSessions(userId);
