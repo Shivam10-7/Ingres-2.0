@@ -107,6 +107,18 @@ const Index = () => {
                 visualizations, and historical analysis—making groundwater information more
                 accessible to planners, researchers, policymakers, and citizens.
               </p>
+              <p className="text-sm md:text-base text-slate-700 leading-relaxed mt-3">
+                To explore the official INGRES platform and access the complete groundwater
+                resource assessment data, visit the portal at{" "}
+                <a
+                  href="https://ingres.iith.ac.in/home"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 font-medium hover:underline"
+                >
+                  https://ingres.iith.ac.in/home
+                </a>.
+              </p>
             </div>
 
             {/* Right: embedded map HTML from public/Ingres_Map.html */}
