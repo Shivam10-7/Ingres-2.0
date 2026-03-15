@@ -771,9 +771,8 @@ try {
   >
     <div
       className={`
-        /* Increase width for charts specifically */
-        w-full md:max-w-[90%] lg:max-w-[75%] 
-        px-2 py-4 rounded-2xl border
+        w-full md:max-w-[90%] lg:max-w-[85%] 
+        p-4 rounded-2xl border transition-colors duration-200
         ${message.sender === 'user' 
           ? 'bg-blue-600 border-blue-500 text-white' 
           : isLightMode 
@@ -782,22 +781,24 @@ try {
         }
       `}
     >
-      {/* Container with a fixed aspect ratio or height for ECharts */}
-      <div className="h-[300px] w-full min-w-[300px]">
+      {/* Increased height for better readability. 
+          The Renderer now fills this container. 
+      */}
+      <div className="h-[400px] w-full">
         <EChartsRenderer 
           option={message.chartData} 
-          // style={{ height: '100%', width: '100%' }}
+          theme={isLightMode ? 'light' : 'dark'}
         />
       </div>
 
-      <div className={`px-3 flex justify-between items-center mt-2 border-t pt-2 ${
+      <div className={`px-1 flex justify-between items-center mt-3 border-t pt-2 ${
         message.sender === 'user' ? 'border-white/10' : 'border-slate-100/50'
       }`}>
-        <span className="text-[10px] font-medium uppercase tracking-wider opacity-50">
-          Data Visualization
+        <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">
+          Analysis Report
         </span>
         <span className={`text-xs ${
-          message.sender === 'user' ? 'text-white/70' : isLightMode ? 'text-slate-500' : 'text-white/40'
+          message.sender === 'user' ? 'text-white/70' : 'opacity-50'
         }`}>
           {formatTime(message.timestamp)}
         </span>

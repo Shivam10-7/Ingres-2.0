@@ -1,27 +1,69 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useMemo } from "react";
 import * as echarts from "echarts";
 
 export type EChartsOption = echarts.EChartsOption;
 
-export function EChartsRenderer({ option }: { option: EChartsOption }) {
-  const ref = useRef<HTMLDivElement | null>(null);
+interface Props {
+  option: EChartsOption;
+  className?: string;
+  style?: React.CSSProperties;
+  theme?: 'light' | 'dark'; // Added for professional UI sync
+}
 
+export function EChartsRenderer({ option, className, style, theme = 'light' }: Props) {
+  const chartRef = useRef<HTMLDivElement | null>(null);
+  const instanceRef = useRef<echarts.ECharts | null>(null);
+
+  // Initialize/Re-initialize chart when theme changes
   useEffect(() => {
-    if (!ref.current) return;
+    if (!chartRef.current) return;
 
-    const chart = echarts.init(ref.current);
-    chart.setOption(option ?? {});
+    // Dispose existing instance before switching themes
+    instanceRef.current?.dispose();
+    instanceRef.current = echarts.init(chartRef.current, theme);
 
-    const handleResize = () => {
-      chart.resize();
-    };
+    const resizeObserver = new ResizeObserver(() => {
+      instanceRef.current?.resize();
+    });
+    
+    resizeObserver.observe(chartRef.current);
 
-    window.addEventListener("resize", handleResize);
     return () => {
-      window.removeEventListener("resize", handleResize);
-      chart.dispose();
+      resizeObserver.disconnect();
+      instanceRef.current?.dispose();
     };
+  }, [theme]);
+
+  // Update options and inject Download Feature
+  useEffect(() => {
+    if (instanceRef.current) {
+      const professionalOption: EChartsOption = {
+        ...option,
+        // Ensure toolbox exists for downloading
+        toolbox: {
+          show: true,
+          right: 10,
+          feature: {
+            saveAsImage: { 
+              title: "Download",
+              type: "png",
+              pixelRatio: 2 // Higher quality for reports
+            },
+            dataView: { readOnly: false, title: "Data View" }, // Useful for analysts
+          },
+          ...option.toolbox as object
+        },
+      };
+
+      instanceRef.current.setOption(professionalOption, { notMerge: true });
+    }
   }, [option]);
 
-  return <div ref={ref} className="w-full h-64" />;
+  return (
+    <div 
+      ref={chartRef} 
+      className={className ?? "w-full h-full"} // Changed default to h-full
+      style={{ minHeight: '300px', ...style }} 
+    />
+  );
 }
