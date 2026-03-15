@@ -131,7 +131,7 @@ const DashboardPreview = () => {
   );
 };
 
-const FeaturesSection = () => {
+export const FeaturesSection = () => {
   return (
     <section id="features" className="relative z-10 border-t border-slate-200 bg-white py-16">
       <div className="container mx-auto px-6">

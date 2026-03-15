@@ -35,7 +35,15 @@ const faqs = [
 
 const FaqSection = () => {
   return (
-    <section className="relative z-10 py-24 bg-primary/[0.03]">
+    <section
+      className="relative z-10 border-t border-slate-200 py-16"
+      style={{
+        backgroundImage: "url('/FAQbg.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      }}
+    >
       <div className="container mx-auto px-6">
         <div className="grid gap-12 lg:grid-cols-2 items-start">
           {/* Left */}
@@ -44,20 +52,12 @@ const FaqSection = () => {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
           >
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4 italic">
-              Frequently Asked{" "}
-              <span className="gradient-text">Questions</span>
+            <h2 className="text-2xl md:text-3xl font-semibold text-slate-900 mb-4 border-b border-slate-200 pb-3">
+              Frequently Asked Questions
             </h2>
-            <p className="text-muted-foreground mb-6 max-w-md">
-              Find answers to common questions about the INGRES ChatBOT. Can't find what you're looking for? Contact our support team.
+            <p className="text-slate-700 mb-6 max-w-md">
+              Find answers to common questions about the INGRES ChatBOT.
             </p>
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              className="btn-glow rounded-xl px-6 py-3 text-sm font-semibold text-primary-foreground"
-            >
-              Contact Support
-            </motion.button>
           </motion.div>
 
           {/* Right – Accordion */}
@@ -71,12 +71,12 @@ const FaqSection = () => {
                 <AccordionItem
                   key={i}
                   value={`faq-${i}`}
-                  className="glass-card px-5 border rounded-xl"
+                  className="rounded-lg border border-slate-200 bg-white px-5 shadow-sm"
                 >
-                  <AccordionTrigger className="text-sm font-medium text-foreground hover:no-underline py-4">
+                  <AccordionTrigger className="text-sm font-semibold text-slate-900 hover:no-underline py-4">
                     {faq.q}
                   </AccordionTrigger>
-                  <AccordionContent className="text-sm text-muted-foreground pb-4">
+                  <AccordionContent className="text-sm text-slate-700 pb-4">
                     {faq.a}
                   </AccordionContent>
                 </AccordionItem>

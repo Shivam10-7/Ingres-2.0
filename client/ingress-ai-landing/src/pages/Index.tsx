@@ -6,9 +6,8 @@ import { useForceLightMode } from "@/hooks/useForceLightMode";
 import HeroSlideshow from "@/components/HeroSlideshow";
 import WaveBackground from "@/components/WaveBackground";
 import WaveDivider from "@/components/WaveDivider";
-import CtaSection from "@/components/CtaSection";
 import AboutSection from "@/components/AboutSection";
-import FeaturesSection from "@/components/FeaturesSection";
+import { FeaturesSection } from "@/components/FeaturesSection";
 import HowItWorksSection from "@/components/HowItWorksSection";
 import FaqSection from "@/components/FaqSection";
 import Footer from "@/components/Footer";
@@ -143,7 +142,6 @@ const Index = () => {
       <WaveDivider />
       <HowItWorksSection />
       <WaveDivider flip />
-      <CtaSection />
       <FaqSection />
       <Footer />
     </div>

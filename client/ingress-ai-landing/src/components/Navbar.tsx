@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, ChevronDown } from "lucide-react";
 
-const navItems = ["Home", "About", "Features", "Contact"];
+const navItems = ["Home", "About", "Features"];
 
 const SCROLL_THRESHOLD_PX = 80;
 
