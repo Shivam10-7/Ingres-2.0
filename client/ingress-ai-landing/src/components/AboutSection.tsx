@@ -1,5 +1,5 @@
-import { useRef, useEffect, useState } from "react";
-import { motion, useMotionValue, useTransform, useSpring } from "framer-motion";
+import { useRef } from "react";
+import { motion } from "framer-motion";
 import { Brain, Globe, Handshake, TrendingUp } from "lucide-react";
 
 const cards = [
@@ -39,136 +39,55 @@ const cardVariants = {
   },
 };
 
-/* Flowing water SVG path connecting cards */
-const FlowingLines = () => (
-  <svg
-    className="absolute inset-0 w-full h-full pointer-events-none hidden lg:block"
-    viewBox="0 0 1200 400"
-    preserveAspectRatio="none"
-    fill="none"
-  >
-    <defs>
-      <linearGradient id="flowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stopColor="hsl(187, 94%, 43%)" stopOpacity="0.1" />
-        <stop offset="50%" stopColor="hsl(217, 91%, 60%)" stopOpacity="0.3" />
-        <stop offset="100%" stopColor="hsl(187, 94%, 43%)" stopOpacity="0.1" />
-      </linearGradient>
-    </defs>
-    <motion.path
-      d="M150,200 C250,100 350,300 450,200 C550,100 650,300 750,200 C850,100 950,300 1050,200"
-      stroke="url(#flowGrad)"
-      strokeWidth="2"
-      strokeLinecap="round"
-      initial={{ pathLength: 0 }}
-      whileInView={{ pathLength: 1 }}
-      viewport={{ once: true }}
-      transition={{ duration: 2.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-    />
-    <motion.path
-      d="M150,220 C250,120 350,320 450,220 C550,120 650,320 750,220 C850,120 950,320 1050,220"
-      stroke="url(#flowGrad)"
-      strokeWidth="1"
-      strokeLinecap="round"
-      strokeDasharray="6 6"
-      initial={{ pathLength: 0 }}
-      whileInView={{ pathLength: 1 }}
-      viewport={{ once: true }}
-      transition={{ duration: 3, ease: [0.25, 0.46, 0.45, 0.94], delay: 0.3 }}
-    />
-  </svg>
-);
-
-/* Subtle animated background waves */
-const BackgroundWaves = () => (
-  <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-[0.04]">
-    <svg className="absolute bottom-0 w-[200%] h-48 wave-animation" viewBox="0 0 1440 320" preserveAspectRatio="none">
-      <path fill="hsl(222, 80%, 33%)" d="M0,160L60,170.7C120,181,240,203,360,192C480,181,600,139,720,128C840,117,960,139,1080,160C1200,181,1320,203,1380,213.3L1440,224L1440,320L0,320Z" />
-    </svg>
-  </div>
-);
-
 const AboutSection = () => {
   const sectionRef = useRef<HTMLElement>(null);
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-  const springX = useSpring(mouseX, { stiffness: 50, damping: 30 });
-  const springY = useSpring(mouseY, { stiffness: 50, damping: 30 });
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!sectionRef.current) return;
-      const rect = sectionRef.current.getBoundingClientRect();
-      const x = (e.clientX - rect.left - rect.width / 2) / 60;
-      const y = (e.clientY - rect.top - rect.height / 2) / 60;
-      mouseX.set(x);
-      mouseY.set(y);
-    };
-    window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [mouseX, mouseY]);
 
   return (
-    <section id="about" ref={sectionRef} className="relative z-10 py-24 overflow-hidden">
-      <BackgroundWaves />
-
+    <section
+      id="about"
+      ref={sectionRef}
+      className="relative z-10 border-t border-slate-200 bg-slate-50/80 py-16"
+    >
       <div className="container mx-auto px-6">
         <motion.h2
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.3 }}
-          transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="font-display text-3xl md:text-4xl font-bold text-foreground mb-16"
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="text-2xl md:text-3xl font-semibold text-slate-900 mb-8 border-b border-slate-200 pb-3"
         >
           About Us
         </motion.h2>
 
         <div className="relative">
-          <FlowingLines />
-
           <motion.div
             variants={containerVariants}
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, amount: 0.3 }}
-            className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 relative z-10"
-            style={{ x: springX, y: springY }}
+            className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 relative z-10"
           >
-            {cards.map((card, i) => (
+            {cards.map((card) => (
               <motion.div
                 key={card.title}
                 variants={cardVariants}
-                className="glass-card p-6 group transition-all duration-500 ease-out hover:border-secondary/40"
-                whileHover={{
-                  scale: 1.05,
-                  y: -8,
-                  boxShadow: "0 20px 60px hsla(217, 91%, 60%, 0.2), 0 0 30px hsla(187, 94%, 43%, 0.1)",
-                }}
-                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                whileHover={{ y: -4, boxShadow: "0 8px 18px rgba(15, 23, 42, 0.12)" }}
+                className="group h-full rounded-lg border border-slate-200 bg-white px-5 py-6 shadow-sm transition-transform transition-shadow duration-200 ease-out"
               >
-                {/* Floating animation wrapper */}
-                <motion.div
-                  animate={{ y: [0, -6, 0] }}
-                  transition={{
-                    duration: 4 + i * 0.5,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
-                >
-                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary group-hover:bg-secondary/10 group-hover:text-secondary transition-colors duration-500">
-                    <motion.div
-                      whileHover={{ rotate: 15, scale: 1.15 }}
-                      transition={{ type: "spring", stiffness: 300, damping: 15 }}
-                    >
-                      <card.icon className="h-6 w-6" />
-                    </motion.div>
+                <div className="mb-2 h-0.5 w-10 bg-orange-500 group-hover:bg-blue-600" />
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-700">
+                    <card.icon className="h-4 w-4" />
                   </div>
-                  <h3 className="font-display text-lg font-semibold text-foreground mb-2">
-                    {card.title}
-                  </h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {card.desc}
-                  </p>
-                </motion.div>
+                  <div>
+                    <h3 className="text-sm md:text-base font-semibold text-slate-900 mb-1">
+                      {card.title}
+                    </h3>
+                    <p className="text-sm text-slate-700 leading-relaxed">
+                      {card.desc}
+                    </p>
+                  </div>
+                </div>
               </motion.div>
             ))}
           </motion.div>

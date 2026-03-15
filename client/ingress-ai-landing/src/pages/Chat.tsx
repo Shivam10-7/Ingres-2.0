@@ -247,7 +247,7 @@ function ChatPage() {
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  // Sync body background with theme mode
+  // Sync body background with theme mode (only for Chat page; landing/login stay light)
   useEffect(() => {
     if (isLightMode) {
       document.body.style.background = '#f3f4f6';
@@ -256,6 +256,11 @@ function ChatPage() {
       document.body.style.background = '#050a30';
       document.body.style.color = '#ffffff';
     }
+    // Clear body styles on unmount so landing/login are not affected when user navigates back
+    return () => {
+      document.body.style.background = '';
+      document.body.style.color = '';
+    };
   }, [isLightMode]);
 
   // Sidebar open state (allow closing)
