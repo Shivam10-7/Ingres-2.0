@@ -17,22 +17,31 @@ const Navbar = () => {
   const [langOpen, setLangOpen] = useState(false);
   const [language, setLanguage] = useState<(typeof LANGUAGES)[number]>(LANGUAGES[0]);
   const [navbarVisible, setNavbarVisible] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
   const location = useLocation();
 
   const isLanding = location.pathname === "/" || location.pathname === "/landing";
 
   // On landing page: show navbar only after user scrolls down a bit
+  // Also compute scroll progress (0–1) for the tricolour progress line
   useEffect(() => {
-    if (!isLanding) {
-      setNavbarVisible(true);
-      return;
-    }
-    const onScroll = () => {
-      setNavbarVisible(window.scrollY > SCROLL_THRESHOLD_PX);
+    const handleScroll = () => {
+      const scrollY = window.scrollY || window.pageYOffset || 0;
+      const doc = document.documentElement;
+      const maxScroll = (doc.scrollHeight || 0) - (window.innerHeight || 0) || 1;
+      const progress = Math.min(Math.max(scrollY / maxScroll, 0), 1);
+
+      if (isLanding) {
+        setNavbarVisible(scrollY > SCROLL_THRESHOLD_PX);
+      } else {
+        setNavbarVisible(true);
+      }
+      setScrollProgress(progress);
     };
-    onScroll(); // set initial state
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+
+    handleScroll(); // set initial state
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
   }, [isLanding]);
 
   return (
@@ -45,7 +54,23 @@ const Navbar = () => {
           transition={{ duration: 0.3, ease: "easeOut" }}
           className="fixed top-0 left-0 right-0 z-50 glass-card rounded-none border-x-0 border-t-0"
         >
-          <div className="container mx-auto flex items-center justify-between px-6 py-4">
+          {/* Tricolour scroll progress bar */}
+          <div className="h-1 w-full bg-transparent overflow-hidden">
+            <div
+              className="h-full rounded-r-full"
+              style={{
+                width: "100%",
+                transform: `scaleX(${scrollProgress})`,
+                transformOrigin: "left",
+                backgroundImage:
+                  "linear-gradient(to right, #FF9933 0%, #FFFFFF 50%, #138808 100%)",
+                transition: "transform 0.25s ease-out",
+                willChange: "transform",
+              }}
+            />
+          </div>
+
+          <div className="container mx-auto flex items-center justify-between px-6 py-3">
             {/* Logos - Government of India + Digital India */}
             <Link to="/" className="flex items-center gap-4">
               <img
