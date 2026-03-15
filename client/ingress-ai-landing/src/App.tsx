@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
+import Login from "./pages/Login";
 import ChatPage from "./pages/Chat";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -20,6 +21,7 @@ const App = () => (
           {/* Landing page - accessible to all */}
           <Route path="/" element={<Index />} />
           <Route path="/landing" element={<Index />} />
+          <Route path="/login" element={<Login />} />
           
           {/* Chat page - protected (requires login) */}
           <Route 
