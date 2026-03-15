@@ -53,38 +53,27 @@ async function AnalyticsQueryHandler(Query) {
             const title = ChartType.title || 'Chart';
             const pieData = await PieChartPayloadd(rows, title);
             console.log("[Visualizer] Pie Chart Payload Generated");
-            return {
-                type: 'pie',
-                data: pieData
-            };
+            return pieData;
         }
 
         case 'bar': {
             const title = ChartType.title || 'Chart';
             const barData = await BarChartPayload(rows, title);
             console.log("[Visualizer] Bar Chart Payload Generated");
-            return {
-                type: 'bar',
-                data: barData
-            };
+            return barData;
+            ;
         }
         case 'line': {
             const title = ChartType.title || 'Chart';
             const lineData = await LineChartPayload(rows, title);
             console.log("[Visualizer] Line Chart Payload Generated");
-            return {
-                type: 'line',
-                data: lineData
-            };
+            return lineData;
         }
 
         default:
             // Fallback: If no specific chart is requested, return the raw data as a table
             console.log("[Visualizer] Defaulting to Table View");
-            return {
-                type: 'table',
-                data: rows 
-            };
+            return rows;
     }
                 
         // 3. Stringify data for the LL

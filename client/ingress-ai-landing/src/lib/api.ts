@@ -11,6 +11,7 @@ export interface ChatResponse {
     | string
     | {
         response?: string;
+        chartdata?: unknown;
         chartData?: unknown;
       };
   markdown_json?: string;

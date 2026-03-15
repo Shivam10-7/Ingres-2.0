@@ -38,6 +38,7 @@ import {
   renameChatSession
 } from '@/lib/api';
 import UserProfile from '@/components/UserProfile';
+import { EChartsRenderer } from '@/components/EChartsRenderer';
 const logoLight = '/logo_LIGHT.png';
 const logoDark = '/logo_DARK.png';
 import '@/chat/index.css';
@@ -362,7 +363,7 @@ try {
 
   const chartData =
     responsePayload && typeof responsePayload === 'object'
-      ? responsePayload.chartData ?? responsePayload.chartData
+      ? responsePayload.chartdata ?? responsePayload.chartData
       : undefined;
 
   setLastChartData(chartData ?? null);
@@ -735,33 +736,51 @@ try {
               ) : (
                 <div className="space-y-6 max-w-3xl mx-auto">
                   {messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}
-                    >
-                      {message.sender === 'bot' && (
-                        <div className="w-8 h-8 flex items-center justify-center mr-3 shrink-0">
-                          <img src={isLightMode ? logoLight : logoDark} alt="bot" className="w-4 h-4 object-contain" />
+                    <React.Fragment key={message.id}>
+                      <div
+                        className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}
+                      >
+                        {message.sender === 'bot' && (
+                          <div className="w-8 h-8 flex items-center justify-center mr-3 shrink-0">
+                            <img src={isLightMode ? logoLight : logoDark} alt="bot" className="w-4 h-4 object-contain" />
+                          </div>
+                        )}
+                        <div
+                          className={`max-w-[80%] px-5 py-3 ${message.sender === 'user' ? 'message-user' : isLightMode ? 'message-bot-light' : 'message-bot-dark'
+                            }`}
+                        >
+                          {message.text.includes('```') ? (
+                            <pre className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'} bg-transparent`}>
+                              {formatMessageText(message.text)}
+                            </pre>
+                          ) : (
+                            <p className={`text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'}`}>
+                              {formatMessageText(message.text)}
+                            </p>
+                          )}
+                          <span className={`text-xs mt-2 block ${message.sender === 'user' ? 'text-white/70' : isLightMode ? 'text-slate-500' : 'text-white/40'}`}>
+                            {formatTime(message.timestamp)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {message.chartData && (
+                        <div
+                          key={`${message.id}-chart`}
+                          className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}
+                        >
+                          <div
+                            className={`max-w-[80%] px-5 py-3 ${message.sender === 'user' ? 'message-user' : isLightMode ? 'message-bot-light' : 'message-bot-dark'
+                              }`}
+                          >
+                            <EChartsRenderer option={message.chartData} />
+                            <span className={`text-xs mt-2 block ${message.sender === 'user' ? 'text-white/70' : isLightMode ? 'text-slate-500' : 'text-white/40'}`}>
+                              {formatTime(message.timestamp)}
+                            </span>
+                          </div>
                         </div>
                       )}
-                      <div
-                        className={`max-w-[80%] px-5 py-3 ${message.sender === 'user' ? 'message-user' : isLightMode ? 'message-bot-light' : 'message-bot-dark'
-                          }`}
-                      >
-                        {message.text.includes('```') ? (
-                          <pre className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'} bg-transparent`}>
-                            {formatMessageText(message.text)}
-                          </pre>
-                        ) : (
-                          <p className={`text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'}`}>
-                            {formatMessageText(message.text)}
-                          </p>
-                        )}
-                        <span className={`text-xs mt-2 block ${message.sender === 'user' ? 'text-white/70' : isLightMode ? 'text-slate-500' : 'text-white/40'}`}>
-                          {formatTime(message.timestamp)}
-                        </span>
-                      </div>
-                    </div>
+                    </React.Fragment>
                   ))}
 
                   {isTyping && (
