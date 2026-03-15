@@ -14,9 +14,19 @@ import ProtectedRoute from "./components/ProtectedRoute";
 const queryClient = new QueryClient();
 
 const App = () => {
-  const [loading, setLoading] = useState(true);
+  const isChatRoute =
+    typeof window !== "undefined" && window.location.pathname.startsWith("/chat");
+
+  // Only show preloader on non-chat routes (/, /landing, /login, etc.)
+  const [loading, setLoading] = useState(!isChatRoute);
 
   useEffect(() => {
+    if (isChatRoute) {
+      // Never show preloader on chat route, even on refresh
+      setLoading(false);
+      return;
+    }
+
     const handleLoaded = () => {
       // Keep preloader visible a bit longer, then fade into content smoothly
       setTimeout(() => setLoading(false), 3000);
@@ -28,7 +38,7 @@ const App = () => {
       window.addEventListener("load", handleLoaded);
       return () => window.removeEventListener("load", handleLoaded);
     }
-  }, []);
+  }, [isChatRoute]);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -36,9 +46,9 @@ const App = () => {
         <Toaster />
         <Sonner />
 
-        {/* Preloader overlay */}
+        {/* Preloader overlay (never shown on /chat route) */}
         <AnimatePresence mode="wait">
-          {loading && (
+          {!isChatRoute && loading && (
             <motion.div
               key="preloader"
               className="fixed inset-0 z-[9999] bg-black"
