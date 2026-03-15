@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { motion, useMotionValue, useTransform, useSpring } from "framer-motion";
+import { motion } from "framer-motion";
 import { BarChart3, Zap, Settings, RefreshCw } from "lucide-react";
 
 const features = [
@@ -75,43 +75,18 @@ const AnimatedGraph = () => (
   </svg>
 );
 
-/* Dashboard preview with 3D tilt */
+/* Dashboard preview – simplified, no 3D tilt */
 const DashboardPreview = () => {
   const ref = useRef<HTMLDivElement>(null);
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-  const rotateX = useSpring(useTransform(y, [-0.5, 0.5], [8, -8]), { stiffness: 200, damping: 20 });
-  const rotateY = useSpring(useTransform(x, [-0.5, 0.5], [-8, 8]), { stiffness: 200, damping: 20 });
-
-  const handleMouse = (e: React.MouseEvent) => {
-    if (!ref.current) return;
-    const rect = ref.current.getBoundingClientRect();
-    x.set((e.clientX - rect.left) / rect.width - 0.5);
-    y.set((e.clientY - rect.top) / rect.height - 0.5);
-  };
-
-  const handleLeave = () => {
-    x.set(0);
-    y.set(0);
-  };
 
   return (
     <motion.div
-      ref={ref}
-      onMouseMove={handleMouse}
-      onMouseLeave={handleLeave}
       initial={{ opacity: 0, x: 80 }}
       whileInView={{ opacity: 1, x: 0 }}
       viewport={{ once: true, amount: 0.3 }}
-      transition={{ duration: 0.9, ease: [0.25, 0.46, 0.45, 0.94] }}
-      style={{ rotateX, rotateY, perspective: 800 }}
-      className="glass-card p-6 relative group hover:border-secondary/30 transition-all duration-500"
+      transition={{ duration: 0.7, ease: "easeOut" }}
+      className="rounded-md border border-slate-200 bg-white p-6 shadow-sm"
     >
-      {/* Glow border on hover */}
-      <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-        style={{ boxShadow: "inset 0 0 30px hsla(187, 94%, 43%, 0.1), 0 0 40px hsla(217, 91%, 60%, 0.15)" }}
-      />
-
       {/* Mini dashboard UI */}
       <motion.div
         animate={{ y: [0, -4, 0] }}
@@ -158,28 +133,20 @@ const DashboardPreview = () => {
 
 const FeaturesSection = () => {
   return (
-    <section id="features" className="relative z-10 py-24 bg-primary/[0.03]">
+    <section id="features" className="relative z-10 border-t border-slate-200 bg-white py-16">
       <div className="container mx-auto px-6">
-        {/* Header with animated gradient underline */}
+        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.3 }}
-          transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="text-center mb-16"
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="text-left mb-8 border-b border-slate-200 pb-3"
         >
-          <h2 className="font-display text-3xl md:text-4xl font-bold gradient-text mb-1 inline-block relative">
-            Features
-            <motion.span
-              className="absolute -bottom-2 left-0 h-[3px] rounded-full"
-              style={{ background: "var(--gradient-aqua)" }}
-              initial={{ width: 0 }}
-              whileInView={{ width: "100%" }}
-              viewport={{ once: true }}
-              transition={{ duration: 1, delay: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-            />
+          <h2 className="text-2xl md:text-3xl font-semibold text-slate-900">
+            Key Features
           </h2>
-          <p className="text-muted-foreground max-w-xl mx-auto mt-4">
+          <p className="text-slate-700 max-w-2xl mt-3 text-sm md:text-base">
             Everything you need to access and analyze India's groundwater data
           </p>
         </motion.div>
@@ -191,34 +158,31 @@ const FeaturesSection = () => {
             {features.map((f, i) => (
               <motion.div
                 key={f.title}
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.3 }}
                 transition={{
-                  duration: 0.6,
-                  delay: i * 0.12,
-                  ease: [0.25, 0.46, 0.45, 0.94],
+                  duration: 0.35,
+                  delay: i * 0.08,
+                  ease: "easeOut",
                 }}
-                whileHover={{
-                  y: -6,
-                  boxShadow: "0 16px 48px hsla(217, 91%, 60%, 0.15)",
-                }}
-                className="glass-card p-5 group hover:border-secondary/40 transition-all duration-500"
+                whileHover={{ y: -3, boxShadow: "0 10px 20px rgba(15, 23, 42, 0.10)" }}
+                className="group h-full rounded-lg border border-slate-200 bg-white px-4 py-5 shadow-sm transition-transform transition-shadow duration-200 ease-out"
               >
-                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-secondary/10 text-secondary group-hover:bg-secondary group-hover:text-secondary-foreground transition-colors duration-500">
-                  <motion.div
-                    whileHover={{ rotate: 10, scale: 1.1 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 15 }}
-                  >
-                    <f.icon className="h-5 w-5" />
-                  </motion.div>
+                <div className="mb-2 h-0.5 w-10 bg-orange-500 group-hover:bg-blue-600" />
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-700">
+                    <f.icon className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm md:text-base font-semibold text-slate-900 mb-1">
+                      {f.title}
+                    </h3>
+                    <p className="text-sm text-slate-700 leading-relaxed">
+                      {f.desc}
+                    </p>
+                  </div>
                 </div>
-                <h3 className="font-display text-base font-semibold text-foreground mb-1.5">
-                  {f.title}
-                </h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {f.desc}
-                </p>
               </motion.div>
             ))}
           </div>

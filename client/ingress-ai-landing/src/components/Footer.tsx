@@ -1,95 +1,54 @@
-import { Droplets } from "lucide-react";
-import { FaFacebookF, FaLinkedinIn, FaYoutube } from "react-icons/fa";
-
 const Footer = () => {
   return (
-    <footer className="relative z-10 border-t border-border bg-foreground/[0.03] py-16">
-      <div className="container mx-auto px-6">
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Brand */}
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <Droplets className="h-6 w-6 text-secondary" />
-              <span className="font-display text-lg font-bold gradient-text">
-                INGRES
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-              AI-powered access to India's groundwater resource data. Developed by CGWB in coordination with State Ground Water Departments.
+    <footer className="relative z-10 mt-8 border-t border-slate-300 bg-slate-900 text-slate-50">
+      <div className="container mx-auto px-6 py-10">
+        <div className="grid gap-8 md:grid-cols-4">
+          {/* About */}
+          <div className="md:col-span-2">
+            <h4 className="text-sm font-semibold uppercase tracking-wide mb-3">
+              India Groundwater Resource Estimation System (INGRES)
+            </h4>
+            <p className="text-xs md:text-sm leading-relaxed text-slate-200">
+              INGRES is developed by the Central Ground Water Board (CGWB), Ministry of Jal Shakti,
+              Government of India, to provide official groundwater resource information for planning
+              and decision making.
             </p>
-            <div className="flex gap-3">
-              {[FaFacebookF, FaLinkedinIn, FaYoutube].map((Icon, i) => (
-                <a
-                  key={i}
-                  href="#"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground hover:bg-secondary hover:text-secondary-foreground transition-colors"
-                >
-                  <Icon className="h-4 w-4" />
-                </a>
-              ))}
-            </div>
           </div>
 
-          {/* Quick Links */}
+          {/* Useful Links */}
           <div>
-            <h4 className="font-display text-sm font-semibold text-foreground mb-4">
-              Quick Links
-            </h4>
-            <ul className="space-y-2">
-              {["Home", "About", "Features", "How it Works", "Contact"].map((link) => (
-                <li key={link}>
-                  <a href={`#${link.toLowerCase().replace(/\s+/g, "")}`} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                    {link}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Resources */}
-          <div>
-            <h4 className="font-display text-sm font-semibold text-foreground mb-4">
-              Resources
-            </h4>
-            <ul className="space-y-2">
-              {["INGRES Portal", "CGWB Website", "User Guide", "API Documentation", "Privacy Policy"].map((link) => (
-                <li key={link}>
-                  <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                    {link}
-                  </a>
-                </li>
-              ))}
+            <h5 className="text-sm font-semibold mb-3">Useful Links</h5>
+            <ul className="space-y-1 text-xs md:text-sm text-slate-200">
+              <li><a href="#" className="hover:underline">INGRES Portal</a></li>
+              <li><a href="#" className="hover:underline">CGWB Website</a></li>
+              <li><a href="#" className="hover:underline">User Manual</a></li>
+              <li><a href="#" className="hover:underline">FAQs</a></li>
             </ul>
           </div>
 
           {/* Contact */}
           <div>
-            <h4 className="font-display text-sm font-semibold text-foreground mb-4">
-              Contact
-            </h4>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>support@ingres.gov.in</li>
-              <li>+91-11-XXXX-XXXX</li>
+            <h5 className="text-sm font-semibold mb-3">Contact</h5>
+            <ul className="space-y-1 text-xs md:text-sm text-slate-200">
+              <li>Email: support@ingres.gov.in</li>
+              <li>Phone: +91-11-XXXX-XXXX</li>
               <li className="pt-2 leading-relaxed">
                 Central Ground Water Board<br />
-                Ministry of Jal Shakti<br />
+                Ministry of Jal Shakti, Government of India<br />
                 New Delhi — 110001
               </li>
             </ul>
           </div>
         </div>
 
-        <div className="mt-12 flex flex-col md:flex-row items-center justify-between gap-4 border-t border-border pt-8">
-          <p className="text-xs text-muted-foreground">
-            © 2026 INGRES ChatBOT. Government of India. All rights reserved.
+        <div className="mt-8 border-t border-slate-700 pt-3 flex flex-col md:flex-row items-center justify-between gap-3">
+          <p className="text-[11px] md:text-xs text-slate-300 text-center md:text-left">
+            © 2026 India Groundwater Resource Estimation System (INGRES). All content is owned by the Government of India.
           </p>
-          <div className="flex gap-6">
-            <a href="#" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-              Terms of Use
-            </a>
-            <a href="#" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-              Privacy Policy
-            </a>
+          <div className="flex gap-4 text-[11px] md:text-xs text-slate-300">
+            <a href="#" className="hover:underline">Terms &amp; Conditions</a>
+            <span>|</span>
+            <a href="#" className="hover:underline">Privacy Policy</a>
           </div>
         </div>
       </div>
