@@ -765,21 +765,46 @@ try {
                       </div>
 
                       {message.chartData && (
-                        <div
-                          key={`${message.id}-chart`}
-                          className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}
-                        >
-                          <div
-                            className={`max-w-[80%] px-5 py-3 ${message.sender === 'user' ? 'message-user' : isLightMode ? 'message-bot-light' : 'message-bot-dark'
-                              }`}
-                          >
-                            <EChartsRenderer option={message.chartData} />
-                            <span className={`text-xs mt-2 block ${message.sender === 'user' ? 'text-white/70' : isLightMode ? 'text-slate-500' : 'text-white/40'}`}>
-                              {formatTime(message.timestamp)}
-                            </span>
-                          </div>
-                        </div>
-                      )}
+  <div
+    key={`${message.id}-chart`}
+    className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn my-4`}
+  >
+    <div
+      className={`
+        /* Increase width for charts specifically */
+        w-full md:max-w-[90%] lg:max-w-[75%] 
+        px-2 py-4 rounded-2xl border
+        ${message.sender === 'user' 
+          ? 'bg-blue-600 border-blue-500 text-white' 
+          : isLightMode 
+            ? 'bg-white border-slate-200 shadow-sm' 
+            : 'bg-slate-900 border-slate-800'
+        }
+      `}
+    >
+      {/* Container with a fixed aspect ratio or height for ECharts */}
+      <div className="h-[300px] w-full min-w-[300px]">
+        <EChartsRenderer 
+          option={message.chartData} 
+          // style={{ height: '100%', width: '100%' }}
+        />
+      </div>
+
+      <div className={`px-3 flex justify-between items-center mt-2 border-t pt-2 ${
+        message.sender === 'user' ? 'border-white/10' : 'border-slate-100/50'
+      }`}>
+        <span className="text-[10px] font-medium uppercase tracking-wider opacity-50">
+          Data Visualization
+        </span>
+        <span className={`text-xs ${
+          message.sender === 'user' ? 'text-white/70' : isLightMode ? 'text-slate-500' : 'text-white/40'
+        }`}>
+          {formatTime(message.timestamp)}
+        </span>
+      </div>
+    </div>
+  </div>
+)}
                     </React.Fragment>
                   ))}
 
