@@ -4,7 +4,7 @@ const ParseModelJson =  require("../Modules/parseLLMJsonString");
 const LocalModel = require("../../../LocalModel");
 const EntityResolver = require("../Modules/Entity_Resolve");
 async function SQLGen(userQuery) {
-const sqlGenerator = `
+let sqlGenerator = `
 You are an expert MySQL query generator for a groundwater assessment database.
 
 Your task is to convert a natural language user query into a SAFE and CORRECT SQL query.
@@ -127,12 +127,17 @@ When filtering location:
 
 • If entity type = state → use \`state\`
 • If entity type = district → use \`district\`
+• If entity type = block → use \`assessment unit name\`
+• If entity type = taluk → use \`assessment unit name\`
+• If entity type = tehsil → use \`assessment unit name\`
 • If entity type = assessment unit name → use \`assessment unit name\`
 • If entity type = assessment unit type → use \`assessment unit type\`
 
 NEVER assume state unless explicitly detected.
 NEVER use \`state\` as default filter.
 Use the column corresponding to detected entity type.
+Below is the reponse form the entity resolver which has detected the entity type and value from the user query. Use this information to construct the SQL query.
+{Resolver_Response}
 
 ==============================
 OUTPUT FORMAT (MANDATORY)
@@ -272,14 +277,15 @@ NOW GENERATE SQL FOR THE FOLLOWING USER QUERY:
 `;
 
 try {
-  console.log("System Instruction for SQL Generation:");
-
   //here we will send a request to the entity resolver module to get the entities and then we will send the user query along with the system instruction to the local model and get the response and then we will parse the response and return it to the user
   try {
     const entities = await EntityResolver(userQuery);
+    sqlGenerator = sqlGenerator.replace("{Resolver_Response}", JSON.stringify(entities));
+    console.log("[SQLGen] Entity resolution successful so the sql prompt is:",sqlGenerator);
   } catch (error) {
     console.error("[SQLGen] Entity resolution failed:", error.message);
   }
+    console.log("System Instruction for SQL Generation:");
     const SQLJresponse = await LocalModel(sqlGenerator, userQuery);
     // const SQLJresponse = await ApiCaller(sqlGenerator, userQuery);
     // const SQLJresponse = await LocalModel(SQL_Prompt2.replace("{{USER_QUERY}}", userQuery));
