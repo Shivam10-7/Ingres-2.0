@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entity Resolver Chat</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            background: #f4f6f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            width: min(720px, calc(100vw - 24px));
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        h2 {
+            text-align: center;
+            margin: 0 0 10px 0;
+        }
+
+        .hint {
+            text-align: center;
+            color: #4b5563;
+            font-size: 13px;
+            margin-bottom: 14px;
+        }
+
+        .chat {
+            height: 420px;
+            overflow: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 12px;
+            background: #fafafa;
+        }
+
+        .row {
+            display: flex;
+            margin: 10px 0;
+        }
+
+        .row.user {
+            justify-content: flex-end;
+        }
+
+        .bubble {
+            max-width: 85%;
+            border-radius: 12px;
+            padding: 10px 12px;
+            white-space: pre-wrap;
+            line-height: 1.35;
+            font-size: 14px;
+        }
+
+        .bubble.user {
+            background: #2563eb;
+            color: white;
+        }
+
+        .bubble.bot {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            color: #111827;
+        }
+
+        .composer {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        input {
+            flex: 1;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid #d1d5db;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        }
+
+        button {
+            width: 120px;
+            padding: 10px 12px;
+            border: none;
+            background: #111827;
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #0b1220;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Entity Resolver Chat</h2>
+    <div class="hint">Type a query (e.g. “Tell me about Kota”). The result will appear as chat messages.</div>
+
+    <div class="chat" id="chat"></div>
+
+    <div class="composer">
+        <input type="text" id="queryInput" placeholder="Enter your message..." autocomplete="off">
+        <button id="sendBtn" onclick="sendQuery()">Send</button>
+    </div>
+</div>
+
+<script>
+    const API_URL = "http://127.0.0.1:8000/resolve-entity";
+
+    function getOrCreateSessionId() {
+        const key = "resolver_session_id";
+        let id = localStorage.getItem(key);
+        if (!id) {
+            id = "sess-" + Math.random().toString(16).slice(2) + "-" + Date.now().toString(16);
+            localStorage.setItem(key, id);
+        }
+        return id;
+    }
+
+    const SESSION_ID = getOrCreateSessionId();
+
+    const chat = document.getElementById("chat");
+    const input = document.getElementById("queryInput");
+    const sendBtn = document.getElementById("sendBtn");
+
+    function scrollToBottom() {
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    function addBubble(text, who = "bot", extraEl = null) {
+        const row = document.createElement("div");
+        row.className = "row " + (who === "user" ? "user" : "bot");
+
+        const bubble = document.createElement("div");
+        bubble.className = "bubble " + (who === "user" ? "user" : "bot");
+        bubble.textContent = text;
+
+        row.appendChild(bubble);
+        chat.appendChild(row);
+
+        if (extraEl) {
+            const row2 = document.createElement("div");
+            row2.className = "row";
+            row2.appendChild(extraEl);
+            chat.appendChild(row2);
+        }
+
+        scrollToBottom();
+    }
+
+    function formatEntity(entity) {
+        const type = entity?.type || "-";
+        const state = entity?.state || "-";
+        const district = entity?.district || "-";
+        const block = entity?.block || "-";
+
+        if (type === "state") return `State: ${state}`;
+        if (type === "district") return `District: ${district} (State: ${state})`;
+        if (type === "block") return `Block: ${block} (District: ${district}, State: ${state})`;
+        return `Resolved: ${JSON.stringify(entity)}`;
+    }
+
+    function formatEntities(entities) {
+        const list = Array.isArray(entities) ? entities : [];
+        if (!list.length) return "Resolved (no details returned).";
+        if (list.length === 1) return formatEntity(list[0]);
+        return `Resolved:\n${list.map((e, i) => `${i + 1}. ${formatEntity(e)}`).join("\n")}`;
+    }
+
+    // Backend may return `options` as a nested list (e.g. ambiguous parts).
+    // Flatten into a single list of entity objects.
+    function flattenOptionsToEntities(options) {
+        const out = [];
+        (options || []).forEach((item) => {
+            if (Array.isArray(item)) out.push(...item);
+            else if (item) out.push(item);
+        });
+
+        // Dedupe by stable fields.
+        const seen = new Set();
+        const unique = [];
+        out.forEach((e) => {
+            const key = [
+                e?.type,
+                e?.state,
+                e?.district,
+                e?.block,
+            ].filter(Boolean).join("|");
+            if (!seen.has(key)) {
+                seen.add(key);
+                unique.push(e);
+            }
+        });
+        return unique;
+    }
+
+    async function sendQuery(customQuery = null) {
+        const query = (customQuery ?? input.value ?? "").trim();
+        if (!query) return;
+
+        addBubble(query, "user");
+        input.value = "";
+
+        sendBtn.disabled = true;
+        input.disabled = true;
+
+        try {
+            const response = await fetch(API_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ query: query, session_id: SESSION_ID }),
+            });
+
+            const data = await response.json();
+            renderResponse(data);
+        } catch (error) {
+            addBubble("Error connecting to API. Is FastAPI running on port 8000?", "bot");
+        } finally {
+            sendBtn.disabled = false;
+            input.disabled = false;
+            input.focus();
+        }
+    }
+
+    function renderResponse(data) {
+        // The API returns a plain shape like {status, message, entities/options}.
+        const payload = data?.data && data?.success !== undefined ? data.data : data;
+
+        if (!payload || !payload.status) {
+            addBubble("Unexpected response from server:\n" + JSON.stringify(data, null, 2), "bot");
+            return;
+        }
+
+        if (payload.status === "resolved") {
+            const entities = payload.entities || (payload.entity ? [payload.entity] : []);
+            addBubble(formatEntities(entities), "bot");
+            return;
+        }
+
+        if (payload.status === "ambiguous") {
+            const msg = payload.message || "Multiple matches found.";
+            const entities = flattenOptionsToEntities(payload.options);
+            const list = entities.length
+                ? `\n${entities.map((e, i) => `${i + 1}. ${formatEntity(e)}`).join("\n")}`
+                : "";
+            addBubble(msg + list, "bot");
+            return;
+        }
+
+        if (payload.status === "suggest") {
+            const msg = payload.message || "Did you mean one of these?";
+            const entities = flattenOptionsToEntities(payload.options);
+            const list = entities.length
+                ? `\n${entities.map((e, i) => `${i + 1}. ${formatEntity(e)}`).join("\n")}`
+                : "";
+            addBubble(msg + list, "bot");
+            return;
+        }
+
+        if (payload.status === "not_found") {
+            const msg = payload.message || "Not found.";
+            addBubble(msg, "bot");
+            return;
+        }
+
+        addBubble("Unknown status: " + payload.status, "bot");
+    }
+
+    input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+            sendQuery();
+        }
+    });
+
+    // initial greeting
+    addBubble("Hi! Ask me for a location (state/district/block). Example: “Tell me about Kota”.", "bot");
+</script>
+
+</body>
+</html>
