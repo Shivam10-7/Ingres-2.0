@@ -11,8 +11,10 @@
   "description": "",
   "dependencies": {
     "@google/genai": "^1.40.0",
+    "axios": "^1.13.6",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "http": "^0.0.1-security",
@@ -21,7 +23,6 @@
     "mysql2": "^3.16.3",
     "nodemon": "^3.1.11",
     "ollama": "^0.6.3",
-    "ws": "^8.19.0",
-    "cors": "^2.8.5"
+    "ws": "^8.19.0"
   }
 }

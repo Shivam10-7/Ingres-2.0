@@ -2,6 +2,7 @@ const  ApiCaller  = require("../../../API-Service");
 const parseLLMJsonString = require("../Modules/parseLLMJsonString");
 const ParseModelJson =  require("../Modules/parseLLMJsonString");
 const LocalModel = require("../../../LocalModel");
+const EntityResolver = require("../Modules/Entity_Resolve");
 async function SQLGen(userQuery) {
 const sqlGenerator = `
 You are an expert MySQL query generator for a groundwater assessment database.
@@ -272,6 +273,13 @@ NOW GENERATE SQL FOR THE FOLLOWING USER QUERY:
 
 try {
   console.log("System Instruction for SQL Generation:");
+
+  //here we will send a request to the entity resolver module to get the entities and then we will send the user query along with the system instruction to the local model and get the response and then we will parse the response and return it to the user
+  try {
+    const entities = await EntityResolver(userQuery);
+  } catch (error) {
+    console.error("[SQLGen] Entity resolution failed:", error.message);
+  }
     const SQLJresponse = await LocalModel(sqlGenerator, userQuery);
     // const SQLJresponse = await ApiCaller(sqlGenerator, userQuery);
     // const SQLJresponse = await LocalModel(SQL_Prompt2.replace("{{USER_QUERY}}", userQuery));

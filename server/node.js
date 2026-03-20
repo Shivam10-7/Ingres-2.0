@@ -85,7 +85,7 @@ app.use('/auth', require('./src/routes/middleware/auth'));
 app.use('/api/chats', require('./src/routes/chatRoutes'));
 
 // these are the routes that we get form the chat
-app.post('/chat', async (req, res) => { 
+app.post('/chat', AuthJwt, async (req, res) => { 
     // 1. Input Validation: Ensure 'query' actually exists before processing
     const { query, isDetailedResponseNeeded, isVisualizationNeeded } = req.body;
 
@@ -208,6 +208,46 @@ if (result && typeof result === 'object') {
 } else {
     return res.status(500).json({ error: "Result is not a valid object", received: result });
 }
+});
+
+
+app.post('/dataQuery/test', async (req, res) => { 
+       // 1. Input Validation: Ensure 'query' actually exists before processing
+    const { query, isDetailedResponseNeeded, isVisualizationNeeded } = req.body;
+
+    if (!query || typeof query !== 'string') {
+        console.warn("[Chat Route] Rejected: Missing or invalid query string.");
+        return res.status(400).json({ error: "A valid query string is required." });
+    }
+
+    console.log(`[Chat Route] Processing query: "${query.substring(0, 50)}..."`);
+    //Normalizd the query by removing punctuation and extra spaces to help the classifier make better decisions. This is a simple form of preprocessing that can improve the accuracy of the classifier.
+    let NormalizedQuery = query.toLowerCase()
+    .replace(/[^\w\s]/g, "")   // remove punctuation
+    .replace(/\s+/g, " ")     // collapse spaces
+    .trim();
+    try {
+
+        /**
+         * 2. Orchestration:
+         * The classifier acts as the router for different logic pipelines.
+         * We await the result of the full pipeline execution.
+         */
+        const response = await classifier(
+            isDetailedResponseNeeded, 
+            isVisualizationNeeded, 
+            NormalizedQuery
+        );
+
+        // 3. Success Response: Send back the structured JSON
+        res.status(200).json({ 
+            success: true,
+            response 
+        });
+    } catch (error) {
+        console.error("Fuck of this is just testing", error);
+        res.status(500).json({ error: "Query banane me vaat lag gayii" });
+    }
 });
 
 // WebSocket connection handling 😎😎the websocket is closed for now
