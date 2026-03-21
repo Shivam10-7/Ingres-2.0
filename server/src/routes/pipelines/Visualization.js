@@ -5,6 +5,8 @@ const database = require('../db/dataRetrive');
 const PieChartPayloadd = require('../ChartData/PieChart');
 const BarChartPayload = require('../ChartData/BarChart'); // Ensure this is correctly imported for use in the tester route
 const LineChartPayload = require('../ChartData/LineChart'); // Ensure this is correctly imported for use in the tester route
+const ScatterChartPayload = require('../ChartData/ScatterChart'); // Ensure this is correctly imported for use in the tester route  
+const RadarChartPayload = require('../ChartData/RadarChart'); // Ensure this is correctly imported for use in the tester route
 /**
  * Orchestrates the full RAG (Retrieval-Augmented Generation) flow:
  * Natural Language -> SQL -> Database Data -> Natural Language Response
@@ -68,6 +70,18 @@ async function AnalyticsQueryHandler(Query) {
             const lineData = await LineChartPayload(rows, title);
             console.log("[Visualizer] Line Chart Payload Generated");
             return lineData;
+        }
+        case 'scatter': {
+            const title = ChartType.title || 'Chart';
+            const scatterData = await ScatterChartPayload(rows, title);
+            console.log("[Visualizer] Scatter Chart Payload Generated");
+            return scatterData;
+        }
+        case 'radar': {
+            const title = ChartType.title || 'Chart';
+            const radarData = await RadarChartPayload(rows, title);
+            console.log("[Visualizer] Radar Chart Payload Generated");
+            return radarData;
         }
 
         default:
