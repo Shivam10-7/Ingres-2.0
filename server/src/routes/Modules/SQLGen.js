@@ -509,8 +509,18 @@ Input Resolver Response: {Resolver_Response}
 - NO 'year' column exists. If a year is requested, return the error JSON.
 
 ### OUTPUT SCHEMA
-{"sql": "SELECT ...", "title": "Short title", "chart": "none|bar|line|pie", "aggregation": "none|avg|sum|weighted"}
-If data/year is unavailable: {"error": "Cannot answer with available data"}
+
+  Return ONLY JSON in this structure strictly given below. **No explanations, no markdown, no extra text.**:
+  {
+    "sql": "SELECT ...",
+    "title": "Short human readable title",
+    "chart": "none | bar | line | pie",
+    "aggregation": "none | avg | sum | weighted"
+
+  If the question cannot be answered using the schema, retur  
+  {
+    "error": "Cannot answer with available data"
+  }
 
 ### EXAMPLES
 User: What is the stage of groundwater extraction in Maharashtra? 
@@ -531,6 +541,14 @@ User: Show over-exploited blocks in Rajasthan
 User: Compare recharge and extraction in haryana and Rajasthan.
 {"sql": "SELECT LOWER(\`state\`) AS \`state\`, ROUND(SUM(\`total annual ground water (ham) recharge\`), 2) AS \`recharge_ham\`, ROUND(SUM(\`total extraction (ham)\`), 2) AS \`extraction_ham\`, ROUND(SUM(\`total extraction (ham)\`) - SUM(\`total annual ground water (ham) recharge\`), 2) AS \`net_balance_ham\` FROM ingresdata2025 WHERE LOWER(\`state\`) IN ('haryana', 'rajasthan') GROUP BY LOWER(\`state\`);", "title": "Groundwater Recharge vs Extraction in Haryana and Rajasthan", "chart": "bar", "aggregation": "sum"}
 
+User: Average groundwater stage by state.
+{"sql": "SELECT LOWER(\`state\`) AS \`state\`, ROUND(AVG(\`stage of ground water extraction (%)\`), 2) AS \`avg_stage_of_extraction\` FROM ingresdata2025 GROUP BY LOWER(\`state\`) ORDER BY avg_stage_of_extraction DESC;", "title": "Average Stage of Groundwater Extraction by State", "chart": "bar", "aggregation": "sum"}
+
+User:  Compare recharge worthy area in Nagpur and Jaipur.
+{"sql": "SELECT LOWER(\`district\`) AS \`district\`, ROUND(SUM(\`recharge worthy area(ha)\`), 2) AS \`recharge_worthy_area_ha\` FROM ingresdata2025 WHERE (LOWER(\`district\`) = 'nagpur' AND LOWER(\`state\`) = 'maharashtra') OR (LOWER(\`district\`) = 'jaipur' AND LOWER(\`state\`) = 'rajasthan') GROUP BY LOWER(\`district\`);", "title": "Recharge Worthy Area Comparison: Nagpur vs Jaipur", "chart": "bar", "aggregation": "sum"}
+
+User:  Top 10 districts with highest groundwater stress.
+{"sql": "SELECT LOWER(\`district\`) AS \`district\`, ROUND(SUM(\`total extraction (ham)\`) - SUM(\`total annual ground water (ham) recharge\`), 2) AS \`groundwater_stress_ham\` FROM ingresdata2025 GROUP BY LOWER(\`district\`) ORDER BY groundwater_stress_ham DESC LIMIT 10;", "title": "Top 10 Districts with Highest Groundwater Stress", "chart": "bar", "aggregation": "sum"}
 `;
 
 try {
@@ -543,11 +561,18 @@ try {
     console.error("[SQLGen] Entity resolution failed:", error.message);
   }
     console.log("System Instruction for SQL Generation:");
+    console.log("[Prompt going inside]"+sqlGenerator);
     const SQLJresponse = await LocalModel(sqlGenerator, userQuery);
     // const SQLJresponse = await ApiCaller(sqlGenerator, userQuery);
     // const SQLJresponse = await LocalModel(SQL_Prompt2.replace("{{USER_QUERY}}", userQuery));
     
-    const FinalResponse=parseLLMJsonString(SQLJresponse);
+    // const FinalResponse=parseLLMJsonString(SQLJresponse);
+    let FinalResponse="";
+    try {
+      FinalResponse=  JSON.parse(SQLJresponse);
+    } catch (error) {
+      console.error("[SQLGen] Failed to parse model response as JSON:", error.message);
+    }
   
     if (!FinalResponse || FinalResponse.error) {
       console.warn(`[SQLGen] Model could not generate SQL for: "${userQuery}"`);
