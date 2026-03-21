@@ -85,7 +85,7 @@ app.use('/auth', require('./src/routes/middleware/auth'));
 app.use('/api/chats', require('./src/routes/chatRoutes'));
 
 // these are the routes that we get form the chat
-app.post('/chat', AuthJwt, async (req, res) => { 
+app.post('/chat', async (req, res) => { 
     // 1. Input Validation: Ensure 'query' actually exists before processing
     const { query, isDetailedResponseNeeded, isVisualizationNeeded } = req.body;
 

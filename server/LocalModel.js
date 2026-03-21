@@ -1,19 +1,23 @@
 const { Ollama } = require('ollama')
 
-async function LocalModel(SystePrompt, Userquery) {
+async function LocalModel(SystemPrompt, Userquery) {
   const ollama = new Ollama()
 
   const response = await ollama.chat({
     model: 'llama3.2',
-    temperature: 0.3,
     messages: [
-      {role: 'system', content: SystePrompt},
+      { role: 'system', content: SystemPrompt },
       { role: 'user', content: Userquery }
     ],
     options: {
-        temperature: 0.1
-      }
-  })
+      temperature: 0.1,
+      // You can also add other constraints here:
+      // num_predict: 128, // Limit output length
+      // top_p: 0.9 
+    }
+  });
+
+console.log(response.message.content);
   console.log("Response from Local Model:", response.message.content);
   return response.message.content;
 }

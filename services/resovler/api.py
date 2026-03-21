@@ -18,7 +18,6 @@ class QueryRequest(BaseModel):
     query: str
     session_id: str
 
-
 @app.post("/resolve-entity")
 def resolve_entity(req: QueryRequest):
     # The resolver currently does not use session context, but we keep
