@@ -7,6 +7,7 @@ const BarChartPayload = require('../ChartData/BarChart'); // Ensure this is corr
 const LineChartPayload = require('../ChartData/LineChart'); // Ensure this is correctly imported for use in the tester route
 const ScatterChartPayload = require('../ChartData/ScatterChart'); // Ensure this is correctly imported for use in the tester route  
 const RadarChartPayload = require('../ChartData/RadarChart'); // Ensure this is correctly imported for use in the tester route
+const KPIChartPayload = require('../ChartData/KPIChart'); // Ensure this is correctly imported for use in the tester route
 /**
  * Orchestrates the full RAG (Retrieval-Augmented Generation) flow:
  * Natural Language -> SQL -> Database Data -> Natural Language Response
@@ -44,10 +45,10 @@ async function AnalyticsQueryHandler(Query) {
 
        switch (chartType) {
         case 'KPI':
-            return {
-                type: 'KPI',
-                data: rows
-            };
+            const title = ChartType.title || 'Chart';
+            const kpiData = await KPIChartPayload(rows, title);
+            console.log("[Visualizer] KPI Chart Payload Generated");
+            return kpiData;
 
         case 'pie': {
             // chartTitle isn't defined anywhere; use a sensible default or

@@ -1,85 +1,72 @@
 /**
- * Builds a professional ECharts Pie/Donut configuration.
- * @param {Array} rows - The data array from the database.
+ * Builds a professional ECharts Radar configuration.
+ * @param {Array} rows - The data array (e.g., [{ category: 'Sales', budget: 5000, actual: 4000 }, ...])
  * @param {string} title - The title of the chart.
  * @returns {Object} ECharts configuration object.
  */
 async function buildRadarChart(rows, title) {
-  // 1. Guard Clause & Empty State
+  // 1. Guard Clause
   if (!rows || rows.length === 0) {
     return {
-      title: { text: `No data for: ${title}`, left: 'center', top: 'middle', textStyle: { color: '#999', fontSize: 14 } }
+      title: { text: `No data for: ${title}`, left: 'center', top: 'middle' }
     };
   }
 
-  // 2. Dynamic Key Detection (Analyst Tip: Don't hardcode keys!)
-  // Assumes first column is Label, second is Value
+  // 2. Dynamic Key Detection
+  // We assume:
+  // keys[0] = The Name of the axis (e.g., "Sales")
+  // keys[1] = The first metric (e.g., "Allocated Budget")
+  // keys[2] = The second metric (e.g., "Actual Spending")
   const keys = Object.keys(rows[0]);
-  const labelKey = keys[0];
-  const valueKey = keys[1];
+  const axisLabelKey = keys[0]; 
+  const metricOneKey = keys[1];
+  const metricTwoKey = keys[2];
 
-  // 3. Data Transformation & Sorting
-  // Analysts always sort descending so the largest slices start at 12 o'clock.
-  const sortedData = [...rows]
-    .sort((a, b) => b[valueKey] - a[valueKey])
-    .map(item => ({
-      name: item[labelKey],
-      value: item[valueKey]
-    }));
+  // 3. Mapping Indicators (The outer axes)
+  // We calculate the max dynamically so the chart scales properly
+  const indicators = rows.map(row => {
+    const maxValue = Math.max(row[metricOneKey], row[metricTwoKey]);
+    return {
+      name: row[axisLabelKey],
+      // Adding 10% buffer to the max for better visuals
+      max: Math.ceil(maxValue * 1.1) 
+    };
+  });
 
-  // 4. Return Professional Payload
+  // 4. Mapping Data Series
+  const metricOneData = rows.map(row => row[metricOneKey]);
+  const metricTwoData = rows.map(row => row[metricTwoKey]);
+
   return {
     title: {
-      text: title,
-      left: 'left',
-      textStyle: { fontSize: 18, fontWeight: '600', color: '#333' }
+      text: title || 'Performance Comparison'
     },
     tooltip: {
-      trigger: 'item',
-      formatter: '{b}: <b>{c}</b> ({d}%)', // Shows name, value, and percentage
-      backgroundColor: 'rgba(255, 255, 255, 0.9)',
-      textStyle: { color: '#000' },
-      borderWidth: 1,
-      borderColor: '#eee'
+      trigger: 'item'
     },
     legend: {
-      orient: 'vertical',
-      right: '5%',
-      top: 'middle',
-      icon: 'circle',
-      itemGap: 15
+      data: [metricOneKey, metricTwoKey],
+      bottom: 0
     },
-    // Professional color palette (Clean & Accessible)
-    color: ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4'],
+    radar: {
+      indicator: indicators,
+      shape: 'polygon' 
+    },
     series: [
       {
-        name: title,
-        type: 'pie',
-        radius: ['45%', '70%'], // Donut style is easier on the eyes than a full pie
-        avoidLabelOverlap: true,
-        itemStyle: {
-          borderRadius: 8,
-          borderColor: '#fff',
-          borderWidth: 2
-        },
-        label: {
-          show: false, // Keep it clean; use tooltip or legend for details
-          position: 'center'
-        },
-        emphasis: {
-          label: {
-            show: true,
-            fontSize: '18',
-            fontWeight: 'bold',
-            formatter: '{b}\n{d}%' // Shows Category and % in the center on hover
+        name: `${metricOneKey} vs ${metricTwoKey}`,
+        type: 'radar',
+        areaStyle: { opacity: 0.1 }, // Adds a professional subtle fill
+        data: [
+          {
+            value: metricOneData,
+            name: metricOneKey
           },
-          itemStyle: {
-            shadowBlur: 10,
-            shadowOffsetX: 0,
-            shadowColor: 'rgba(0, 0, 0, 0.5)'
+          {
+            value: metricTwoData,
+            name: metricTwoKey
           }
-        },
-        data: sortedData
+        ]
       }
     ]
   };

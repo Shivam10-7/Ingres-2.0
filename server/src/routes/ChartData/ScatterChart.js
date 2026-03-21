@@ -1,88 +1,45 @@
 /**
- * Builds a professional ECharts Pie/Donut configuration.
+ * Builds a professional ECharts Scatter configuration.
  * @param {Array} rows - The data array from the database.
  * @param {string} title - The title of the chart.
  * @returns {Object} ECharts configuration object.
  */
 async function buildScatterChart(rows, title) {
-  // 1. Guard Clause & Empty State
+  // 1. Guard Clause
   if (!rows || rows.length === 0) {
     return {
-      title: { text: `No data for: ${title}`, left: 'center', top: 'middle', textStyle: { color: '#999', fontSize: 14 } }
+      title: { text: `No data for: ${title}`, left: 'center', top: 'middle' }
     };
   }
 
-  // 2. Dynamic Key Detection (Analyst Tip: Don't hardcode keys!)
-  // Assumes first column is Label, second is Value
+  // 2. Dynamic Key Detection
+  // We assume the first two numeric columns are our X and Y coordinates
   const keys = Object.keys(rows[0]);
-  const labelKey = keys[0];
-  const valueKey = keys[1];
+  const xKey = keys[0]; // e.g., 'advertising_spend'
+  const yKey = keys[1]; // e.g., 'sales_revenue'
 
-  // 3. Data Transformation & Sorting
-  // Analysts always sort descending so the largest slices start at 12 o'clock.
-  const sortedData = [...rows]
-    .sort((a, b) => b[valueKey] - a[valueKey])
-    .map(item => ({
-      name: item[labelKey],
-      value: item[valueKey]
-    }));
+  // 3. Data Transformation
+  // Scatter series 'data' expects an array of arrays: [[x1, y1], [x2, y2]]
+  const scatterData = rows.map(item => [
+    item[xKey], 
+    item[yKey]
+  ]);
 
   // 4. Return Professional Payload
   return {
-    title: {
-      text: title,
-      left: 'left',
-      textStyle: { fontSize: 18, fontWeight: '600', color: '#333' }
-    },
-    tooltip: {
-      trigger: 'item',
-      formatter: '{b}: <b>{c}</b> ({d}%)', // Shows name, value, and percentage
-      backgroundColor: 'rgba(255, 255, 255, 0.9)',
-      textStyle: { color: '#000' },
-      borderWidth: 1,
-      borderColor: '#eee'
-    },
-    legend: {
-      orient: 'vertical',
-      right: '5%',
-      top: 'middle',
-      icon: 'circle',
-      itemGap: 15
-    },
-    // Professional color palette (Clean & Accessible)
-    color: ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4'],
+    title: { text: title, left: 'center' },
+    tooltip: { trigger: 'item', axisPointer: { type: 'cross' } },
+    xAxis: { name: xKey, splitLine: { lineStyle: { type: 'dashed' } } },
+    yAxis: { name: yKey, splitLine: { lineStyle: { type: 'dashed' } } },
     series: [
       {
-        name: title,
-        type: 'pie',
-        radius: ['45%', '70%'], // Donut style is easier on the eyes than a full pie
-        avoidLabelOverlap: true,
+        symbolSize: 12,
+        data: scatterData,
+        type: 'scatter',
         itemStyle: {
-          borderRadius: 8,
-          borderColor: '#fff',
-          borderWidth: 2
-        },
-        label: {
-          show: false, // Keep it clean; use tooltip or legend for details
-          position: 'center'
-        },
-        emphasis: {
-          label: {
-            show: true,
-            fontSize: '18',
-            fontWeight: 'bold',
-            formatter: '{b}\n{d}%' // Shows Category and % in the center on hover
-          },
-          itemStyle: {
-            shadowBlur: 10,
-            shadowOffsetX: 0,
-            shadowColor: 'rgba(0, 0, 0, 0.5)'
-          }
-        },
-        data: sortedData
+          color: '#5470c6'
+        }
       }
     ]
   };
 }
-
-module.exports = buildScatterChart;
