@@ -4,7 +4,7 @@ async function LocalModel(SystemPrompt, Userquery) {
   const ollama = new Ollama()
 
   const response = await ollama.chat({
-    model: 'llama3.2',
+    model: 'qwen2.5-coder:7b', // Specify the model you want to use
     messages: [
       { role: 'system', content: SystemPrompt },
       { role: 'user', content: Userquery }

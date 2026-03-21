@@ -566,10 +566,12 @@ try {
     // const SQLJresponse = await ApiCaller(sqlGenerator, userQuery);
     // const SQLJresponse = await LocalModel(SQL_Prompt2.replace("{{USER_QUERY}}", userQuery));
     
-    // const FinalResponse=parseLLMJsonString(SQLJresponse);
+    
     let FinalResponse="";
     try {
-      FinalResponse=  JSON.parse(SQLJresponse);
+      FinalResponse=parseLLMJsonString(SQLJresponse);
+      //Changed  parsing and moved to fuunction
+      // FinalResponse=  JSON.parse(SQLJresponse);
     } catch (error) {
       console.error("[SQLGen] Failed to parse model response as JSON:", error.message);
     }
