@@ -91,7 +91,7 @@ const Navbar = () => {
                 {navItems.map((item) => (
                   <a
                     key={item}
-                    href={`#${item.toLowerCase()}`}
+                    href={`/#${item.toLowerCase()}`}
                     className="relative text-sm font-medium text-muted-foreground transition-colors hover:text-foreground after:absolute after:bottom-[-4px] after:left-0 after:h-[2px] after:w-0 after:bg-secondary after:transition-all after:duration-300 hover:after:w-full"
                   >
                     {item}
@@ -201,7 +201,7 @@ const Navbar = () => {
               {navItems.map((item) => (
                 <a
                   key={item}
-                  href={`#${item.toLowerCase()}`}
+                  href={`/#${item.toLowerCase()}`}
                   onClick={() => setMobileOpen(false)}
                   className="block py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
                 >

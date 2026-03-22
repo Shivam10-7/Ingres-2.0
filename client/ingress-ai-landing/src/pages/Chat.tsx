@@ -1,10 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus,
-  Search,
-  MessageSquare,
-  Folder,
   ChevronDown,
   Menu,
   Sparkles,
@@ -24,7 +22,6 @@ import {
   Mic,
   Sun,
   Moon,
-  MoreVertical
 } from 'lucide-react';
 
 import {
@@ -35,13 +32,16 @@ import {
   getChatSessionHistory,
   saveChatMessage,
   ChatSession,
-  renameChatSession
 } from '@/lib/api';
-import UserProfile from '@/components/UserProfile';
+import { ChatSidebarContent } from '@/components/ChatSidebarContent';
 import { EChartsRenderer } from '@/components/EChartsRenderer';
 const logoLight = '/logo_LIGHT.png';
 const logoDark = '/logo_DARK.png';
 import '@/chat/index.css';
+
+/** Smooth sidebar motion (ease-out; mobile + desktop stay in sync). */
+const SIDEBAR_DURATION = 0.48;
+const SIDEBAR_EASE = [0.32, 0.72, 0, 1] as const;
 
 // Mode options
 const MODES = [
@@ -49,10 +49,6 @@ const MODES = [
   { id: 'quick', label: 'Quick Chat', description: 'Fast data lookup', icon: Zap },
   { id: 'deep', label: 'Deep Search', description: 'Detailed analysis', icon: SearchIcon },
   { id: 'visualizer', label: 'Visualizer', description: 'Charts & graphs', icon: BarChart3 },
-];
-
-const PROJECTS = [
-  { id: 1, name: 'Water Analysis', icon: Folder },
 ];
 
 // Sample data for dropdowns
@@ -95,7 +91,7 @@ function ChatPage() {
   const navigate = useNavigate();
   const [selectedMode, setSelectedMode] = useState(MODES[0]);
   const [showModeDropdown, setShowModeDropdown] = useState(false);
-  const [isLightMode, setIsLightMode] = useState(false);
+  const [isLightMode, setIsLightMode] = useState(true);
   const [messages, setMessages] = useState<any[]>([]);
   const [inputValue, setInputValue] = useState<string>('');
   const [isTyping, setIsTyping] = useState(false);
@@ -104,6 +100,7 @@ function ChatPage() {
   const [chats, setChats] = useState<ChatSession[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   // Toggle buttons and output data
   const [isVisualizationNeeded, setIsVisualizationNeeded] = useState(false);
@@ -127,6 +124,9 @@ function ChatPage() {
           const data = await res.json();
           const uid = data.user?.userId || data.user?._id || data.user?.id;
           setUserId(uid);
+          setUserEmail(
+            typeof data.user?.email === 'string' ? data.user.email : null
+          );
           if (uid) {
             const userChats = await getUserChatSessions(uid);
             setChats(userChats);
@@ -265,6 +265,15 @@ function ChatPage() {
 
   // Sidebar open state (allow closing)
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
+
+  /** Sidebar width scales with signed-in email length (longer Gmail → wider panel, capped at 28rem). */
+  const sidebarWidthPx = useMemo(() => {
+    const len = (userEmail ?? '').trim().length;
+    const minW = 288; // 18rem
+    const maxW = 448; // 28rem (previous max-w-[28rem])
+    if (len === 0) return 320;
+    return Math.min(maxW, Math.max(minW, 195 + Math.round(len * 6.5)));
+  }, [userEmail]);
 
   // Quick Chat modal for mobile
   const [showQuickModal, setShowQuickModal] = useState(false);
@@ -451,212 +460,113 @@ try {
             zIndex: 9999,
             pointerEvents: 'auto',
           }}
-          className="fixed p-2 rounded-lg bg-black/40 backdrop-blur-md hover:bg-black/50 focus:outline-none"
+          className={`fixed p-2 rounded-lg backdrop-blur-md focus:outline-none ${
+            isLightMode
+              ? 'bg-slate-200/90 hover:bg-slate-300/90'
+              : 'bg-black/40 hover:bg-black/50'
+          }`}
         >
-          <Menu className="w-5 h-5 text-white/80" />
+          <Menu className={`w-5 h-5 ${isLightMode ? 'text-slate-700' : 'text-white/80'}`} />
         </button>
       )}
-      {/* Sidebar (overlay) */}
-      {sidebarOpen && (
-        <>
-          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setSidebarOpen(false)} />
-          <aside className={`fixed inset-y-0 left-0 w-auto min-w-[20rem] max-w-[28rem] ${isLightMode ? 'glass-panel-light' : 'glass-panel'} flex flex-col h-full shrink-0 z-50`} style={{ maxHeight: '100vh' }}>
-            {/* Logo */}
-            <div className="p-4 flex items-center gap-3">
-              <div className="w-10 h-10 flex items-center justify-center">
-                <img src={isLightMode ? logoLight : logoDark} alt="INGRES" className="w-6 h-6 object-contain" />
-              </div>
-              <span className={`text-xl font-semibold tracking-tight ${isLightMode ? 'text-slate-800' : 'text-white'}`}>INGRES</span>
-            </div>
+      {/* Mobile backdrop — fades in/out with sidebar */}
+      <AnimatePresence>
+        {sidebarOpen && isMobile && (
+          <motion.div
+            key="sidebar-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: SIDEBAR_DURATION * 0.85, ease: SIDEBAR_EASE }}
+            className="fixed inset-0 z-40 bg-black/35 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden
+          />
+        )}
+      </AnimatePresence>
 
-            {/* New Chat Button */}
-            <div className="px-4 pb-3">
-              <button
-                onClick={handleNewChatClick}
-                className={`w-full rounded-xl px-4 py-3 flex items-center gap-3 transition-all duration-200 group ${isLightMode
-                    ? 'glass-card-light text-slate-800 hover:bg-slate-50'
-                    : 'glass-card-dark text-white hover:bg-white/10'
-                  }`}
-              >
-                <Plus className={`w-5 h-5 group-hover:scale-110 transition-transform ${isLightMode ? 'text-blue-600' : 'text-blue-400'}`} />
-                <span className="font-medium">New chat</span>
-              </button>
-            </div>
-
-            {/* Search */}
-            <div className="px-4 pb-4">
-              <div className="relative">
-                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isLightMode ? 'text-slate-400' : 'text-white/50'}`} />
-                <input
-                  type="text"
-                  placeholder="Search chats..."
-                  className={`w-full rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
-                    isLightMode 
-                      ? 'glass-input-light text-slate-800 placeholder:text-slate-400' 
-                      : 'glass-input text-white placeholder:text-white/40'
-                  }`}
-                />
-              </div>
-            </div>
-
-            {/* Recent Chats */}
-            <div
-              className="flex-1 overflow-y-auto px-2"
+      {/* Sidebar: mobile = slide drawer; desktop = width collapse so main area eases smoothly */}
+      {isMobile ? (
+        <AnimatePresence mode="sync">
+          {sidebarOpen && (
+            <motion.aside
+              key="chat-sidebar"
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ duration: SIDEBAR_DURATION, ease: SIDEBAR_EASE }}
+              className={`relative flex flex-col h-full shrink-0 z-50 max-h-screen will-change-transform fixed inset-y-0 left-0 ${
+                isLightMode ? 'chat-sidebar-glass-light' : 'chat-sidebar-glass-dark'
+              }`}
               style={{
-                paddingBottom: keyboardHeight ? `${keyboardHeight + 120}px` : undefined,
-                WebkitOverflowScrolling: 'touch',
-                touchAction: 'pan-y',
+                width: `min(100vw, ${sidebarWidthPx}px)`,
+                minWidth: '18rem',
+                maxWidth: '28rem',
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden',
               }}
             >
-              <div className="px-3 py-2">
-                <span className={`text-xs font-medium uppercase tracking-wider ${isLightMode ? 'text-slate-500' : 'text-white/40'}`}>Recent</span>
-              </div>
-              <div className="space-y-1">
-                {chats.map((chat) => (
-                  <div
-                    key={chat._id}
-                    className="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 hover:bg-white/5"
-                  >
-
-                    <button
-                      onClick={() => loadChat(chat.chatId)}
-                      className="flex items-center gap-3 flex-1 text-left"
-                    >
-                      <MessageSquare className="w-4 h-4 text-white/40 group-hover:text-blue-400" />
-
-                      {editingChatId === chat.chatId ? (
-                        <div className="flex items-center gap-2 flex-1">
-
-                          <input
-                            value={editedName}
-                            autoFocus
-                            onChange={(e) => setEditedName(e.target.value)}
-                            className="bg-transparent border-b border-blue-400 outline-none text-sm flex-1"
-                          />
-
-                          {/* SAVE */}
-                          <button
-                            onClick={async () => {
-                              await renameChatSession(chat.chatId, editedName)
-
-                              setChats(prev =>
-                                prev.map(c =>
-                                  c.chatId === chat.chatId
-                                    ? { ...c, chatName: editedName }
-                                    : c
-                                )
-                              )
-
-                              setEditingChatId(null)
-                            }}
-                            className="text-green-400 hover:text-green-300 text-sm"
-                          >
-                            ✓
-                          </button>
-
-                          {/* CANCEL */}
-                          <button
-                            onClick={() => setEditingChatId(null)}
-                            className="text-red-400 hover:text-red-300 text-sm"
-                          >
-                            ✕
-                          </button>
-
-                        </div>
-                      ) : (
-                        <span className="text-sm truncate flex-1">
-                          {chat.chatName}
-                        </span>
-                      )}
-                    </button>
-
-                    {/* Three dots */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setMenuOpenChatId(menuOpenChatId === chat.chatId ? null : chat.chatId)
-                      }}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <MoreVertical className="w-4 h-4 text-white/60 hover:text-white" />
-                    </button>
-
-                    {/* Dropdown menu */}
-                    {menuOpenChatId === chat.chatId && (
-                      <div
-                        className={`absolute right-2 top-8 rounded-lg shadow-lg z-50 border
-                        ${isLightMode
-                          ? "bg-white border-slate-200 text-slate-800"
-                          : "bg-black border-white/10 text-white"
-                        }`}
-                      >
-
-                        <button
-                          onClick={() => {
-                            setEditingChatId(chat.chatId)
-                            setEditedName(chat.chatName)
-                            setMenuOpenChatId(null)
-                          }}
-                          className={`block w-full text-left px-4 py-2 text-sm ${isLightMode ? "hover:bg-slate-100" : "hover:bg-white/10"}`}
-                        >
-                          Rename
-                        </button>
-
-                        <button
-                          onClick={() => setDeleteChatId(chat.chatId)}
-                          className={`block w-full text-left px-4 py-2 text-sm
-                          ${isLightMode
-                            ? "hover:bg-red-100 text-red-600"
-                            : "hover:bg-red-500/20 text-red-400"
-                          }`}
-                        >
-                          Delete
-                        </button>
-
-                      </div>
-                    )}
-
-                  </div>
-                ))}
-              </div>
-
-              {/* Projects */}
-              <div className="px-3 py-4">
-                <span className={`text-xs font-medium uppercase tracking-wider ${isLightMode ? 'text-slate-500' : 'text-white/40'}`}>Projects</span>
-              </div>
-              <div className="space-y-1">
-                {PROJECTS.map((project) => (
-                  <button
-                    key={project.id}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
-                        isLightMode ? 'text-slate-600 hover:text-slate-900 hover:bg-black/5' : 'text-white/70 hover:text-white hover:bg-white/5'
-                    }`}
-                  >
-                    <Folder className={`w-4 h-4 ${isLightMode ? 'text-blue-500' : 'text-blue-400'}`} />
-                    <span className="text-sm">{project.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* User Profile (real data) */}
-            <UserProfile />
-            {/* Close Sidebar Button */}
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className={`absolute top-3 right-3 p-2 rounded-lg transition-colors ${isLightMode ? 'hover:bg-slate-200' : 'hover:bg-white/5'}`}
-              aria-label="Close sidebar"
-            >
-              <X className={`w-4 h-4 ${isLightMode ? 'text-slate-500' : 'text-white/60'}`} />
-            </button>
+              <ChatSidebarContent
+                isLightMode={isLightMode}
+                keyboardHeight={keyboardHeight}
+                chats={chats}
+                loadChat={loadChat}
+                handleNewChatClick={handleNewChatClick}
+                editingChatId={editingChatId}
+                setEditingChatId={setEditingChatId}
+                editedName={editedName}
+                setEditedName={setEditedName}
+                setChats={setChats}
+                menuOpenChatId={menuOpenChatId}
+                setMenuOpenChatId={setMenuOpenChatId}
+                setDeleteChatId={setDeleteChatId}
+                onCloseSidebar={() => setSidebarOpen(false)}
+              />
+            </motion.aside>
+          )}
+        </AnimatePresence>
+      ) : (
+        <motion.div
+          initial={false}
+          animate={{ width: sidebarOpen ? sidebarWidthPx : 0 }}
+          transition={{ duration: SIDEBAR_DURATION, ease: SIDEBAR_EASE }}
+          className="relative shrink-0 h-full overflow-hidden z-50 min-w-0"
+          style={{ pointerEvents: sidebarOpen ? 'auto' : 'none' }}
+        >
+          <aside
+            className={`relative flex flex-col h-full max-h-screen will-change-transform ${
+              isLightMode ? 'chat-sidebar-glass-light' : 'chat-sidebar-glass-dark'
+            }`}
+            style={{ width: sidebarWidthPx }}
+          >
+            <ChatSidebarContent
+              isLightMode={isLightMode}
+              keyboardHeight={keyboardHeight}
+              chats={chats}
+              loadChat={loadChat}
+              handleNewChatClick={handleNewChatClick}
+              editingChatId={editingChatId}
+              setEditingChatId={setEditingChatId}
+              editedName={editedName}
+              setEditedName={setEditedName}
+              setChats={setChats}
+              menuOpenChatId={menuOpenChatId}
+              setMenuOpenChatId={setMenuOpenChatId}
+              setDeleteChatId={setDeleteChatId}
+              onCloseSidebar={() => setSidebarOpen(false)}
+            />
           </aside>
-        </>
+        </motion.div>
       )}
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-full relative">
+      <main className="flex-1 flex flex-col h-full relative min-w-0">
         {/* Header with user profile and theme toggle */}
-        <header className="h-auto glass-panel border-b-0 flex items-center justify-between pl-16 pr-6 py-4 shrink-0">
+        <header
+          className={`h-auto glass-panel border-b-0 flex items-center justify-between pr-6 py-4 shrink-0 ${
+            sidebarOpen && !isMobile ? 'pl-6' : 'pl-16'
+          }`}
+        >
           <div className="flex items-center">
 
             <h1
