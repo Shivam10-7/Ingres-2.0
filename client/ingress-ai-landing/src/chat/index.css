@@ -74,6 +74,39 @@ body {
   box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
 }
 
+/* Chat sidebar — light mode: medium grey frosted glass + soft highlight (ref: glass panel) */
+.chat-sidebar-glass-light {
+  background:
+    radial-gradient(ellipse 95% 75% at 100% 100%, rgba(255, 255, 255, 0.42) 0%, transparent 52%),
+    linear-gradient(
+      168deg,
+      rgba(203, 213, 225, 0.72) 0%,
+      rgba(186, 198, 214, 0.68) 38%,
+      rgba(163, 176, 196, 0.62) 100%
+    );
+  backdrop-filter: blur(40px) saturate(1.06);
+  -webkit-backdrop-filter: blur(40px) saturate(1.06);
+  border-right: 1px solid rgba(100, 116, 139, 0.28);
+  box-shadow:
+    4px 0 32px rgba(15, 23, 42, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.chat-sidebar-glass-dark {
+  background: linear-gradient(
+    180deg,
+    rgba(30, 41, 59, 0.82) 0%,
+    rgba(15, 23, 42, 0.78) 100%
+  );
+  backdrop-filter: blur(32px) saturate(1.1);
+  -webkit-backdrop-filter: blur(32px) saturate(1.1);
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    4px 0 32px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
 .glass-card-light {
   background: rgba(255, 255, 255, 0.3);
   backdrop-filter: blur(24px);
