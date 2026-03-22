@@ -475,7 +475,8 @@ Use EXACT column names wrapped in backticks (\`).
 - \`categorization\`: Status (Safe, Semi-critical, Critical, Over-exploited, Salinity)
 
 ### RESOLVER & ENTITY RULES
-Input Resolver Response: {Resolver_Response}
+Input Resolver Response with Entities and Entity types: {Resolver_Response}
+
 1. Scope Priority: block > taluk > tehsil > district > state. 
 2. Match Entity to Column:
    - state -> \`state\`
@@ -554,9 +555,36 @@ User:  Top 10 districts with highest groundwater stress.
 try {
   //here we will send a request to the entity resolver module to get the entities and then we will send the user query along with the system instruction to the local model and get the response and then we will parse the response and return it to the user
   try {
-    const entities = await EntityResolver(userQuery);
-    sqlGenerator = sqlGenerator.replace("{Resolver_Response}", JSON.stringify(entities));
-    console.log("[SQLGen] Entity resolution successful so the sql prompt is:",sqlGenerator);
+    const Detectedentities = await EntityResolver(userQuery);
+
+    // Normalize → { type, value }
+    const normalizedEntities = (Detectedentities.entities || []).map(ent => {
+      const { type, ...rest } = ent;
+
+      const keys = Object.keys(rest);
+      const valueKey = keys[0]; // assumes first key is primary
+      const value = ent[valueKey];
+
+      return { type, value };
+    });
+
+    // Convert to JSON string (THIS is what goes into prompt)
+    const entityJSON = JSON.stringify(normalizedEntities);
+
+    console.log(
+      "[SQLGen] Entity resolution successful.",
+      "Entities JSON:", entityJSON,
+      "| status:", Detectedentities.status
+    );
+
+    // Inject JSON into single placeholder
+    sqlGenerator = sqlGenerator.replace("{Resolver_Response}", entityJSON);
+
+    console.log(
+      "[SQLGen] SQL prompt after entity injection:",
+      sqlGenerator
+    );
+
   } catch (error) {
     console.error("[SQLGen] Entity resolution failed:", error.message);
   }
