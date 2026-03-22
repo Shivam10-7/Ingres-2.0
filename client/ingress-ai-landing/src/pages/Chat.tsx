@@ -249,6 +249,7 @@ function ChatPage() {
 
   // Sync body background with theme mode (only for Chat page; landing/login stay light)
   useEffect(() => {
+    document.body.classList.add('chat-page-theme');
     if (isLightMode) {
       document.body.style.background = '#f3f4f6';
       document.body.style.color = '#020617';
@@ -258,6 +259,7 @@ function ChatPage() {
     }
     // Clear body styles on unmount so landing/login are not affected when user navigates back
     return () => {
+      document.body.classList.remove('chat-page-theme');
       document.body.style.background = '';
       document.body.style.color = '';
     };
@@ -446,9 +448,17 @@ try {
   }
 
   return (
-    <div
-      className={`flex h-screen w-full overflow-hidden ${isLightMode ? 'bg-gradient-radial-light' : 'bg-gradient-radial'
-        }`}>
+    <div className="relative flex h-screen w-full overflow-hidden">
+      {/* Crossfade gradients — CSS cannot interpolate between distinct gradient definitions */}
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute inset-0 bg-gradient-radial-light transition-opacity duration-500 ease-out ${isLightMode ? 'opacity-100' : 'opacity-0'}`}
+      />
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute inset-0 bg-gradient-radial transition-opacity duration-500 ease-out ${isLightMode ? 'opacity-0' : 'opacity-100'}`}
+      />
+      <div className="relative z-10 flex h-full min-h-0 w-full flex-1 flex-row overflow-hidden">
       {/* Floating open-sidebar button (top-left), appears when sidebar is closed */}
       {!sidebarOpen && (
         <button
@@ -460,13 +470,13 @@ try {
             zIndex: 9999,
             pointerEvents: 'auto',
           }}
-          className={`fixed p-2 rounded-lg backdrop-blur-md focus:outline-none ${
+          className={`fixed p-2 rounded-lg backdrop-blur-md focus:outline-none transition-colors duration-500 ease-out ${
             isLightMode
               ? 'bg-slate-200/90 hover:bg-slate-300/90'
               : 'bg-black/40 hover:bg-black/50'
           }`}
         >
-          <Menu className={`w-5 h-5 ${isLightMode ? 'text-slate-700' : 'text-white/80'}`} />
+          <Menu className={`w-5 h-5 transition-colors duration-500 ${isLightMode ? 'text-slate-700' : 'text-white/80'}`} />
         </button>
       )}
       {/* Mobile backdrop — fades in/out with sidebar */}
@@ -563,14 +573,14 @@ try {
       <main className="flex-1 flex flex-col h-full relative min-w-0">
         {/* Header with user profile and theme toggle */}
         <header
-          className={`h-auto glass-panel border-b-0 flex items-center justify-between pr-6 py-4 shrink-0 ${
+          className={`h-auto glass-panel border-b-0 flex items-center justify-between pr-6 py-4 shrink-0 transition-[background,backdrop-filter,box-shadow,border-color] duration-500 ease-out ${
             sidebarOpen && !isMobile ? 'pl-6' : 'pl-16'
           }`}
         >
           <div className="flex items-center">
 
             <h1
-              className={`text-lg font-semibold ${isLightMode ? 'text-slate-800' : 'text-white'
+              className={`text-lg font-semibold transition-colors duration-500 ease-out ${isLightMode ? 'text-slate-800' : 'text-white'
                 }`}
             >
               INGRES ChatBOT
@@ -606,7 +616,7 @@ try {
 
               {/* Label */}
               <span
-                className={`whitespace-nowrap ${isLightMode ? 'text-slate-600' : 'text-white/70'
+                className={`whitespace-nowrap transition-colors duration-500 ease-out ${isLightMode ? 'text-slate-600' : 'text-white/70'
                   }`}
               >
                 {isLightMode ? 'Light Mode' : 'Dark Mode'}
@@ -687,7 +697,7 @@ try {
     <div
       className={`
         w-full md:max-w-[90%] lg:max-w-[85%] 
-        p-4 rounded-2xl border transition-colors duration-200
+        p-4 rounded-2xl border transition-colors duration-500 ease-out
         ${message.sender === 'user' 
           ? 'bg-blue-600 border-blue-500 text-white' 
           : isLightMode 
@@ -1292,6 +1302,7 @@ try {
     </div>
   )}
       </main>
+      </div>
     </div>
   )};
 export default ChatPage;

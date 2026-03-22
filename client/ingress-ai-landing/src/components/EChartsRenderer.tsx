@@ -56,8 +56,11 @@ export function EChartsRenderer({ option, className, style, theme = 'light' }: P
       };
 
       instanceRef.current.setOption(professionalOption, { notMerge: true });
+      // Theme effect recreates the instance; without re-applying options the canvas stays blank
+      // until something else updates `option` (e.g. switching chats).
+      requestAnimationFrame(() => instanceRef.current?.resize());
     }
-  }, [option]);
+  }, [option, theme]);
 
   return (
     <div 
