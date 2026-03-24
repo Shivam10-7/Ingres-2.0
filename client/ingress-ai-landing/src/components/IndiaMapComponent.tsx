@@ -188,6 +188,8 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
   isVisible = true,
   mapTheme = 'dark',
 }) => {
+  const STATE_ONLY_MAX_ZOOM = 5;
+  const CITY_MODE_MIN_ZOOM = STATE_ONLY_MAX_ZOOM + 1;
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const ttRef = useRef<HTMLDivElement>(null);
@@ -522,8 +524,67 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
         },
       });
 
+      const enrichDistricts = (features: GeoJSON.Feature[]) => {
+        return features.map((f) => {
+          const district = (f.properties?.district || '').toString();
+          const state = (f.properties?.st_nm || f.properties?.state || '').toString();
+          const key = `${district}|${state}`;
+          const gw = DISTRICT_GW[key];
+          return {
+            ...f,
+            properties: {
+              ...f.properties,
+              gw_status: gw?.status || 'unknown',
+            },
+          };
+        });
+      };
+
+      const setCityLayerVisibility = (visible: boolean) => {
+        ['city-fill', 'city-border', 'city-glow', 'city-selected-line', 'city-labels'].forEach((layerId) => {
+          if (map.current?.getLayer(layerId)) {
+            map.current.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
+          }
+        });
+      };
+
+      const applyZoomMode = () => {
+        if (!map.current?.getSource('city-boundaries')) return;
+        const z = map.current.getZoom();
+        const cityMode = z >= CITY_MODE_MIN_ZOOM;
+
+        if (cityMode) {
+          const features = allDistrictsGeoJSONRef.current?.features || [];
+          const enriched: GeoJSON.FeatureCollection = {
+            type: 'FeatureCollection',
+            features: enrichDistricts(features),
+          };
+          (map.current.getSource('city-boundaries') as mapboxgl.GeoJSONSource).setData(enriched);
+          setCityLayerVisibility(true);
+        } else {
+          // In far zoom-out mode, show only states.
+          (map.current.getSource('city-boundaries') as mapboxgl.GeoJSONSource).setData({
+            type: 'FeatureCollection',
+            features: [],
+          });
+          setCityLayerVisibility(false);
+          if (selectedDistrictIdRef.current !== null) {
+            selectedDistrictIdRef.current = null;
+            setCurrentDistrict(null);
+          }
+        }
+      };
+
+      map.current!.on('zoomend', () => {
+        applyZoomMode();
+      });
+
+      // initial mode
+      applyZoomMode();
+
       // ── 5. State interactions ─────────────────────────────────────────────
       map.current!.on('mousemove', 'states-fill', (e) => {
+        if (map.current!.getZoom() >= CITY_MODE_MIN_ZOOM) return;
         if (hierarchyLevelRef.current !== 'india') return;
         map.current!.getCanvas().style.cursor = 'pointer';
         const feat = e.features?.[0];
@@ -544,6 +605,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
       map.current!.on('mousemove', (e) => moveTooltip(e.originalEvent));
 
       map.current!.on('mouseleave', 'states-fill', () => {
+        if (map.current!.getZoom() >= CITY_MODE_MIN_ZOOM) return;
         map.current!.getCanvas().style.cursor = '';
         if (hoveredStateIdRef.current !== null) {
           map.current!.setFeatureState(
@@ -556,6 +618,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
 
       // State SINGLE click → load districts
       map.current!.on('click', 'states-fill', (e) => {
+        if (map.current!.getZoom() >= CITY_MODE_MIN_ZOOM) return;
         const feat = e.features?.[0];
         if (!feat) return;
         const id   = feat.id as number;
@@ -587,23 +650,14 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
         setHierarchyLevel('state');
         hierarchyLevelRef.current = 'state';
 
-        // Zoom to state bounds
-        const bounds = geomBounds(feat.geometry);
-        map.current!.fitBounds(bounds as [number, number, number, number], {
-          padding: 60,
-          duration: 900,
-        });
-
-        // Load districts for this state
-        loadDistrictsForState(name);
-
-        // Notify parent
+        // In top zoom-out levels: state click only glows/selects.
         if (onStateSelect) onStateSelect(name, GW[name]);
-        onMapMessage?.(`Loaded districts for ${name}`);
+        onMapMessage?.(`Selected state: ${name}`);
       });
 
       // State DOUBLE click → zoom closer (handled above + prevent double fire)
       map.current!.on('dblclick', 'states-fill', (e) => {
+        if (map.current!.getZoom() >= CITY_MODE_MIN_ZOOM) return;
         e.preventDefault();
         const feat = e.features?.[0];
         if (!feat) return;
@@ -615,6 +669,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
 
       // ── 6. District interactions ──────────────────────────────────────────
       map.current!.on('mouseenter', 'city-fill', (e) => {
+        if (map.current!.getZoom() < CITY_MODE_MIN_ZOOM) return;
         map.current!.getCanvas().style.cursor = 'pointer';
         const feat = e.features?.[0];
         if (!feat) return;
@@ -630,6 +685,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
       });
 
       map.current!.on('mousemove', 'city-fill', (e) => {
+        if (map.current!.getZoom() < CITY_MODE_MIN_ZOOM) return;
         moveTooltip(e.originalEvent);
         const feat = e.features?.[0];
         if (!feat) return;
@@ -647,6 +703,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
       });
 
       map.current!.on('mouseleave', 'city-fill', () => {
+        if (map.current!.getZoom() < CITY_MODE_MIN_ZOOM) return;
         map.current!.getCanvas().style.cursor = '';
         if (hoveredDistrictIdRef.current !== null) {
           map.current!.setFeatureState(
@@ -659,6 +716,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
 
       // District SINGLE click → highlight + popup
       map.current!.on('click', 'city-fill', (e) => {
+        if (map.current!.getZoom() < CITY_MODE_MIN_ZOOM) return;
         e.preventDefault(); // stop state click firing
         const feat = e.features?.[0];
         if (!feat) return;
@@ -718,6 +776,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
 
       // District DOUBLE click → zoom to district + show parent state info
       map.current!.on('dblclick', 'city-fill', (e) => {
+        if (map.current!.getZoom() < CITY_MODE_MIN_ZOOM) return;
         e.preventDefault();
         const feat = e.features?.[0];
         if (!feat) return;
@@ -728,7 +787,30 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
           padding: 60, duration: 900, maxZoom: 12,
         });
 
-        // Highlight parent state — find it in state source
+        // Highlight parent state on city double click.
+        const stateFeatures = stateGeoJSON?.features || [];
+        const targetState = state.toString().trim().toLowerCase();
+        const parent = stateFeatures.find((sf: any) => {
+          const n = (sf.properties?._name || '').toString().trim().toLowerCase();
+          return n === targetState;
+        });
+        if (parent?.id !== undefined) {
+          if (selectedStateIdRef.current !== null && selectedStateIdRef.current !== parent.id) {
+            map.current!.setFeatureState(
+              { source: 'india-states', id: selectedStateIdRef.current },
+              { selected: false }
+            );
+          }
+          selectedStateIdRef.current = parent.id as number;
+          map.current!.setFeatureState(
+            { source: 'india-states', id: parent.id as number },
+            { selected: true }
+          );
+          setCurrentState(state);
+          setHierarchyLevel('state');
+          hierarchyLevelRef.current = 'state';
+        }
+
         onMapMessage?.(`Zoomed to district. Parent state: ${state}`);
         if (onStateSelect) onStateSelect(state, GW[state]);
       });
