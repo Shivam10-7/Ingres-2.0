@@ -17,6 +17,17 @@ if exist ".\myvenv\Scripts\activate.bat" (
     exit /b 1
 )
 
+if exist ".\myvenv\Scripts\activate.bat" (
+    call ".\myvenv\Scripts\activate.bat"
+) else if exist ".\myvenv\Scripts\Activate.ps1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "& '.\myvenv\Scripts\Activate.ps1'"
+) else (
+    echo ERROR: virtualenv activation script not found in %cd%\myvenv\Scripts
+    popd
+    pause
+    exit /b 1
+)
+
 echo Starting FastAPI server...
 uvicorn api:app --reload --port 8000
 

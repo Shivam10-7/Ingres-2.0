@@ -17,6 +17,8 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "grok-sdk": "^0.0.1-security",
+    "groq-sdk": "^1.1.1",
     "http": "^0.0.1-security",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.1.6",
