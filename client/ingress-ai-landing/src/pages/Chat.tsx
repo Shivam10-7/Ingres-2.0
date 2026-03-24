@@ -36,7 +36,7 @@ import {
 } from '@/lib/api';
 import { ChatSidebarContent } from '@/components/ChatSidebarContent';
 import { EChartsRenderer } from '@/components/EChartsRenderer';
-import { MapDrawer } from '@/components/MapDrawer';
+import IndiaMapComponent, { GW as GW_DATA } from '@/components/IndiaMapComponent';
 const logoLight = '/logo_LIGHT.png';
 const logoDark = '/logo_DARK.png';
 import '@/chat/index.css';
@@ -283,8 +283,9 @@ function ChatPage() {
   // Quick Chat modal for mobile
   const [showQuickModal, setShowQuickModal] = useState(false);
 
-  // Map drawer state
-  const [isMapDrawerOpen, setIsMapDrawerOpen] = useState(false);
+  // Map panel state (integrated in main chat screen)
+  const [isMapPanelOpen, setIsMapPanelOpen] = useState(false); // start hidden until user clicks map icon
+  const [isMapInitialized, setIsMapInitialized] = useState(false); // lazy initialize map when needed
 
   // Handle mode selection
   const handleModeSelect = (mode) => {
@@ -315,6 +316,52 @@ function ChatPage() {
 
   setShowResults(false);
 };
+
+  const handleMapStateSelect = (stateName: string, data?: any) => {
+    const userMsg = {
+      id: crypto.randomUUID(),
+      text: `Selected state: ${stateName}`,
+      sender: 'user',
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, userMsg]);
+
+    if (data) {
+      const botMsg = {
+        id: crypto.randomUUID(),
+        text: `📊 ${stateName} groundwater summary:\n` +
+          `• status: ${data.status?.toUpperCase() ?? 'Unknown'}\n` +
+          `• rainfall: ${data.rain ?? 'N/A'} mm\n` +
+          `• extractable GW: ${data.ext?.toLocaleString() ?? 'N/A'} ham\n` +
+          `• extracted GW: ${data.extr?.toLocaleString() ?? 'N/A'} ham\n` +
+          `• stage: ${data.stage ?? 'N/A'}%`,
+        sender: 'bot',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, botMsg]);
+    } else {
+      const botMsg = {
+        id: crypto.randomUUID(),
+        text: `No groundwater data available for ${stateName}.`,
+        sender: 'bot',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, botMsg]);
+    }
+    setShowResults(true);
+    setIsVisualizationNeeded(false);
+    setIsDetailedResponseNeeded(false);
+  };
+
+  const handleMapMessage = (text: string) => {
+    const botMsg = {
+      id: crypto.randomUUID(),
+      text,
+      sender: 'bot',
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, botMsg]);
+  };
 
   // Handle logout
   const handleLogout = async () => {
@@ -455,13 +502,25 @@ try {
 
   return (
     <>
-      {/* Map Drawer */}
-      <MapDrawer 
-        isOpen={isMapDrawerOpen} 
-        onClose={() => setIsMapDrawerOpen(false)}
-      />
+      <div className="absolute top-4 right-4 z-50 space-x-2">
+        <button
+          onClick={() => {
+            setIsMapPanelOpen((prev) => {
+              const next = !prev;
+              if (next) setIsMapInitialized(true);
+              setIsMapNeeded(next);       // sync, don't invert blindly
+              if (next) setSidebarOpen(false);
+              return next;
+            });
+            
+          }}
+          className={`px-3 py-1 rounded-lg border ${isLightMode ? 'border-slate-200' : 'border-white/20'} bg-white/10 text-xs transition`}
+        >
+          {isMapPanelOpen ? 'Hide Map' : 'Show Map'}
+        </button>
+      </div>
 
-    <div className="relative flex h-screen w-full overflow-hidden">
+      <div className="relative flex h-screen w-full overflow-hidden">
       {/* Crossfade gradients — CSS cannot interpolate between distinct gradient definitions */}
       <div
         aria-hidden
@@ -640,8 +699,8 @@ try {
 
         {/* Chat Area */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Main Chat */}
-          <div className={`flex-1 flex flex-col ${showDataPanel ? 'border-r border-white/5' : ''}`}>
+          {/* Main Chat Column */}
+          <div className={`flex flex-col ${showDataPanel ? 'border-r border-white/5' : ''} transition-all duration-300 ${isMapPanelOpen ? 'w-1/2' : 'w-full'}`}>
             {/* Messages */}
             <div
               className="flex-1 overflow-y-auto p-6 pb-32 md:pb-6"
@@ -894,11 +953,21 @@ try {
 
                     </div>
 
-                    {/* Map Drawer Toggle Button */}
+                    {/* Map Panel Toggle Button */}
                     <button
-                      onClick={() => setIsMapDrawerOpen(true)}
+                      onClick={() => {
+                        setIsMapPanelOpen((prev) => {
+                          const next = !prev;
+                          if (next) setIsMapInitialized(true);
+                          return next;
+                        });
+                        setIsMapNeeded((prev) => !prev);
+                        if (!isMapPanelOpen) {
+                          setSidebarOpen(false);
+                        }
+                      }}
                       className={`p-2.5 rounded-xl transition-colors ${isLightMode ? 'hover:bg-slate-200/80' : 'hover:bg-white/10'}`}
-                      title="Open Map"
+                      title="Toggle Map"
                     >
                       <MapIcon className={`w-5 h-5 ${isLightMode ? 'text-slate-500' : 'text-white/60'}`} />
                     </button>
@@ -936,6 +1005,19 @@ try {
               </div>
             </div>
           </div>
+
+          {/* Map Panel — mounted lazily on first open, then kept alive with CSS visibility */}
+          {isMapInitialized && (
+            <div
+              className="border-l border-white/10 relative overflow-hidden transition-all duration-300"
+              style={{ width: isMapPanelOpen ? '50%' : '0px', minWidth: isMapPanelOpen ? undefined : '0' }}
+            >
+              <IndiaMapComponent
+                onStateSelect={handleMapStateSelect}
+                isVisible={isMapPanelOpen}
+              />
+            </div>
+          )}
 
           {/* Data Query Panel - for Quick Chat mode */}
           {showDataPanel && (

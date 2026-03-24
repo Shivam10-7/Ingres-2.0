@@ -5,14 +5,14 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import '@/components/IndiaMapComponent.css';
 
 // Mapbox token from environment variable
-const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined;
-if (!mapboxToken) {
+const mapboxToken = (import.meta.env as any).VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
+if (!mapboxToken || mapboxToken === 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw') {
   console.warn('VITE_MAPBOX_TOKEN is not set in environment. Mapbox may not work.');
 }
-mapboxgl.accessToken = mapboxToken ?? 'YOUR_MAPBOX_TOKEN';
+mapboxgl.accessToken = mapboxToken;
 
 // Groundwater database
-const GW: Record<string, any> = {
+export const GW: Record<string, any> = {
   'Gujarat':           { rain:855.95, ext:37411.68, extr:17418.39, stage:55.95, status:'safe' },
   'Maharashtra':       { rain:1180.4, ext:48200.00, extr:31850.00, stage:66.10, status:'caution' },
   'Rajasthan':         { rain:415.20, ext:17420.00, extr:19800.00, stage:113.7, status:'critical' },
@@ -74,25 +74,35 @@ function geomBounds(geom: any): [number, number, number, number] {
 }
 
 interface IndiaMapComponentProps {
-  onMessage?: (text: string) => void;
+  onStateSelect?: (stateName: string, data?: any) => void;
+  onMapMessage?: (text: string) => void;
+  isVisible?: boolean;
 }
 
-export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onMessage }) => {
+export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onStateSelect, onMapMessage, isVisible = true }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
-  const [messages, setMessages] = useState<Array<{ text: string; role: 'user' | 'bot' }>>([]);
-  const [inputValue, setInputValue] = useState('');
-  const [currentMode, setCurrentMode] = useState('quick');
   const [currentState, setCurrentState] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [zoom, setZoom] = useState(4);
   const [coords, setCoords] = useState({ lat: 22.59, lng: 78.96 });
   const [selectedState, setSelectedState] = useState<string | null>(null);
   const [showLoader, setShowLoader] = useState(true);
-  const chatAreaRef = useRef<HTMLDivElement>(null);
   const ttRef = useRef<HTMLDivElement>(null);
   const ttInnerRef = useRef<HTMLDivElement>(null);
   const hoveredCityIdRef = useRef<number | null>(null);
+
+  // When the panel becomes visible, tell Mapbox to recalculate its canvas size.
+  // Without this the map renders blank because it was sized when the container was hidden.
+  useEffect(() => {
+    if (isVisible && map.current) {
+      // Small delay ensures the CSS transition has finished and the container has real dimensions
+      const t = window.setTimeout(() => {
+        map.current?.resize();
+      }, 50);
+      return () => window.clearTimeout(t);
+    }
+  }, [isVisible]);
 
   // Initialize map
   useEffect(() => {
@@ -110,10 +120,14 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onMessage 
 
     map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-left');
 
-    let loaderTimer = window.setTimeout(() => {
-      addMessage('⚠️ Map is taking too long to load. Check your Mapbox token/network and refresh.', 'bot');
-      setShowLoader(false);
-    }, 15000);
+    // Only start the timeout warning if we're actually visible
+    let loaderTimer: number | undefined;
+    if (isVisible) {
+      loaderTimer = window.setTimeout(() => {
+        console.warn('Map is taking too long to load. Check your Mapbox token/network and refresh.');
+        setShowLoader(false);
+      }, 15000);
+    }
 
     map.current.on('zoom', () => {
       const z = Math.round(map.current!.getZoom());
@@ -142,7 +156,6 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onMessage 
         });
       } catch (e) {
         console.error('GeoJSON load failed', e);
-        addMessage('⚠️ GeoJSON load failed. Base map loaded, but states unavailable.', 'bot');
         setShowLoader(false);
         return;
       }
@@ -271,7 +284,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onMessage 
       });
 
       initCityLayer();
-      addMessage('✅ India GeoJSON loaded — ' + geojson.features.length + ' states rendered. Click any state to explore.', 'bot');
+      console.info('India GeoJSON loaded — ' + geojson.features.length + ' states rendered. Click any state to explore.');
       setShowLoader(false);
     });
 
@@ -403,7 +416,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onMessage 
             <div class="popup-row"><span class="pk">State</span><span class="pv">${p.state}</span></div>
           `)
           .addTo(map.current!);
-        addMessage(`📍 <strong>${p.city}</strong> — Lat: ${parseFloat(p.lat).toFixed(4)}, Lng: ${parseFloat(p.lng).toFixed(4)} | Pop: ${p.pop || '—'}`, 'bot');
+        console.log(`City clicked: ${p.city} — Lat: ${parseFloat(p.lat).toFixed(4)}, Lng: ${parseFloat(p.lng).toFixed(4)} | Pop: ${p.pop || '—'}`);
       }
     });
   };
@@ -471,23 +484,14 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onMessage 
 
   const botRespond = (name: string) => {
     const d = GW[name];
+    if (onStateSelect) onStateSelect(name, d);
+
     if (!d) {
-      addMessage(`📍 <strong>${name}</strong> selected. No groundwater data.`, 'bot');
+      console.warn(`No groundwater data for ${name}.`);
       return;
     }
-    addMessage(`
-      📊 <strong>${name}</strong> — GW Report 2024–25<br>
-      <span class="badge b-${d.status}" style="margin-left:5px;">${d.status.toUpperCase()}</span><br><br>
-      <em>Rainfall:</em> ${d.rain} mm<br>
-      <em>Extractable GW:</em> ${d.ext.toLocaleString()} ham<br>
-      <em>GW Extracted:</em> ${d.extr.toLocaleString()} ham<br>
-      <em>Stage of Extraction:</em> ${d.stage}%
-    `, 'bot');
-  };
 
-  const addMessage = (text: string, role: 'user' | 'bot') => {
-    setMessages(prev => [...prev, { text, role }]);
-    if (onMessage) onMessage(text);
+    console.info(`State selected: ${name}`, d);
   };
 
   const resetMap = () => {
@@ -502,155 +506,17 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onMessage 
     map.current?.flyTo({ center: [78.9629, 22.5937], zoom: 4, duration: 1000 });
   };
 
-  const processQuery = (q: string) => {
-    const lower = q.toLowerCase();
-    const stateMatch = Object.keys(GW).find(s => lower.includes(s.toLowerCase()));
-
-    if (stateMatch) {
-      botRespond(stateMatch);
-      const features = (map.current?.querySourceFeatures('india-states') as any) || [];
-      const feat = features.find((f: any) => f.properties._name === stateMatch);
-      if (feat) {
-        map.current?.removeFeatureState({ source: 'india-states' });
-        map.current?.setFeatureState({ source: 'india-states', id: feat.id }, { selected: true });
-        const bounds = geomBounds(feat.geometry);
-        map.current?.fitBounds(bounds as [number, number, number, number], { padding: 60, duration: 900 });
-        loadCities(stateMatch);
-      }
-      return;
-    }
-
-    if (lower.includes('critical')) {
-      const crit = Object.entries(GW).filter(([,v])=>v.status==='critical').map(([k])=>k);
-      addMessage(`⚠️ <strong>Critical groundwater states:</strong><br>${crit.map(s=>`• ${s}`).join('<br>')}`, 'bot');
-      return;
-    }
-    if (lower.includes('safe')) {
-      const safe = Object.entries(GW).filter(([,v])=>v.status==='safe').map(([k])=>k);
-      addMessage(`✅ <strong>Safe groundwater states:</strong><br>${safe.map(s=>`• ${s}`).join('<br>')}`, 'bot');
-      return;
-    }
-    addMessage(`ℹ️ Try: <em>"Groundwater status in Maharashtra"</em> or <em>"Critical states"</em>`, 'bot');
-  };
-
-  const sendMessage = () => {
-    const txt = inputValue.trim();
-    if (!txt) return;
-    setInputValue('');
-    addMessage(txt, 'user');
-    setTimeout(() => {
-      processQuery(txt);
-    }, 600);
-  };
-
-  const quickPromptClick = (prompt: string) => {
-    setInputValue('');
-    addMessage(prompt, 'user');
-    setTimeout(() => {
-      processQuery(prompt);
-    }, 600);
-  };
-
-  const handleModeChange = (mode: string) => {
-    setCurrentMode(mode);
-  };
-
-  useEffect(() => {
-    if (chatAreaRef.current) {
-      chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
-    }
-  }, [messages]);
-
   return (
-    <div className="map-container">
-      <div id="map-app" className="map-app">
-        {/* HEADER */}
-        <header id="map-hdr" className="map-hdr">
-          <div className="pulse-dot"></div>
-          <div>
-            <div className="title">India GIS Intelligence</div>
-            <div className="sub">Groundwater · States · Districts · Real-time</div>
-          </div>
-          <div className="hdr-sep"></div>
-          <span className="status-pill pill-live">● LIVE</span>
-        </header>
-
-        {/* SIDEBAR */}
-        <aside id="map-sidebar" className="map-sidebar">
-          {/* Stats */}
-          <div id="statsRow" className="statsRow">
-            <div className="stat-cell">
-              <div className="sv" id="sv-states">28</div>
-              <div className="sl">States</div>
-            </div>
-            <div className="stat-cell">
-              <div className="sv" id="sv-sel">—</div>
-              <div className="sl">Selected</div>
-            </div>
-            <div className="stat-cell">
-              <div className="sv" id="sv-zoom">{zoom}</div>
-              <div className="sl">Zoom</div>
-            </div>
-          </div>
-
-          {/* State info card */}
-          <div id="infoPanel" className="infoPanel">
-            <div className="ip-idle">Hover over a state · Click to explore</div>
-            <div id="stateCard" style={{ display: 'none' }}>
-              <div className="sc-header">
-                <div className="sc-name">—</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Chat */}
-          <div id="chatArea" className="chatArea" ref={chatAreaRef}>
-            {messages.map((msg, i) => (
-              <div key={i} className={`msg ${msg.role}`}>
-                <div dangerouslySetInnerHTML={{ __html: msg.text }} />
-              </div>
-            ))}
-          </div>
-
-          {/* Quick prompts */}
-          <div id="qps" className="qps">
-            <div className="qp" onClick={() => quickPromptClick('What is groundwater status in Gujarat?')}>Gujarat GW</div>
-            <div className="qp" onClick={() => quickPromptClick('Critical states for groundwater?')}>Critical states</div>
-            <div className="qp" onClick={() => quickPromptClick('Show Maharashtra districts')}>Maharashtra</div>
-            <div className="qp" onClick={() => quickPromptClick('Water extraction in Punjab?')}>Punjab water</div>
-          </div>
-
-          {/* Input */}
-          <div id="inputRow" className="inputRow">
-            <input
-              id="chatInput"
-              className="chatInput"
-              placeholder="Ask about any state or region…"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-            />
-            <button id="sendBtn" className="sendBtn" onClick={sendMessage}>↑</button>
-          </div>
-        </aside>
-
-        {/* MAP */}
-        <div id="mapWrap" className="mapWrap">
-          <div id="map" ref={mapContainer} className="map" />
-          <div id="mapBadge" className="mapBadge">
-            <div>Zoom: <span className="mb-z">{zoom}</span></div>
-            <div id="mb-coord" style={{fontSize:'9px'}}>{coords.lat.toFixed(2)}° N · {coords.lng.toFixed(2)}° E</div>
-          </div>
-          {showLoader && (
-            <div id="loader" className="loader">
-              <div className="loader-ring"></div>
-              <div className="loader-text">Loading GeoJSON…</div>
-            </div>
-          )}
+    <div
+      className="map-container h-full w-full relative"
+      style={{ display: isVisible ? 'block' : 'none' }}
+    >
+      <div id="map" ref={mapContainer} className="h-full w-full" />
+      {showLoader && (
+        <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-sm text-white">
+          Loading map...
         </div>
-      </div>
-
-      {/* Tooltip */}
+      )}
       <div id="tooltip" className="tooltip" ref={ttRef} style={{ display: 'none' }}>
         <div className="tt-inner" ref={ttInnerRef}></div>
       </div>

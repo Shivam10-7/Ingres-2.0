@@ -44,7 +44,7 @@ export const MapDrawer: React.FC<MapDrawerProps> = ({ isOpen, onClose, onMessage
 
           {/* Drawer Panel */}
           <motion.div
-            className="relative ml-auto w-full max-w-5xl bg-white shadow-2xl overflow-hidden"
+            className="relative ml-auto w-screen max-w-none bg-white shadow-2xl overflow-hidden"
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
@@ -65,9 +65,9 @@ export const MapDrawer: React.FC<MapDrawerProps> = ({ isOpen, onClose, onMessage
             </button>
 
             {/* Map Component */}
-            <div className="w-full h-screen overflow-hidden">
-              <IndiaMapComponent onMessage={onMessage} />
-            </div>
+              <div className="w-full h-screen overflow-hidden">
+                  <IndiaMapComponent onMapMessage={onMessage} isVisible={isOpen} />
+              </div>
           </motion.div>
         </motion.div>
       )}
