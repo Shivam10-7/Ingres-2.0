@@ -77,13 +77,14 @@ interface IndiaMapComponentProps {
   onStateSelect?: (stateName: string, data?: any) => void;
   onMapMessage?: (text: string) => void;
   isVisible?: boolean;
+  mapTheme?: 'light' | 'dark';
 }
 
-export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onStateSelect, onMapMessage, isVisible = true }) => {
+export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onStateSelect, onMapMessage, isVisible = true, mapTheme = 'dark' }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [currentState, setCurrentState] = useState<string | null>(null);
-  const [hoveredId, setHoveredId] = useState<number | null>(null);
+  const selectedFeatureIdRef = useRef<number | null>(null);
   const [zoom, setZoom] = useState(4);
   const [coords, setCoords] = useState({ lat: 22.59, lng: 78.96 });
   const [selectedState, setSelectedState] = useState<string | null>(null);
@@ -91,6 +92,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onStateSel
   const ttRef = useRef<HTMLDivElement>(null);
   const ttInnerRef = useRef<HTMLDivElement>(null);
   const hoveredCityIdRef = useRef<number | null>(null);
+  const selectedCityIdRef = useRef<number | null>(null);
 
   // When the panel becomes visible, tell Mapbox to recalculate its canvas size.
   // A single 50ms tick may be too early if CSS transition isn't complete, so we do multiple passes.
@@ -122,7 +124,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onStateSel
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/dark-v11',
+      style: mapTheme === 'light' ? 'mapbox://styles/mapbox/light-v10' : 'mapbox://styles/mapbox/dark-v11',
       center: [78.9629, 22.5937],
       zoom: 4,
       minZoom: 3,
@@ -187,13 +189,11 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onStateSel
         paint: {
           'fill-color': [
             'case',
-            ['boolean', ['feature-state', 'hover'], false], '#00d4ff',
             ['boolean', ['feature-state', 'selected'], false], '#00d4ff',
             '#0f2a44',
           ],
           'fill-opacity': [
             'case',
-            ['boolean', ['feature-state', 'hover'], false], 0.65,
             ['boolean', ['feature-state', 'selected'], false], 0.6,
             0.72,
           ],
@@ -219,14 +219,12 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onStateSel
           'line-color': '#00d4ff',
           'line-width': [
             'case',
-            ['boolean', ['feature-state', 'hover'], false], 3,
             ['boolean', ['feature-state', 'selected'], false], 3,
             0,
           ],
           'line-blur': 3,
           'line-opacity': [
             'case',
-            ['boolean', ['feature-state', 'hover'], false], 0.9,
             ['boolean', ['feature-state', 'selected'], false], 0.9,
             0,
           ],
@@ -241,7 +239,6 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onStateSel
           'fill-color': '#00d4ff',
           'fill-opacity': [
             'case',
-            ['boolean', ['feature-state', 'hover'], false], 0.12,
             ['boolean', ['feature-state', 'selected'], false], 0.10,
             0,
           ],
@@ -256,23 +253,14 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onStateSel
 
       map.current!.setPaintProperty('states-fill', 'fill-color', [
         'case',
-        ['boolean', ['feature-state', 'hover'], false], '#00d4ff',
         ['boolean', ['feature-state', 'selected'], false], '#00d4ff',
         colorExpr,
       ]);
-
       map.current!.on('mousemove', 'states-fill', (e) => {
         map.current!.getCanvas().style.cursor = 'pointer';
         if (e.features && e.features.length > 0) {
           const feat = e.features[0];
-          const id = feat.id;
           const name = feat.properties._name;
-
-          if (hoveredId !== null && hoveredId !== id) {
-            map.current!.setFeatureState({ source: 'india-states', id: hoveredId }, { hover: false });
-          }
-          setHoveredId(id as number);
-          map.current!.setFeatureState({ source: 'india-states', id: id }, { hover: true });
           showTooltip(name);
           showInfoCard(name);
         }
@@ -280,17 +268,32 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onStateSel
 
       map.current!.on('mouseleave', 'states-fill', () => {
         map.current!.getCanvas().style.cursor = '';
-        if (hoveredId !== null) {
-          map.current!.setFeatureState({ source: 'india-states', id: hoveredId }, { hover: false });
-          setHoveredId(null);
-        }
         hideTooltip();
       });
 
       map.current!.on('click', 'states-fill', (e) => {
         const feat = e.features?.[0];
         if (feat) {
+          const id = feat.id as number;
           const name = feat.properties._name;
+
+          const isSame = selectedFeatureIdRef.current === id;
+          if (isSame) {
+            map.current!.setFeatureState({ source: 'india-states', id }, { selected: false });
+            selectedFeatureIdRef.current = null;
+            setCurrentState(null);
+            setSelectedState(null);
+            loadCities('');
+            return;
+          }
+
+          if (selectedFeatureIdRef.current !== null) {
+            map.current!.setFeatureState({ source: 'india-states', id: selectedFeatureIdRef.current }, { selected: false });
+          }
+
+          selectedFeatureIdRef.current = id;
+          map.current!.setFeatureState({ source: 'india-states', id }, { selected: true });
+
           zoomToState(feat, name);
         }
       });
@@ -305,7 +308,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onStateSel
         map.current.remove();
       }
     };
-  }, []);
+  }, [mapTheme]);
 
   const zoomToState = (feat: any, name: string) => {
     setCurrentState(name);
@@ -341,16 +344,16 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onStateSel
         'circle-radius': ['interpolate', ['linear'], ['zoom'], 4, 5, 8, 9, 12, 12],
         'circle-color': [
           'case',
-          ['boolean', ['feature-state', 'hover'], false], '#00d4ff',
+          ['boolean', ['feature-state', 'selected'], false], '#00d4ff',
           '#7c3aed',
         ],
         'circle-stroke-width': 1.5,
         'circle-stroke-color': [
           'case',
-          ['boolean', ['feature-state', 'hover'], false], '#ffffff',
+          ['boolean', ['feature-state', 'selected'], false], '#ffffff',
           '#c4b5fd',
         ],
-        'circle-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 1, 0.9],
+        'circle-opacity': ['case', ['boolean', ['feature-state', 'selected'], false], 1, 0.9],
       },
     });
 
@@ -377,12 +380,6 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onStateSel
       map.current!.getCanvas().style.cursor = 'pointer';
       const feat = e.features?.[0];
       if (feat) {
-        if (hoveredCityIdRef.current !== null) {
-          map.current!.setFeatureState({ source: 'city-data', id: hoveredCityIdRef.current }, { hover: false });
-        }
-        hoveredCityIdRef.current = feat.id as number;
-        map.current!.setFeatureState({ source: 'city-data', id: feat.id }, { hover: true });
-
         const p = feat.properties;
         if (ttInnerRef.current) {
           ttInnerRef.current.innerHTML = `
@@ -407,29 +404,40 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onStateSel
 
     map.current.on('mouseleave', 'city-layer', () => {
       map.current!.getCanvas().style.cursor = '';
-      if (hoveredCityIdRef.current !== null) {
-        map.current!.setFeatureState({ source: 'city-data', id: hoveredCityIdRef.current }, { hover: false });
-        hoveredCityIdRef.current = null;
-      }
       hideTooltip();
     });
 
     map.current.on('click', 'city-layer', (e) => {
-      const p = e.features?.[0]?.properties;
-      if (p) {
-        const coords = [p.lng, p.lat];
-        new mapboxgl.Popup({ closeOnClick: true, maxWidth: '220px' })
-          .setLngLat(coords as [number, number])
-          .setHTML(`
-            <div class="popup-title">📍 ${p.city}</div>
-            <div class="popup-row"><span class="pk">Latitude</span><span class="pv">${parseFloat(p.lat).toFixed(4)}</span></div>
-            <div class="popup-row"><span class="pk">Longitude</span><span class="pv">${parseFloat(p.lng).toFixed(4)}</span></div>
-            <div class="popup-row"><span class="pk">Population</span><span class="pv">${p.pop || '—'}</span></div>
-            <div class="popup-row"><span class="pk">State</span><span class="pv">${p.state}</span></div>
-          `)
-          .addTo(map.current!);
-        console.log(`City clicked: ${p.city} — Lat: ${parseFloat(p.lat).toFixed(4)}, Lng: ${parseFloat(p.lng).toFixed(4)} | Pop: ${p.pop || '—'}`);
+      const feature = e.features?.[0];
+      if (!feature) return;
+
+      const p = feature.properties;
+      const id = feature.id as number;
+      const isSameCity = selectedCityIdRef.current === id;
+
+      if (isSameCity) {
+        map.current!.setFeatureState({ source: 'city-data', id }, { selected: false });
+        selectedCityIdRef.current = null;
+      } else {
+        if (selectedCityIdRef.current !== null) {
+          map.current!.setFeatureState({ source: 'city-data', id: selectedCityIdRef.current }, { selected: false });
+        }
+        selectedCityIdRef.current = id;
+        map.current!.setFeatureState({ source: 'city-data', id }, { selected: true });
       }
+
+      const coords = [p.lng, p.lat];
+      new mapboxgl.Popup({ closeOnClick: true, maxWidth: '220px' })
+        .setLngLat(coords as [number, number])
+        .setHTML(`
+          <div class="popup-title">📍 ${p.city}</div>
+          <div class="popup-row"><span class="pk">Latitude</span><span class="pv">${parseFloat(p.lat).toFixed(4)}</span></div>
+          <div class="popup-row"><span class="pk">Longitude</span><span class="pv">${parseFloat(p.lng).toFixed(4)}</span></div>
+          <div class="popup-row"><span class="pk">Population</span><span class="pv">${p.pop || '—'}</span></div>
+          <div class="popup-row"><span class="pk">State</span><span class="pv">${p.state}</span></div>
+        `)
+        .addTo(map.current!);
+      console.log(`City clicked: ${p.city} — Lat: ${parseFloat(p.lat).toFixed(4)}, Lng: ${parseFloat(p.lng).toFixed(4)} | Pop: ${p.pop || '—'}`);
     });
   };
 
@@ -454,6 +462,10 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onStateSel
 
   const loadCities = (stateName: string) => {
     if (!map.current?.getSource('city-data')) return;
+    if (!stateName) {
+      (map.current.getSource('city-data') as any).setData({ type: 'FeatureCollection', features: [] });
+      return;
+    }
     const fc = stateCitiesToGeoJSON(stateName);
     (map.current.getSource('city-data') as any).setData(fc);
   };

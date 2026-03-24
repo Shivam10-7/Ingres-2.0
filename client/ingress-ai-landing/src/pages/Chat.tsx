@@ -285,7 +285,7 @@ function ChatPage() {
 
   // Map panel state (integrated in main chat screen)
   const [isMapPanelOpen, setIsMapPanelOpen] = useState(false); // start hidden until user clicks map icon
-  const [isMapInitialized, setIsMapInitialized] = useState(false); // lazy initialize map when needed
+  const [isMapInitialized, setIsMapInitialized] = useState(true); // start loading map in background immediately
 
   // Handle mode selection
   const handleModeSelect = (mode) => {
@@ -318,6 +318,8 @@ function ChatPage() {
 };
 
   const handleMapStateSelect = (stateName: string, data?: any) => {
+    if (!stateName) return; // on deselect, do nothing
+
     const userMsg = {
       id: crypto.randomUUID(),
       text: `Selected state: ${stateName}`,
@@ -326,28 +328,21 @@ function ChatPage() {
     };
     setMessages(prev => [...prev, userMsg]);
 
-    if (data) {
-      const botMsg = {
-        id: crypto.randomUUID(),
-        text: `📊 ${stateName} groundwater summary:\n` +
-          `• status: ${data.status?.toUpperCase() ?? 'Unknown'}\n` +
-          `• rainfall: ${data.rain ?? 'N/A'} mm\n` +
-          `• extractable GW: ${data.ext?.toLocaleString() ?? 'N/A'} ham\n` +
-          `• extracted GW: ${data.extr?.toLocaleString() ?? 'N/A'} ham\n` +
-          `• stage: ${data.stage ?? 'N/A'}%`,
-        sender: 'bot',
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, botMsg]);
-    } else {
-      const botMsg = {
-        id: crypto.randomUUID(),
-        text: `No groundwater data available for ${stateName}.`,
-        sender: 'bot',
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, botMsg]);
-    }
+    if (!data) return; // No response for missing data from map deselect path
+
+    const botMsg = {
+      id: crypto.randomUUID(),
+      text: `📊 ${stateName} groundwater summary:\n` +
+        `• status: ${data.status?.toUpperCase() ?? 'Unknown'}\n` +
+        `• rainfall: ${data.rain ?? 'N/A'} mm\n` +
+        `• extractable GW: ${data.ext?.toLocaleString() ?? 'N/A'} ham\n` +
+        `• extracted GW: ${data.extr?.toLocaleString() ?? 'N/A'} ham\n` +
+        `• stage: ${data.stage ?? 'N/A'}%`,
+      sender: 'bot',
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, botMsg]);
+
     setShowResults(true);
     setIsVisualizationNeeded(false);
     setIsDetailedResponseNeeded(false);
@@ -700,7 +695,10 @@ try {
         {/* Chat Area */}
         <div className="flex-1 flex overflow-hidden">
           {/* Main Chat Column */}
-          <div className={`flex flex-col ${showDataPanel ? 'border-r border-white/5' : ''} transition-all duration-300 ${isMapPanelOpen ? 'w-1/2' : 'w-full'}`}>
+          <div
+            className={`flex flex-col ${showDataPanel ? 'border-r border-white/5' : ''} transition-all duration-300`}
+            style={{ width: isMapPanelOpen ? '50%' : '100%', minWidth: 0 }}
+          >
             {/* Messages */}
             <div
               className="flex-1 overflow-y-auto p-6 pb-32 md:pb-6"
@@ -958,7 +956,6 @@ try {
                       onClick={() => {
                         setIsMapPanelOpen((prev) => {
                           const next = !prev;
-                          if (next) setIsMapInitialized(true);
                           return next;
                         });
                         setIsMapNeeded((prev) => !prev);
@@ -1016,6 +1013,7 @@ try {
               <IndiaMapComponent
                 onStateSelect={handleMapStateSelect}
                 isVisible={isMapPanelOpen}
+                mapTheme={isLightMode ? 'light' : 'dark'}
               />
             </div>
           )}
