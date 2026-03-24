@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import DOMPurify from 'dompurify';
 import {
   Plus,
   ChevronDown,
@@ -86,13 +87,18 @@ const formatMessageText = (text: string) => {
   });
 };
 
-const TypewriterText = React.memo(({ text, isNew, onUpdate }: { text: string, isNew?: boolean, onUpdate?: () => void }) => {
+const TypewriterText = React.memo(({ text, isNew, onUpdate, onComplete }: { text: string, isNew?: boolean, onUpdate?: () => void, onComplete?: () => void }) => {
   const [displayedText, setDisplayedText] = React.useState(isNew ? '' : text);
   const onUpdateRef = React.useRef(onUpdate);
+  const onCompleteRef = React.useRef(onComplete);
 
   React.useEffect(() => {
     onUpdateRef.current = onUpdate;
   }, [onUpdate]);
+
+  React.useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   React.useEffect(() => {
     if (!isNew) {
@@ -108,7 +114,7 @@ const TypewriterText = React.memo(({ text, isNew, onUpdate }: { text: string, is
       if (currentIndex >= text.length) {
         setDisplayedText(text);
         clearInterval(interval);
-        if (onUpdateRef.current) onUpdateRef.current();
+        if (onCompleteRef.current) onCompleteRef.current();
       } else {
         setDisplayedText(text.slice(0, currentIndex));
         const now = Date.now();
@@ -207,6 +213,7 @@ function ChatPage() {
           chartData,
           sender: m.role === 'user' ? 'user' : 'bot',
           timestamp: new Date(m.timestamp || Date.now()),
+          isNew: false,
         };
       });
 
@@ -355,6 +362,15 @@ function ChatPage() {
       await fetch('/auth/logout', { method: 'POST', credentials: 'include' });
     } catch { }
     navigate('/landing');
+  };
+
+  // Mark message as complete (transition from typewriter to HTML)
+  const markMessageComplete = (id: string) => {
+    setMessages(prev =>
+      prev.map(msg =>
+        msg.id === id ? { ...msg, isNew: false } : msg
+      )
+    );
   };
 
   // Handle send message - actually call server
@@ -717,19 +733,27 @@ try {
                           {message.text.includes('```') ? (
                             <pre className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'} bg-transparent`}>
                               {message.sender === 'bot' ? (
-                                <TypewriterText text={message.text} isNew={message.isNew} onUpdate={scrollToBottom} />
+                                message.isNew ? (
+                                  <TypewriterText text={message.text} isNew={message.isNew} onUpdate={scrollToBottom} onComplete={() => markMessageComplete(message.id)} />
+                                ) : (
+                                  formatMessageText(message.text)
+                                )
                               ) : (
                                 formatMessageText(message.text)
                               )}
                             </pre>
                           ) : (
-                            <p className={`text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'}`}>
+                            <div className={`text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'}`}>
                               {message.sender === 'bot' ? (
-                                <TypewriterText text={message.text} isNew={message.isNew} onUpdate={scrollToBottom} />
+                                message.isNew ? (
+                                  <TypewriterText text={message.text} isNew={message.isNew} onUpdate={scrollToBottom} onComplete={() => markMessageComplete(message.id)} />
+                                ) : (
+                                  <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(message.text) }} />
+                                )
                               ) : (
                                 formatMessageText(message.text)
                               )}
-                            </p>
+                            </div>
                           )}
                           <span className={`text-xs mt-2 block ${message.sender === 'user' ? 'text-white/70' : isLightMode ? 'text-slate-500' : 'text-white/40'}`}>
                             {formatTime(message.timestamp)}
