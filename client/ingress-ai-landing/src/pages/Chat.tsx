@@ -503,7 +503,7 @@ try {
   return (
     <>
       <div className="absolute top-4 right-4 z-50 space-x-2">
-        <button
+        {/* <button
           onClick={() => {
             setIsMapPanelOpen((prev) => {
               const next = !prev;
@@ -517,7 +517,7 @@ try {
           className={`px-3 py-1 rounded-lg border ${isLightMode ? 'border-slate-200' : 'border-white/20'} bg-white/10 text-xs transition`}
         >
           {isMapPanelOpen ? 'Hide Map' : 'Show Map'}
-        </button>
+        </button> */}
       </div>
 
       <div className="relative flex h-screen w-full overflow-hidden">
@@ -1009,8 +1009,9 @@ try {
           {/* Map Panel — mounted lazily on first open, then kept alive with CSS visibility */}
           {isMapInitialized && (
             <div
-              className="border-l border-white/10 relative overflow-hidden transition-all duration-300"
+              className="border-l border-white/10 relative overflow-hidden transition-all duration-300 shrink-0"
               style={{ width: isMapPanelOpen ? '50%' : '0px', minWidth: isMapPanelOpen ? undefined : '0' }}
+              onTransitionEnd={() => window.dispatchEvent(new Event('resize'))}
             >
               <IndiaMapComponent
                 onStateSelect={handleMapStateSelect}

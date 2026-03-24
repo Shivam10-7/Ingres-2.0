@@ -93,16 +93,28 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onStateSel
   const hoveredCityIdRef = useRef<number | null>(null);
 
   // When the panel becomes visible, tell Mapbox to recalculate its canvas size.
-  // Without this the map renders blank because it was sized when the container was hidden.
+  // A single 50ms tick may be too early if CSS transition isn't complete, so we do multiple passes.
   useEffect(() => {
-    if (isVisible && map.current) {
-      // Small delay ensures the CSS transition has finished and the container has real dimensions
-      const t = window.setTimeout(() => {
-        map.current?.resize();
-      }, 50);
-      return () => window.clearTimeout(t);
+    if (!map.current) return;
+    if (isVisible) {
+      const delays = [120, 300, 600];
+      const timers: number[] = [];
+      delays.forEach((delay) => {
+        timers.push(window.setTimeout(() => map.current?.resize(), delay));
+      });
+      return () => timers.forEach((t) => window.clearTimeout(t));
     }
+    return;
   }, [isVisible]);
+
+  // Keep map responsive to window resizes and transition end resizes from parent.
+  useEffect(() => {
+    const onResize = () => {
+      if (map.current) map.current.resize();
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // Initialize map
   useEffect(() => {
