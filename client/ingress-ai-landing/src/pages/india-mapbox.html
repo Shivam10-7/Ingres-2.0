@@ -1,0 +1,1443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>India GIS — Groundwater Intelligence</title>
+
+<!-- Mapbox GL JS -->
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet"/>
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+
+<style>
+/* ── VARIABLES ──────────────────────────────────────────── */
+:root {
+  --bg:        #03080f;
+  --panel:     #070e1c;
+  --panel2:    #0a1628;
+  --border:    rgba(0,212,255,0.12);
+  --accent:    #00d4ff;
+  --accent2:   #7c3aed;
+  --glow:      rgba(0,212,255,0.4);
+  --glow2:     rgba(124,58,237,0.4);
+  --text:      #e2eaf8;
+  --muted:     #4a6080;
+  --success:   #00e5a0;
+  --warning:   #f5a623;
+  --danger:    #ff4d6d;
+  --r:         10px;
+  --mono:      'JetBrains Mono', monospace;
+  --sans:      'Syne', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+}
+
+/* ── LAYOUT ─────────────────────────────────────────────── */
+#app {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  grid-template-rows: 52px 1fr;
+  height: 100vh;
+}
+
+/* ── HEADER ─────────────────────────────────────────────── */
+#hdr {
+  grid-column: 1/-1;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  gap: 12px;
+  z-index: 900;
+  position: relative;
+}
+
+.pulse-dot {
+  width: 8px; height: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: pdot 2s ease-in-out infinite;
+  box-shadow: 0 0 10px var(--glow);
+}
+@keyframes pdot {
+  0%,100% { box-shadow: 0 0 6px var(--glow); transform: scale(1); }
+  50%      { box-shadow: 0 0 20px var(--glow); transform: scale(1.3); }
+}
+
+#hdr .title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+#hdr .sub {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 1.5px;
+  margin-top: 1px;
+}
+
+.hdr-sep { flex: 1; }
+
+/* Breadcrumb */
+#breadcrumb {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#breadcrumb .bc-active { color: var(--accent); }
+
+#backBtn {
+  display: none;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all .2s;
+}
+#backBtn:hover { background: var(--accent); color: #000; border-color: var(--accent); }
+
+/* Status pill */
+.status-pill {
+  font-family: var(--mono);
+  font-size: 9px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.pill-live { background: rgba(0,229,160,.12); color: var(--success); border: 1px solid rgba(0,229,160,.3); }
+
+/* ── SIDEBAR ─────────────────────────────────────────────── */
+#sidebar {
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  z-index: 800;
+}
+
+/* Scanline aesthetic top strip */
+#sidebar::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: scanline 3s ease-in-out infinite;
+}
+@keyframes scanline {
+  0%,100% { opacity: .3; } 50% { opacity: 1; }
+}
+
+/* Stats strip */
+#statsRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.stat-cell {
+  padding: 10px 0;
+  text-align: center;
+  border-right: 1px solid var(--border);
+}
+.stat-cell:last-child { border-right: none; }
+.stat-cell .sv {
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--accent);
+  letter-spacing: -.5px;
+}
+.stat-cell .sl {
+  font-size: 8px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-top: 2px;
+}
+
+/* Info panel (selected state data) */
+#infoPanel {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  min-height: 68px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+#infoPanel .ip-idle {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  text-align: center;
+}
+#stateCard { display: none; }
+#stateCard .sc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+#stateCard .sc-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.gw-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.gw-item {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 7px 10px;
+}
+.gw-item .gi-val {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 500;
+}
+.gw-item .gi-lbl {
+  font-size: 9px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 2px;
+}
+.badge {
+  font-family: var(--mono);
+  font-size: 9px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.b-safe     { background: rgba(0,229,160,.12); color: var(--success); border: 1px solid rgba(0,229,160,.3); }
+.b-caution  { background: rgba(245,166,35,.12); color: var(--warning); border: 1px solid rgba(245,166,35,.3); }
+.b-critical { background: rgba(255,77,109,.12);  color: var(--danger);  border: 1px solid rgba(255,77,109,.3); }
+
+/* Chat area */
+#chatArea {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  scroll-behavior: smooth;
+}
+#chatArea::-webkit-scrollbar { width: 3px; }
+#chatArea::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.msg {
+  max-width: 90%;
+  padding: 9px 13px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  animation: msgIn .2s ease both;
+}
+@keyframes msgIn {
+  from { opacity:0; transform: translateY(5px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+.msg.user {
+  align-self: flex-end;
+  background: linear-gradient(135deg, var(--accent), #0099cc);
+  color: #000;
+  font-weight: 600;
+  border-bottom-right-radius: 3px;
+}
+.msg.bot {
+  align-self: flex-start;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-bottom-left-radius: 3px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+.msg.bot strong { color: var(--accent); }
+.msg.bot em { color: var(--muted); font-style: normal; }
+
+/* Typing indicator */
+.typing { display: flex; gap: 4px; align-items: center; padding: 10px 13px; }
+.typing span {
+  width: 5px; height: 5px;
+  background: var(--muted);
+  border-radius: 50%;
+  animation: blink 1.2s infinite;
+}
+.typing span:nth-child(2) { animation-delay: .2s; }
+.typing span:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 0%,80%,100%{opacity:.2} 40%{opacity:1} }
+
+/* Quick prompts */
+#qps {
+  padding: 8px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+}
+.qp {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  cursor: pointer;
+  color: var(--muted);
+  transition: all .2s;
+  white-space: nowrap;
+}
+.qp:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,.06); }
+
+/* Input */
+#inputRow {
+  padding: 10px 12px;
+  display: flex;
+  gap: 7px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#chatInput {
+  flex: 1;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 7px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-family: var(--mono);
+  outline: none;
+  transition: border-color .2s;
+}
+#chatInput:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,212,255,.08); }
+#chatInput::placeholder { color: var(--muted); }
+#sendBtn {
+  background: var(--accent);
+  border: none;
+  color: #000;
+  border-radius: 7px;
+  width: 36px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  transition: all .2s;
+  flex-shrink: 0;
+}
+#sendBtn:hover { filter: brightness(1.2); box-shadow: 0 0 12px var(--glow); }
+
+/* ── MAP ─────────────────────────────────────────────────── */
+#mapWrap {
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+}
+#map { width: 100%; height: 100%; }
+
+/* Mapbox attribution */
+.mapboxgl-ctrl-attrib { display: none !important; }
+.mapboxgl-ctrl-logo   { display: none !important; }
+
+/* Zoom & status badge */
+#mapBadge {
+  position: absolute;
+  bottom: 18px;
+  right: 18px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  z-index: 100;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-end;
+}
+#mapBadge .mb-z { color: var(--accent); }
+
+/* ── CUSTOM TOOLTIP ──────────────────────────────────────── */
+#tooltip {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  display: none;
+  animation: ttIn .15s ease;
+}
+@keyframes ttIn {
+  from { opacity:0; transform: scale(.95) translateY(-3px); }
+  to   { opacity:1; transform: scale(1) translateY(0); }
+}
+.tt-inner {
+  background: rgba(3,8,15,0.94);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  min-width: 160px;
+  box-shadow: 0 8px 30px rgba(0,0,0,.7), 0 0 0 1px var(--border);
+  backdrop-filter: blur(10px);
+}
+.tt-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 5px;
+}
+.tt-row {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.tt-row span { color: var(--accent); }
+.tt-divider { border: none; border-top: 1px solid var(--border); margin: 6px 0; }
+
+/* ── CITY POPUP ──────────────────────────────────────────── */
+.mapboxgl-popup-content {
+  background: rgba(3,8,15,0.96) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 10px !important;
+  padding: 12px 16px !important;
+  box-shadow: 0 8px 30px rgba(0,0,0,.7), 0 0 16px var(--glow) !important;
+  color: var(--text) !important;
+  font-family: var(--mono) !important;
+  font-size: 12px !important;
+  min-width: 170px;
+}
+.mapboxgl-popup-tip { border-top-color: var(--border) !important; }
+.mapboxgl-popup-close-button { color: var(--muted) !important; font-size: 16px !important; }
+.popup-title {
+  font-family: var(--sans) !important;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 7px;
+}
+.popup-row { display: flex; justify-content: space-between; gap: 12px; margin: 3px 0; }
+.popup-row .pk { color: var(--muted); }
+.popup-row .pv { color: var(--accent); font-weight: 500; }
+
+/* ── LOADING OVERLAY ─────────────────────────────────────── */
+#loader {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9000;
+  transition: opacity .6s;
+}
+#loader.hidden { opacity: 0; pointer-events: none; }
+.loader-ring {
+  width: 48px; height: 48px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .9s linear infinite;
+  margin-bottom: 16px;
+  box-shadow: 0 0 20px var(--glow);
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loader-text {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* scrollbar */
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+
+/* ── MODE TOGGLE ──────────────────────────────────────── */
+#modeToggle {
+  display: flex;
+  gap: 0;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px;
+  flex-shrink: 0;
+  margin: 10px 12px 0;
+}
+.mode-btn {
+  flex: 1;
+  padding: 5px 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.mode-btn:hover { color: var(--text); }
+.mode-btn.active {
+  background: var(--accent);
+  color: #000;
+  font-weight: 700;
+  box-shadow: 0 0 10px var(--glow);
+}
+.mode-btn.active.map-mode {
+  background: var(--accent2);
+  box-shadow: 0 0 10px var(--glow2);
+}
+
+/* Map Mode banner inside chatArea */
+#mapModeHint {
+  display: none;
+  text-align: center;
+  padding: 14px 12px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  margin: 6px 0;
+}
+#mapModeHint strong { color: var(--accent2); }
+
+/* Map overlay when NOT in map mode */
+#mapOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(3,8,15,0.55);
+  backdrop-filter: blur(2px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: all;
+  transition: opacity .3s;
+}
+#mapOverlay.hidden { opacity: 0; pointer-events: none; }
+#mapOverlay .mo-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+  padding: 8px 18px;
+  border-radius: 8px;
+  background: var(--panel);
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- HEADER -->
+  <header id="hdr">
+    <div class="pulse-dot"></div>
+    <div>
+      <div class="title">India GIS Intelligence</div>
+      <div class="sub">Groundwater · States · Districts · Real-time</div>
+    </div>
+    <div id="breadcrumb" style="margin-left:14px;">
+      <span>India</span>
+      <span id="bc-arrow" style="display:none; color:var(--muted)">›</span>
+      <span id="bc-state" class="bc-active" style="display:none;"></span>
+    </div>
+    <button id="backBtn" onclick="resetMap()">← India</button>
+    <div class="hdr-sep"></div>
+    <span class="status-pill pill-live">● LIVE</span>
+  </header>
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+    <!-- Stats -->
+    <div id="statsRow">
+      <div class="stat-cell">
+        <div class="sv" id="sv-states">28</div>
+        <div class="sl">States</div>
+      </div>
+      <div class="stat-cell">
+        <div class="sv" id="sv-sel">—</div>
+        <div class="sl">Selected</div>
+      </div>
+      <div class="stat-cell">
+        <div class="sv" id="sv-zoom">4</div>
+        <div class="sl">Zoom</div>
+      </div>
+    </div>
+
+    <!-- State info card -->
+    <div id="infoPanel">
+      <div class="ip-idle" id="idleMsg">Hover over a state · Click to explore</div>
+      <div id="stateCard">
+        <div class="sc-header">
+          <div class="sc-name" id="sc-name">—</div>
+          <span class="badge" id="sc-badge">—</span>
+        </div>
+        <div class="gw-grid" id="sc-grid"></div>
+      </div>
+    </div>
+
+    <!-- Mode Toggle -->
+    <div id="modeToggle">
+      <button class="mode-btn active" id="btn-quick"    onclick="setMode('quick')">Quick Chat</button>
+      <button class="mode-btn"        id="btn-deep"     onclick="setMode('deep')">Deep Search</button>
+      <button class="mode-btn"        id="btn-map"      onclick="setMode('map')">🗺 Map Mode</button>
+    </div>
+
+    <!-- Chat -->
+    <div id="chatArea">
+    </div>
+
+    <!-- Quick prompts -->
+    <div id="qps">
+      <div class="qp" onclick="ask('What is groundwater status in Gujarat?')">Gujarat GW</div>
+      <div class="qp" onclick="ask('Critical states for groundwater?')">Critical states</div>
+      <div class="qp" onclick="ask('Show Maharashtra districts')">Maharashtra</div>
+      <div class="qp" onclick="ask('Water extraction in Punjab?')">Punjab water</div>
+    </div>
+
+    <!-- Input -->
+    <div id="inputRow">
+      <input id="chatInput" placeholder="Ask about any state or region…" onkeydown="if(event.key==='Enter') sendMsg()"/>
+      <button id="sendBtn" onclick="sendMsg()">↑</button>
+    </div>
+  </aside>
+
+  <!-- MAP -->
+  <div id="mapWrap">
+    <div id="map"></div>
+    <!-- Non-map-mode overlay -->
+    <div id="mapOverlay">
+      <div class="mo-label">Switch to Map Mode to interact</div>
+    </div>
+    <div id="mapBadge">
+      <div>Zoom: <span class="mb-z" id="mbz">4</span></div>
+      <div id="mb-coord" style="font-size:9px;">22.59° N · 78.96° E</div>
+    </div>
+    <!-- Loader -->
+    <div id="loader">
+      <div class="loader-ring"></div>
+      <div class="loader-text">Loading GeoJSON…</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Tooltip -->
+<div id="tooltip"><div class="tt-inner" id="ttInner"></div></div>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   GROUNDWATER DATABASE (2024-25, real-world approximations)
+══════════════════════════════════════════════════════ */
+const GW = {
+  "Gujarat":           { rain:855.95, ext:37411.68, extr:17418.39, stage:55.95, status:"safe" },
+  "Maharashtra":       { rain:1180.4, ext:48200.00, extr:31850.00, stage:66.10, status:"caution" },
+  "Rajasthan":         { rain:415.20, ext:17420.00, extr:19800.00, stage:113.7, status:"critical" },
+  "Punjab":            { rain:649.00, ext:21700.00, extr:30800.00, stage:141.9, status:"critical" },
+  "Uttar Pradesh":     { rain:899.30, ext:76000.00, extr:68400.00, stage:90.00, status:"caution" },
+  "Madhya Pradesh":    { rain:1017.0, ext:54200.00, extr:28300.00, stage:52.20, status:"safe" },
+  "Karnataka":         { rain:1248.0, ext:16550.00, extr:13800.00, stage:83.40, status:"caution" },
+  "Andhra Pradesh":    { rain:890.00, ext:23100.00, extr:15300.00, stage:66.20, status:"caution" },
+  "Tamil Nadu":        { rain:925.00, ext:22400.00, extr:22800.00, stage:101.8, status:"critical" },
+  "Kerala":            { rain:3055.0, ext:6870.00,  extr:3840.00,  stage:55.90, status:"safe" },
+  "West Bengal":       { rain:1582.0, ext:29800.00, extr:18900.00, stage:63.40, status:"caution" },
+  "Bihar":             { rain:1028.0, ext:28400.00, extr:17200.00, stage:60.60, status:"safe" },
+  "Haryana":           { rain:571.50, ext:8700.00,  extr:11400.00, stage:131.0, status:"critical" },
+  "Odisha":            { rain:1489.0, ext:16600.00, extr:6800.00,  stage:41.00, status:"safe" },
+  "Telangana":         { rain:904.00, ext:14200.00, extr:9800.00,  stage:69.00, status:"caution" },
+  "Assam":             { rain:1962.0, ext:26900.00, extr:5400.00,  stage:20.10, status:"safe" },
+  "Jharkhand":         { rain:1200.0, ext:6400.00,  extr:2800.00,  stage:43.80, status:"safe" },
+  "Chhattisgarh":      { rain:1292.0, ext:14300.00, extr:4200.00,  stage:29.40, status:"safe" },
+  "Himachal Pradesh":  { rain:1251.0, ext:1400.00,  extr:690.00,   stage:49.30, status:"safe" },
+  "Uttarakhand":       { rain:1558.0, ext:2100.00,  extr:1200.00,  stage:57.10, status:"safe" },
+};
+
+/* ── City data per state ─── */
+const CITIES = {
+  "Gujarat":        [{name:"Ahmedabad", lat:23.0225, lng:72.5714, pop:"8.4M"}, {name:"Surat",    lat:21.1702, lng:72.8311, pop:"6.5M"}, {name:"Rajkot",   lat:22.3039, lng:70.8022, pop:"1.6M"}, {name:"Vadodara", lat:22.3072, lng:73.1812, pop:"2.1M"}, {name:"Gandhinagar",lat:23.2156,lng:72.6369, pop:"1.4M"}],
+  "Maharashtra":    [{name:"Mumbai",    lat:19.0760, lng:72.8777, pop:"12.5M"},{name:"Pune",     lat:18.5204, lng:73.8567, pop:"7.4M"}, {name:"Nagpur",   lat:21.1458, lng:79.0882, pop:"2.9M"}, {name:"Nashik",   lat:20.0000, lng:73.7833, pop:"2.2M"}],
+  "Rajasthan":      [{name:"Jaipur",   lat:26.9124, lng:75.7873, pop:"3.9M"}, {name:"Jodhpur",  lat:26.2389, lng:73.0243, pop:"1.7M"}, {name:"Udaipur",  lat:24.5854, lng:73.7125, pop:"1.4M"}, {name:"Bikaner",  lat:28.0229, lng:73.3119, pop:"1.1M"}],
+  "Punjab":         [{name:"Chandigarh",lat:30.7333,lng:76.7794, pop:"1.1M"}, {name:"Ludhiana", lat:30.9010, lng:75.8573, pop:"1.7M"}, {name:"Amritsar", lat:31.6340, lng:74.8723, pop:"1.1M"}],
+  "Uttar Pradesh":  [{name:"Lucknow",  lat:26.8467, lng:80.9462, pop:"3.7M"}, {name:"Kanpur",   lat:26.4499, lng:80.3319, pop:"2.9M"}, {name:"Agra",     lat:27.1767, lng:78.0081, pop:"1.7M"}, {name:"Varanasi", lat:25.3176, lng:82.9739, pop:"1.2M"}],
+  "Karnataka":      [{name:"Bengaluru",lat:12.9716, lng:77.5946, pop:"12.3M"},{name:"Mysuru",   lat:12.2958, lng:76.6394, pop:"1.1M"}, {name:"Mangaluru",lat:12.9141, lng:74.8560, pop:"0.6M"}],
+  "Tamil Nadu":     [{name:"Chennai",  lat:13.0827, lng:80.2707, pop:"10.7M"},{name:"Coimbatore",lat:11.0168,lng:76.9558, pop:"2.1M"}, {name:"Madurai",  lat:9.9252,  lng:78.1198, pop:"1.5M"}],
+  "West Bengal":    [{name:"Kolkata",  lat:22.5726, lng:88.3639, pop:"14.9M"},{name:"Howrah",   lat:22.5958, lng:88.2636, pop:"1.1M"}, {name:"Durgapur", lat:23.4800, lng:87.3200, pop:"0.6M"}],
+  "Andhra Pradesh": [{name:"Visakhapatnam",lat:17.6868,lng:83.2185,pop:"2.0M"},{name:"Vijayawada",lat:16.5062,lng:80.6480,pop:"1.5M"},{name:"Guntur",lat:16.3008,lng:80.4428,pop:"0.7M"}],
+  "Telangana":      [{name:"Hyderabad",lat:17.3850, lng:78.4867, pop:"10.5M"},{name:"Warangal", lat:17.9689, lng:79.5941, pop:"0.8M"}],
+  "Madhya Pradesh": [{name:"Bhopal",   lat:23.2599, lng:77.4126, pop:"2.4M"}, {name:"Indore",   lat:22.7196, lng:75.8577, pop:"3.3M"}, {name:"Jabalpur", lat:23.1815, lng:79.9864, pop:"1.2M"}],
+  "Kerala":         [{name:"Thiruvananthapuram",lat:8.5241,lng:76.9366,pop:"0.9M"},{name:"Kochi",lat:9.9312,lng:76.2673,pop:"0.7M"},{name:"Kozhikode",lat:11.2588,lng:75.7804,pop:"0.6M"}],
+};
+
+/* Default cities for unmapped states */
+function getStateCities(name) {
+  return CITIES[name] || [{ name: name + " (Capital)", lat: 22.5, lng: 78.9, pop: "N/A" }];
+}
+
+/* Fill color by status */
+function statusColor(status) {
+  return status === 'critical' ? '#3d0010'
+       : status === 'caution'  ? '#2d1f00'
+       : '#003320';
+}
+function hoverColor() { return '#00d4ff'; }
+
+/* Welcome message (injected here so toggle bar renders first) */
+document.addEventListener('DOMContentLoaded', () => {
+  addMsg('👋 <strong>India GIS</strong> ready.<br><br>Use <strong>Map Mode</strong> to click states and explore cities.<br>Or ask me about groundwater status in any mode.', 'bot');
+});
+
+/* ══════════════════════════════════════════════════════
+   MAPBOX TOKEN — Public token (replace with your own in production)
+   Using a demo/public token approach with open style
+══════════════════════════════════════════════════════ */
+// We use a free public Mapbox token (works for demos)
+// Replace with your own from https://mapbox.com
+mapboxgl.accessToken = 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/dark-v11',
+  center: [78.9629, 22.5937],
+  zoom: 4,
+  minZoom: 3,
+  maxZoom: 14,
+  antialias: true,
+});
+
+map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-left');
+
+/* ── Loader safety: hide overlay even if Mapbox fails ── */
+const LOADER_TIMEOUT_MS = 15000;
+let loaderTimer = window.setTimeout(() => {
+  console.warn('Mapbox loading timeout reached; hiding loader.');
+  addMsg('⚠️ Map is taking too long to load. Check your Mapbox token/network and refresh.', 'bot');
+  hideLoader();
+}, LOADER_TIMEOUT_MS);
+
+function mapInitError(prefix, e) {
+  console.error(prefix, e);
+  if (loaderTimer) window.clearTimeout(loaderTimer);
+  addMsg(`⚠️ ${prefix}. Check Mapbox token/network and refresh.`, 'bot');
+  hideLoader();
+}
+
+// If the style can't be fetched/parsed, `load` may never fire.
+map.on('style.loaderror', (e) => mapInitError('Map style failed to load', e));
+// Generic Mapbox error event.
+map.on('error', (e) => mapInitError('Mapbox error', e));
+
+/* Zoom tracker */
+map.on('zoom', () => {
+  const z = map.getZoom().toFixed(1);
+  document.getElementById('mbz').textContent = z;
+  document.getElementById('sv-zoom').textContent = Math.round(map.getZoom());
+});
+map.on('mousemove', e => {
+  document.getElementById('mb-coord').textContent =
+    `${e.lngLat.lat.toFixed(2)}° N · ${e.lngLat.lng.toFixed(2)}° E`;
+});
+
+/* ── State data ── */
+let currentState = null;
+let hoveredId    = null;
+
+/* ══════════════════════════════════════════════════════
+   LOAD GEOJSON + ADD LAYERS
+══════════════════════════════════════════════════════ */
+const GEOJSON_URL = 'https://raw.githubusercontent.com/geohacker/india/master/state/india_telengana.geojson';
+
+map.on('load', async () => {
+  if (loaderTimer) window.clearTimeout(loaderTimer);
+  /* ── Fetch India States GeoJSON ── */
+  let geojson;
+  try {
+    const geoController = new AbortController();
+    const geoTimer = window.setTimeout(() => {
+      geoController.abort('GeoJSON fetch timeout');
+    }, 12000);
+
+    const res = await fetch(GEOJSON_URL, { signal: geoController.signal });
+    geojson = await res.json();
+    window.clearTimeout(geoTimer);
+    // Normalize state name property
+    geojson.features.forEach((f, i) => {
+      f.id = i; // assign numeric id for feature-state
+      const p = f.properties;
+      p._name = p.NAME_1 || p.ST_NM || p.name || p.state || 'Unknown';
+    });
+  } catch (e) {
+    console.error('GeoJSON load failed', e);
+    addMsg('⚠️ GeoJSON load failed (or timed out). Base map loaded, but states are unavailable.', 'bot');
+    hideLoader();
+    return;
+  }
+
+  /* ─────────────────────────────────────────────
+     1. ADD SOURCE
+  ───────────────────────────────────────────── */
+  map.addSource('india-states', {
+    type: 'geojson',
+    data: geojson,
+    generateId: true,   // auto-generates feature ids for feature-state
+  });
+
+  /* ─────────────────────────────────────────────
+     2. FILL LAYER — state shapes
+  ───────────────────────────────────────────── */
+  map.addLayer({
+    id: 'states-fill',
+    type: 'fill',
+    source: 'india-states',
+    paint: {
+      'fill-color': [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false],
+        '#00d4ff',          // hovered → bright cyan
+        ['boolean', ['feature-state', 'selected'], false],
+        '#00d4ff',          // selected → cyan
+        // default: color by GW status stored in feature property
+        // We set it dynamically below via setPaintProperty per feature
+        '#0f2a44',          // fallback dark blue
+      ],
+      'fill-opacity': [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false], 0.65,
+        ['boolean', ['feature-state', 'selected'], false], 0.6,
+        0.72,
+      ],
+      'fill-outline-color': 'rgba(0,212,255,0.0)',
+    },
+  });
+
+  /* ─────────────────────────────────────────────
+     3. LINE LAYER — state borders
+  ───────────────────────────────────────────── */
+  map.addLayer({
+    id: 'states-line',
+    type: 'line',
+    source: 'india-states',
+    paint: {
+      'line-color': 'rgba(0,212,255,0.3)',
+      'line-width': 0.8,
+    },
+  });
+
+  /* ─────────────────────────────────────────────
+     4. HOVER GLOW LINE — thick outline on hover
+  ───────────────────────────────────────────── */
+  map.addLayer({
+    id: 'states-hover-line',
+    type: 'line',
+    source: 'india-states',
+    paint: {
+      'line-color': '#00d4ff',
+      'line-width': [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false], 3,
+        ['boolean', ['feature-state', 'selected'], false], 3,
+        0,
+      ],
+      'line-blur': 3,
+      'line-opacity': [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false], 0.9,
+        ['boolean', ['feature-state', 'selected'], false], 0.9,
+        0,
+      ],
+    },
+  });
+
+  /* ─────────────────────────────────────────────
+     5. GLOW FILL — extra radiant layer for hover
+  ───────────────────────────────────────────── */
+  map.addLayer({
+    id: 'states-glow',
+    type: 'fill',
+    source: 'india-states',
+    paint: {
+      'fill-color': '#00d4ff',
+      'fill-opacity': [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false], 0.12,
+        ['boolean', ['feature-state', 'selected'], false], 0.10,
+        0,
+      ],
+    },
+  });
+
+  /* ─────────────────────────────────────────────
+     Apply GW status fill colors via expressions
+  ───────────────────────────────────────────── */
+  // Build a match expression for fill color
+  const colorExpr = ['match', ['get', '_name']];
+  Object.entries(GW).forEach(([name, d]) => {
+    colorExpr.push(name, statusColor(d.status));
+  });
+  colorExpr.push('#0f2a44'); // default
+
+  map.setPaintProperty('states-fill', 'fill-color', [
+    'case',
+    ['boolean', ['feature-state', 'hover'], false],    '#00d4ff',
+    ['boolean', ['feature-state', 'selected'], false],  '#00d4ff',
+    colorExpr,
+  ]);
+
+  /* ─────────────────────────────────────────────
+     HOVER INTERACTION
+  ───────────────────────────────────────────── */
+  map.on('mousemove', 'states-fill', (e) => {
+    map.getCanvas().style.cursor = 'pointer';
+
+    if (e.features.length === 0) return;
+    const feat = e.features[0];
+    const id = feat.id;
+    const name = feat.properties._name;
+
+    if (hoveredId !== null && hoveredId !== id) {
+      map.setFeatureState({ source: 'india-states', id: hoveredId }, { hover: false });
+    }
+    hoveredId = id;
+    map.setFeatureState({ source: 'india-states', id: id }, { hover: true });
+
+    showTooltip(e.originalEvent, name);
+  });
+
+  map.on('mouseleave', 'states-fill', () => {
+    map.getCanvas().style.cursor = '';
+    if (hoveredId !== null) {
+      map.setFeatureState({ source: 'india-states', id: hoveredId }, { hover: false });
+      hoveredId = null;
+    }
+    hideTooltip();
+    document.getElementById('idleMsg').style.display = 'block';
+    document.getElementById('stateCard').style.display = 'none';
+  });
+
+  map.on('mousemove', 'states-fill', (e) => {
+    // Update sidebar info card on hover
+    const name = e.features[0]?.properties?._name;
+    if (name) showInfoCard(name);
+  });
+
+  /* ─────────────────────────────────────────────
+     CLICK → ZOOM + LOAD CITIES
+  ───────────────────────────────────────────── */
+  map.on('click', 'states-fill', (e) => {
+    const feat = e.features[0];
+    if (!feat) return;
+    const name = feat.properties._name;
+
+    zoomToState(feat, name);
+  });
+
+  hideLoader();
+  initCityLayer();   // ← register city circle layer + hover events
+  addMsg('✅ India GeoJSON loaded — <strong>' + geojson.features.length + ' states</strong> rendered.<br>Click any state to explore.', 'bot');
+});
+
+/* ══════════════════════════════════════════════════════
+   ZOOM TO STATE + CITIES
+══════════════════════════════════════════════════════ */
+function zoomToState(feat, name) {
+  currentState = name;
+
+  // Update breadcrumb
+  document.getElementById('bc-arrow').style.display = 'inline';
+  document.getElementById('bc-state').style.display = 'inline';
+  document.getElementById('bc-state').textContent = name;
+  document.getElementById('backBtn').style.display = 'inline-block';
+  document.getElementById('sv-sel').textContent = name.length > 7 ? name.slice(0,7)+'…' : name;
+
+  // Highlight selected feature
+  map.setFeatureState({ source: 'india-states', id: feat.id }, { selected: true });
+
+  // Compute bounding box from geometry
+  const bounds = geomBounds(feat.geometry);
+  map.fitBounds(bounds, {
+    padding: 60,
+    duration: 900,
+    easing: t => t < .5 ? 2*t*t : -1+(4-2*t)*t,
+  });
+
+  hideTooltip();
+  botRespond(name);
+  loadCities(name);
+}
+
+/* Compute [minLng, minLat, maxLng, maxLat] from geometry */
+function geomBounds(geom) {
+  let minLng=180, minLat=90, maxLng=-180, maxLat=-90;
+  function processCoords(coords) {
+    if (typeof coords[0] === 'number') {
+      const [lng, lat] = coords;
+      if (lng<minLng) minLng=lng; if (lng>maxLng) maxLng=lng;
+      if (lat<minLat) minLat=lat; if (lat>maxLat) maxLat=lat;
+    } else coords.forEach(processCoords);
+  }
+  processCoords(geom.coordinates);
+  return [[minLng, minLat], [maxLng, maxLat]];
+}
+
+/* ══════════════════════════════════════════════════════
+   CITY CIRCLE LAYER (Mapbox layer — NOT DOM markers)
+══════════════════════════════════════════════════════ */
+
+/* Build an empty GeoJSON FeatureCollection used as the live source */
+const EMPTY_FC = { type: 'FeatureCollection', features: [] };
+
+/* Called once after map.on('load') to register the source + layers */
+function initCityLayer() {
+  map.addSource('city-data', { type: 'geojson', data: EMPTY_FC, generateId: true });
+
+  /* Glow halo — slightly larger, blurred */
+  map.addLayer({
+    id: 'city-glow',
+    type: 'circle',
+    source: 'city-data',
+    paint: {
+      'circle-radius': 14,
+      'circle-color': '#7c3aed',
+      'circle-blur': 0.8,
+      'circle-opacity': 0.35,
+      'circle-opacity-transition': { duration: 300 },
+    },
+  });
+
+  /* Main dot */
+  map.addLayer({
+    id: 'city-layer',
+    type: 'circle',
+    source: 'city-data',
+    paint: {
+      'circle-radius': [
+        'interpolate', ['linear'], ['zoom'],
+        4, 5,
+        8, 9,
+        12, 12,
+      ],
+      'circle-color': [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false], '#00d4ff',
+        '#7c3aed',
+      ],
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false], '#ffffff',
+        '#c4b5fd',
+      ],
+      'circle-opacity': [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false], 1,
+        0.9,
+      ],
+      'circle-opacity-transition': { duration: 200 },
+    },
+  });
+
+  /* City label */
+  map.addLayer({
+    id: 'city-labels',
+    type: 'symbol',
+    source: 'city-data',
+    layout: {
+      'text-field': ['get', 'city'],
+      'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+      'text-size': 11,
+      'text-offset': [0, 1.4],
+      'text-anchor': 'top',
+      'text-allow-overlap': false,
+    },
+    paint: {
+      'text-color': '#c4b5fd',
+      'text-halo-color': 'rgba(3,8,15,0.9)',
+      'text-halo-width': 1.5,
+    },
+  });
+
+  /* ── Hover interaction ── */
+  let hoveredCityId = null;
+
+  map.on('mouseenter', 'city-layer', (e) => {
+    map.getCanvas().style.cursor = 'pointer';
+    if (!e.features || e.features.length === 0) return;
+    const feat = e.features[0];
+    if (hoveredCityId !== null) {
+      map.setFeatureState({ source: 'city-data', id: hoveredCityId }, { hover: false });
+    }
+    hoveredCityId = feat.id;
+    map.setFeatureState({ source: 'city-data', id: feat.id }, { hover: true });
+
+    const p = feat.properties;
+    ttInner.innerHTML = `
+      <div class="tt-name">📍 ${p.city}</div>
+      <hr class="tt-divider"/>
+      <div class="tt-row">Latitude  <span>${parseFloat(p.lat).toFixed(4)}</span></div>
+      <div class="tt-row">Longitude <span>${parseFloat(p.lng).toFixed(4)}</span></div>
+      <div class="tt-row">Population <span>${p.pop || '—'}</span></div>
+      <div class="tt-row">State <span>${p.state}</span></div>
+    `;
+    ttEl.style.display = 'block';
+    moveTooltip(e.originalEvent);
+  });
+
+  map.on('mousemove', 'city-layer', (e) => {
+    if (ttEl.style.display === 'block') moveTooltip(e.originalEvent);
+  });
+
+  map.on('mouseleave', 'city-layer', () => {
+    map.getCanvas().style.cursor = '';
+    if (hoveredCityId !== null) {
+      map.setFeatureState({ source: 'city-data', id: hoveredCityId }, { hover: false });
+      hoveredCityId = null;
+    }
+    hideTooltip();
+  });
+
+  /* Click → popup + chat message */
+  map.on('click', 'city-layer', (e) => {
+    if (!e.features || e.features.length === 0) return;
+    const p = e.features[0].properties;
+    const coords = e.features[0].geometry.coordinates.slice();
+    new mapboxgl.Popup({ closeOnClick: true, maxWidth: '220px' })
+      .setLngLat(coords)
+      .setHTML(`
+        <div class="popup-title">📍 ${p.city}</div>
+        <div class="popup-row"><span class="pk">Latitude</span><span class="pv">${parseFloat(p.lat).toFixed(4)}</span></div>
+        <div class="popup-row"><span class="pk">Longitude</span><span class="pv">${parseFloat(p.lng).toFixed(4)}</span></div>
+        <div class="popup-row"><span class="pk">Population</span><span class="pv">${p.pop || '—'}</span></div>
+        <div class="popup-row"><span class="pk">State</span><span class="pv">${p.state}</span></div>
+      `)
+      .addTo(map);
+    addMsg(`📍 <strong>${p.city}</strong> — Lat: ${parseFloat(p.lat).toFixed(4)}, Lng: ${parseFloat(p.lng).toFixed(4)} | Pop: ${p.pop || '—'}`, 'bot');
+  });
+}
+
+/* Convert CITIES array for a given state → GeoJSON FeatureCollection */
+function stateCitiesToGeoJSON(stateName) {
+  const cities = getStateCities(stateName);
+  return {
+    type: 'FeatureCollection',
+    features: cities.map((c, i) => ({
+      type: 'Feature',
+      id: i,
+      geometry: { type: 'Point', coordinates: [c.lng, c.lat] },
+      properties: {
+        city:  c.name,
+        state: stateName,
+        lat:   c.lat,
+        lng:   c.lng,
+        pop:   c.pop || '—',
+      },
+    })),
+  };
+}
+
+/* Load (or refresh) cities for a state — only on click, lazy */
+function loadCities(stateName) {
+  if (!map.getSource('city-data')) return;   // layer not ready yet
+  const fc = stateCitiesToGeoJSON(stateName);
+  map.getSource('city-data').setData(fc);
+}
+
+/* ══════════════════════════════════════════════════════
+   TOOLTIP
+══════════════════════════════════════════════════════ */
+const ttEl = document.getElementById('tooltip');
+const ttInner = document.getElementById('ttInner');
+
+function showTooltip(e, stateName) {
+  const d = GW[stateName];
+  const badge = d
+    ? `<span class="badge b-${d.status}" style="font-size:9px;">${d.status.toUpperCase()}</span>`
+    : '';
+  ttInner.innerHTML = `
+    <div class="tt-name">${stateName} ${badge}</div>
+    ${d ? `
+    <hr class="tt-divider"/>
+    <div class="tt-row">Rainfall <span>${d.rain} mm</span></div>
+    <div class="tt-row">Stage <span>${d.stage}%</span></div>
+    ` : `<div class="tt-row" style="color:var(--muted)">Click to explore</div>`}
+  `;
+  ttEl.style.display = 'block';
+  moveTooltip(e);
+}
+
+function moveTooltip(e) {
+  const cx = e.clientX ?? e.pageX;
+  const cy = e.clientY ?? e.pageY;
+  const w = window.innerWidth, h = window.innerHeight;
+  const tw = 200, th = 100;
+  ttEl.style.left = (cx + 16 + tw > w ? cx - tw - 10 : cx + 16) + 'px';
+  ttEl.style.top  = (cy + 16 + th > h ? cy - th - 10 : cy + 16) + 'px';
+}
+
+function hideTooltip() { ttEl.style.display = 'none'; }
+
+/* Also move tooltip on Mapbox mousemove */
+map.on('mousemove', e => {
+  if (ttEl.style.display === 'block') moveTooltip(e.originalEvent);
+});
+
+/* ══════════════════════════════════════════════════════
+   SIDEBAR INFO CARD
+══════════════════════════════════════════════════════ */
+function showInfoCard(name) {
+  document.getElementById('idleMsg').style.display = 'none';
+  document.getElementById('stateCard').style.display = 'block';
+  document.getElementById('sc-name').textContent = name;
+
+  const d = GW[name];
+  if (!d) {
+    document.getElementById('sc-grid').innerHTML = `<div style="color:var(--muted);font-size:11px;grid-column:1/-1;font-family:var(--mono)">No data available</div>`;
+    document.getElementById('sc-badge').textContent = '—';
+    document.getElementById('sc-badge').className = 'badge';
+    return;
+  }
+  document.getElementById('sc-badge').textContent = d.status.toUpperCase();
+  document.getElementById('sc-badge').className = `badge b-${d.status}`;
+  document.getElementById('sc-grid').innerHTML = `
+    <div class="gw-item"><div class="gi-val">${d.rain} mm</div><div class="gi-lbl">Rainfall</div></div>
+    <div class="gw-item"><div class="gi-val">${d.stage}%</div><div class="gi-lbl">Extraction %</div></div>
+    <div class="gw-item"><div class="gi-val">${(d.ext/1000).toFixed(1)}K</div><div class="gi-lbl">Extractable</div></div>
+    <div class="gw-item"><div class="gi-val">${(d.extr/1000).toFixed(1)}K</div><div class="gi-lbl">Extracted</div></div>
+  `;
+}
+
+/* ══════════════════════════════════════════════════════
+   RESET
+══════════════════════════════════════════════════════ */
+function resetMap() {
+  currentState = null;
+  document.getElementById('bc-arrow').style.display = 'none';
+  document.getElementById('bc-state').style.display = 'none';
+  document.getElementById('backBtn').style.display = 'none';
+  document.getElementById('sv-sel').textContent = '—';
+  document.getElementById('idleMsg').style.display = 'block';
+  document.getElementById('stateCard').style.display = 'none';
+
+  // Clear cities from circle layer
+  if (map.getSource('city-data')) {
+    map.getSource('city-data').setData({ type: 'FeatureCollection', features: [] });
+  }
+
+  // Clear all feature-state selections
+  if (map.getSource('india-states')) {
+    // Clear selected states by resetting all (iterate features isn't needed — we can use a flag)
+    map.removeFeatureState({ source: 'india-states' });
+  }
+
+  map.flyTo({ center: [78.9629, 22.5937], zoom: 4, duration: 1000 });
+}
+
+/* ══════════════════════════════════════════════════════
+   CHAT ENGINE
+══════════════════════════════════════════════════════ */
+function addMsg(html, role) {
+  const box = document.getElementById('chatArea');
+  const el = document.createElement('div');
+  el.className = `msg ${role}`;
+  el.innerHTML = html;
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+}
+
+function addTyping() {
+  const box = document.getElementById('chatArea');
+  const el = document.createElement('div');
+  el.className = 'msg bot typing-wrapper';
+  el.id = 'typing-indicator';
+  el.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+}
+
+function removeTyping() {
+  const t = document.getElementById('typing-indicator');
+  if (t) t.remove();
+}
+
+function sendMsg() {
+  const inp = document.getElementById('chatInput');
+  const txt = inp.value.trim();
+  if (!txt) return;
+  inp.value = '';
+  ask(txt);
+}
+
+function ask(q) {
+  addMsg(q, 'user');
+  addTyping();
+  setTimeout(() => {
+    removeTyping();
+    processQuery(q);
+  }, 600);
+}
+
+function processQuery(q) {
+  const lower = q.toLowerCase();
+  const stateMatch = Object.keys(GW).find(s => lower.includes(s.toLowerCase()));
+
+  if (stateMatch) {
+    botRespond(stateMatch);
+    // Try to highlight on map by querying source
+    highlightStateByName(stateMatch);
+    return;
+  }
+
+  if (lower.includes('critical')) {
+    const crit = Object.entries(GW).filter(([,v])=>v.status==='critical').map(([k])=>k);
+    addMsg(`⚠️ <strong>Critical groundwater states:</strong><br>${crit.map(s=>`• ${s}`).join('<br>')}`, 'bot');
+    return;
+  }
+  if (lower.includes('safe')) {
+    const safe = Object.entries(GW).filter(([,v])=>v.status==='safe').map(([k])=>k);
+    addMsg(`✅ <strong>Safe groundwater states:</strong><br>${safe.map(s=>`• ${s}`).join('<br>')}`, 'bot');
+    return;
+  }
+  addMsg(`ℹ️ Try: <em>"Groundwater status in Maharashtra"</em> or <em>"Critical states"</em>`, 'bot');
+}
+
+function botRespond(name) {
+  const d = GW[name];
+  if (!d) {
+    addMsg(`📍 <strong>${name}</strong> selected. No groundwater data on record.`, 'bot');
+    return;
+  }
+  addMsg(`
+    📊 <strong>${name}</strong> — GW Report 2024–25
+    <span class="badge b-${d.status}" style="margin-left:5px;">${d.status.toUpperCase()}</span><br><br>
+    <em>Rainfall:</em> ${d.rain} mm<br>
+    <em>Extractable GW:</em> ${d.ext.toLocaleString()} ham<br>
+    <em>GW Extracted:</em> ${d.extr.toLocaleString()} ham<br>
+    <em>Stage of Extraction:</em> ${d.stage}%
+  `, 'bot');
+}
+
+function highlightStateByName(name) {
+  if (!map.getSource('india-states')) return;
+  // Query rendered features to find the matching one
+  const features = map.querySourceFeatures('india-states', { sourceLayer: '' });
+  const feat = features.find(f => f.properties._name === name);
+  if (feat) {
+    map.removeFeatureState({ source: 'india-states' });
+    map.setFeatureState({ source: 'india-states', id: feat.id }, { selected: true });
+    const bounds = geomBounds(feat.geometry);
+    map.fitBounds(bounds, { padding: 60, duration: 900 });
+    loadCities(name);
+    document.getElementById('bc-arrow').style.display = 'inline';
+    document.getElementById('bc-state').style.display = 'inline';
+    document.getElementById('bc-state').textContent = name;
+    document.getElementById('backBtn').style.display = 'inline-block';
+  }
+}
+
+/* ── Loader ── */
+function hideLoader() {
+  const l = document.getElementById('loader');
+  l.classList.add('hidden');
+  setTimeout(() => l.style.display = 'none', 700);
+}
+
+/* ── Expose resetMap globally for backBtn ── */
+window.resetMap = resetMap;
+window.ask = ask;
+
+/* ══════════════════════════════════════════════════════
+   MODE TOGGLE
+══════════════════════════════════════════════════════ */
+let currentMode = 'quick';
+
+function setMode(mode) {
+  currentMode = mode;
+
+  // Update button states
+  document.getElementById('btn-quick').classList.toggle('active', mode === 'quick');
+  document.getElementById('btn-quick').classList.remove('map-mode');
+  document.getElementById('btn-deep').classList.toggle('active', mode === 'deep');
+  document.getElementById('btn-deep').classList.remove('map-mode');
+  document.getElementById('btn-map').classList.toggle('active', mode === 'map');
+  if (mode === 'map') document.getElementById('btn-map').classList.add('map-mode');
+
+  const overlay = document.getElementById('mapOverlay');
+  const chatInput = document.getElementById('chatInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const qps = document.getElementById('qps');
+
+  if (mode === 'map') {
+    // Reveal map fully — hide overlay
+    overlay.classList.add('hidden');
+    // Disable chat input to encourage map interaction
+    chatInput.placeholder = 'Click a state on the map to explore…';
+    chatInput.disabled = false; // keep enabled so user can still type
+    addMsg('🗺️ <strong>Map Mode active</strong> — click any state on the map to explore cities and groundwater data.', 'bot');
+  } else {
+    // Cover map with semi-transparent overlay
+    overlay.classList.remove('hidden');
+    overlay.querySelector('.mo-label').textContent =
+      mode === 'deep'
+        ? 'Map locked in Deep Search mode'
+        : 'Switch to Map Mode to interact';
+    chatInput.placeholder = mode === 'deep'
+      ? 'Deep search: ask detailed groundwater questions…'
+      : 'Ask about any state or region…';
+    chatInput.disabled = false;
+
+    if (mode === 'deep') {
+      addMsg('🔍 <strong>Deep Search mode</strong> — ask detailed questions about groundwater data, comparisons, or trends.', 'bot');
+    }
+  }
+}
+
+window.setMode = setMode;
+
+// Start with map overlay showing (Quick Chat is default, map not interactive)
+// Give DOM a tick to settle before applying
+setTimeout(() => setMode('quick'), 0);
+</script>
+</body>
+</html>

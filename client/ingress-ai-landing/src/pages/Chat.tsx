@@ -22,6 +22,7 @@ import {
   Mic,
   Sun,
   Moon,
+  Map as MapIcon,
 } from 'lucide-react';
 
 import {
@@ -35,6 +36,7 @@ import {
 } from '@/lib/api';
 import { ChatSidebarContent } from '@/components/ChatSidebarContent';
 import { EChartsRenderer } from '@/components/EChartsRenderer';
+import { MapDrawer } from '@/components/MapDrawer';
 const logoLight = '/logo_LIGHT.png';
 const logoDark = '/logo_DARK.png';
 import '@/chat/index.css';
@@ -105,6 +107,7 @@ function ChatPage() {
   // Toggle buttons and output data
   const [isVisualizationNeeded, setIsVisualizationNeeded] = useState(false);
   const [isDetailedResponseNeeded, setIsDetailedResponseNeeded] = useState(false);
+  const [isMapNeeded, setIsMapNeeded] = useState(false);
   const [lastChartData, setLastChartData] = useState<any>(null);
 
   //For Renaming & Deleting the ChatNames
@@ -280,6 +283,9 @@ function ChatPage() {
   // Quick Chat modal for mobile
   const [showQuickModal, setShowQuickModal] = useState(false);
 
+  // Map drawer state
+  const [isMapDrawerOpen, setIsMapDrawerOpen] = useState(false);
+
   // Handle mode selection
   const handleModeSelect = (mode) => {
   setSelectedMode(mode);
@@ -448,6 +454,13 @@ try {
   }
 
   return (
+    <>
+      {/* Map Drawer */}
+      <MapDrawer 
+        isOpen={isMapDrawerOpen} 
+        onClose={() => setIsMapDrawerOpen(false)}
+      />
+
     <div className="relative flex h-screen w-full overflow-hidden">
       {/* Crossfade gradients — CSS cannot interpolate between distinct gradient definitions */}
       <div
@@ -871,7 +884,24 @@ try {
                       </div>
                     )}
 
+                    {/* Map badge */}
+                    {isMapNeeded && (
+                      <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 text-xs">
+                        <MapIcon className="w-4 h-4 text-blue-400" />
+                        Map
+                      </div>
+                    )}
+
                     </div>
+
+                    {/* Map Drawer Toggle Button */}
+                    <button
+                      onClick={() => setIsMapDrawerOpen(true)}
+                      className={`p-2.5 rounded-xl transition-colors ${isLightMode ? 'hover:bg-slate-200/80' : 'hover:bg-white/10'}`}
+                      title="Open Map"
+                    >
+                      <MapIcon className={`w-5 h-5 ${isLightMode ? 'text-slate-500' : 'text-white/60'}`} />
+                    </button>
 
                   {/* Input */}
                   <input
@@ -1302,7 +1332,9 @@ try {
     </div>
   )}
       </main>
-      </div>
     </div>
-  )};
+  </div>
+  </>
+  );
+}
 export default ChatPage;
