@@ -18,7 +18,7 @@ const mysql = require("mysql2"); // Keep the import for the connection block
 const classifier = require('./src/routes/classifier');
 const { stat } = require('fs');
 
-mongoose.connect(process.env.MONGO_URL)
+mongoose.connect(process.env.MONGO_URI)
 .then(() => {
     console.log("✅ MongoDB connected");
 })
@@ -69,8 +69,8 @@ app.use(cors({
 }));
 
 // mongodb connection
-console.log("This is the mongo url node "+process.env.MONGO_URL)
- mongoose.connect(process.env.MONGO_URL)
+console.log("This is the mongo url node "+process.env.MONGO_URI)
+ mongoose.connect(process.env.MONGO_URI)
  .then(() => console.log("MongoDB connected"))
  .catch((err) => console.log("MongoDB connection error:", err));
 
