@@ -158,6 +158,8 @@ function ChatPage() {
   const [location, setLocation] = useState<{city?: string; state?: string; lat: number; lng: number} | null>(null);
   const [locationStatus, setLocationStatus] = useState<'pending' | 'granted' | 'denied'>('pending');
   const [suggestions, setSuggestions] = useState<SuggestionOption[]>([]);
+  const [suggestionContextLabel, setSuggestionContextLabel] = useState('India');
+  const [showInlineMapOptions, setShowInlineMapOptions] = useState(false);
 
   //For Renaming & Deleting the ChatNames
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
@@ -374,7 +376,9 @@ function ChatPage() {
   useEffect(() => {
     const buildSuggestions = (city?: string, state?: string) => {
       const place = city || state || 'India';
+      setSuggestionContextLabel(place);
       setSuggestions(buildLocationSuggestions(place));
+      setShowInlineMapOptions(false);
 
       if (!city && !state) {
         setLocationStatus('denied');
@@ -434,6 +438,9 @@ function ChatPage() {
     setMessages(prev => [...prev, userMsg]);
 
     setLastChartData(null);
+    setSuggestionContextLabel(stateName);
+    setSuggestions(buildLocationSuggestions(stateName));
+    setShowInlineMapOptions(true);
 
     const botMsg: ChatMessageItem = {
       id: crypto.randomUUID(),
@@ -459,6 +466,9 @@ function ChatPage() {
     setMessages(prev => [...prev, userMsg]);
 
     setLastChartData(null);
+    setSuggestionContextLabel(place);
+    setSuggestions(buildLocationSuggestions(place));
+    setShowInlineMapOptions(true);
 
     const botMsg: ChatMessageItem = {
       id: crypto.randomUUID(),
@@ -509,6 +519,7 @@ function ChatPage() {
     let activeChatId = currentChatId;
 
     setInputValue('');
+    setShowInlineMapOptions(false);
     setSuggestions([]);
 
     const userMsg: ChatMessageItem = {
@@ -849,7 +860,7 @@ function ChatPage() {
                   </p>
 
                   {locationStatus !== 'pending' && (
-                    <p className="text-center text-sm font-medium text-cyan-100 mb-5">
+                    <p className={`text-center text-sm font-medium mb-5 ${isLightMode ? 'text-slate-700' : 'text-cyan-100'}`}>
                       📍 Based on your location: {location?.city ? `${location.city}, ${location.state}` : location?.state || 'India'}
                     </p>
                   )}
@@ -922,6 +933,7 @@ function ChatPage() {
                               ))}
                             </div>
                           )}
+
                         </div>
                       </div>
 
@@ -982,6 +994,33 @@ function ChatPage() {
                           <span></span>
                         </div>
                       </div>
+                    </div>
+                  )}
+
+                  {!showInlineMapOptions && suggestions.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {suggestions.map((suggestion, index) => {
+                        const icon = SUGGESTION_ICONS[index % SUGGESTION_ICONS.length];
+                        return (
+                          <button
+                            key={`${suggestionContextLabel}-${suggestion.label}`}
+                            onClick={() => handleSend(suggestion.prompt)}
+                            className={`rounded-2xl border p-4 text-left transition-all duration-300 hover:scale-[1.01] ${
+                              isLightMode
+                                ? 'border-slate-200 bg-white hover:border-cyan-400 hover:bg-cyan-50'
+                                : 'border-cyan-300/15 bg-[rgba(10,20,40,0.7)] hover:border-cyan-300/80 hover:bg-slate-800/30'
+                            }`}
+                          >
+                            <div className="text-2xl">{icon}</div>
+                            <div className={`mt-2 text-base font-semibold ${isLightMode ? 'text-slate-900' : 'text-white'}`}>
+                              {suggestion.label}
+                            </div>
+                            <div className={`mt-1 text-xs ${isLightMode ? 'text-slate-500' : 'text-cyan-100/80'}`}>
+                              {suggestionContextLabel}
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
 
