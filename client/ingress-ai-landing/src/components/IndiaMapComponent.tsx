@@ -4,8 +4,12 @@ import * as GeoJSON from 'geojson';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@/components/IndiaMapComponent.css';
 
-// Mapbox token - replace with your own
-mapboxgl.accessToken = 'your token';
+// Mapbox token from environment variable
+const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined;
+if (!mapboxToken) {
+  console.warn('VITE_MAPBOX_TOKEN is not set in environment. Mapbox may not work.');
+}
+mapboxgl.accessToken = mapboxToken ?? 'YOUR_MAPBOX_TOKEN';
 
 // Groundwater database
 const GW: Record<string, any> = {
