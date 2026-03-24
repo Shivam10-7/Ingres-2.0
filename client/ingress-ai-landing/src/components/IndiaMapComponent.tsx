@@ -116,7 +116,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({ onStateSel
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, []);
+  }, [mapTheme]);
 
   // Initialize map
   useEffect(() => {

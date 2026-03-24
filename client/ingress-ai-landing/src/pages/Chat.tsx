@@ -53,6 +53,8 @@ const MODES = [
   { id: 'visualizer', label: 'Visualizer', description: 'Charts & graphs', icon: BarChart3 },
 ];
 
+const SUGGESTION_ICONS = ['💧', '📊', '📍', '⚠️'];
+
 // Sample data for dropdowns
 const STATES = ['ANDHRA PRADESH', 'MAHARASHTRA', 'KARNATAKA', 'TAMIL NADU'];
 const DISTRICTS = ['KURNOOL', 'MUMBAI', 'BANGALORE', 'CHENNAI'];
@@ -109,6 +111,10 @@ function ChatPage() {
   const [isDetailedResponseNeeded, setIsDetailedResponseNeeded] = useState(false);
   const [isMapNeeded, setIsMapNeeded] = useState(false);
   const [lastChartData, setLastChartData] = useState<any>(null);
+
+  const [location, setLocation] = useState<{city?: string; state?: string; lat: number; lng: number} | null>(null);
+  const [locationStatus, setLocationStatus] = useState<'pending' | 'granted' | 'denied'>('pending');
+  const [suggestions, setSuggestions] = useState<string[]>([]);
 
   //For Renaming & Deleting the ChatNames
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
@@ -317,6 +323,67 @@ function ChatPage() {
   setShowResults(false);
 };
 
+  useEffect(() => {
+    // Start loading the map immediately (hidden by default) so user-click is fast.
+    setIsMapInitialized(true);
+  }, []);
+
+  useEffect(() => {
+    const buildSuggestions = (city?: string, state?: string) => {
+      const place = city || state || 'India';
+      setSuggestions([
+        `Give me groundwater level of ${place}`,
+        `Total recharge in ${place}`,
+        `Stage of groundwater extraction % in ${place}`,
+        `Groundwater categorization of ${place}`,
+      ]);
+
+      if (!city && !state) {
+        setLocationStatus('denied');
+      }
+
+      return place;
+    };
+
+    if (!('geolocation' in navigator)) {
+      setLocationStatus('denied');
+      buildSuggestions(undefined, 'Gujarat');
+      return;
+    }
+
+    const onSuccess = async (position: GeolocationPosition) => {
+      const { latitude, longitude } = position.coords;
+
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1`,
+          { headers: { 'User-Agent': 'ingres-gw-chat/1.0' } }
+        );
+        const payload = await res.json();
+
+        const addr = payload.address || {};
+        const city = (addr.city || addr.town || addr.village || addr.hamlet || addr.county) as string;
+        const state = (addr.state || addr.region || addr['state_district'] || 'India') as string;
+
+        setLocation({ city, state, lat: latitude, lng: longitude });
+        setLocationStatus('granted');
+        buildSuggestions(city, state);
+      } catch (err) {
+        console.error('Reverse geocoding failed', err);
+        setLocationStatus('denied');
+        buildSuggestions(undefined, 'Gujarat');
+      }
+    };
+
+    const onError = (err: GeolocationPositionError) => {
+      console.warn('Geolocation denied or failed', err);
+      setLocationStatus('denied');
+      buildSuggestions(undefined, 'Gujarat');
+    };
+
+    navigator.geolocation.getCurrentPosition(onSuccess, onError, { timeout: 12000 });
+  }, []);
+
   const handleMapStateSelect = (stateName: string, data?: any) => {
     if (!stateName) return; // on deselect, do nothing
 
@@ -380,89 +447,87 @@ function ChatPage() {
     };
   };
 
-  const handleSend = async () => {
-    if (!inputValue.trim()) return;
+  const handleSend = async (overrideText?: string) => {
+    const textToSend = overrideText?.trim() || inputValue.trim();
+    if (!textToSend) return;
 
     let activeChatId = currentChatId;
 
-    // Create new chat session if none is active
-    if (!activeChatId && userId) {
-      const newChat = await createNewChatSession(userId, inputValue.substring(0, 30));
-      if (newChat) {
-        activeChatId = newChat.chatId;
-        setCurrentChatId(activeChatId);
-        // add to sidebar temporarily until refresh
-        setChats(prev => [newChat, ...prev]);
-      }
-    }
+    setInputValue('');
 
     const userMsg = {
       id: Date.now(),
-      text: inputValue,
+      text: textToSend,
       sender: 'user',
       timestamp: new Date(),
     };
 
     setMessages(prev => [...prev, userMsg]);
-    setInputValue('');
     setIsTyping(true);
 
-    // Save message to mongo if we have active chat
+    // Create new chat session if needed (only if user typed in regular flow)
+    if (!activeChatId && userId) {
+      const newChat = await createNewChatSession(userId, textToSend.substring(0, 30));
+      if (newChat) {
+        activeChatId = newChat.chatId;
+        setCurrentChatId(activeChatId);
+        setChats(prev => [newChat, ...prev]);
+      }
+    }
+
+    // Save user message
     if (activeChatId) {
-      await saveChatMessage(activeChatId, 'user', [{ response: userMsg.text }]);
+      await saveChatMessage(activeChatId, 'user', [{ response: textToSend }]);
     }
 
-try {
-  const data = await sendChatRequest(userMsg.text, isDetailedResponseNeeded, isVisualizationNeeded); // manually passed charts and detailed response
+    try {
+      const data = await sendChatRequest(textToSend, isDetailedResponseNeeded, isVisualizationNeeded);
 
-  if (!data.success) {
-    throw new Error(data.error || 'Failed to fetch response');
-  }
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to fetch response');
+      }
 
-  const responsePayload = data.response;
-  const answerText =
-    typeof responsePayload === 'string'
-      ? responsePayload
-      : responsePayload?.response ?? "I'm sorry, I received an empty response.";
+      const responsePayload = data.response;
+      const answerText =
+        typeof responsePayload === 'string'
+          ? responsePayload
+          : responsePayload?.response ?? "I'm sorry, I received an empty response.";
 
-  const chartData =
-    responsePayload && typeof responsePayload === 'object'
-      ? responsePayload.chartdata ?? responsePayload.chartData
-      : undefined;
+      const chartData =
+        responsePayload && typeof responsePayload === 'object'
+          ? responsePayload.chartdata ?? responsePayload.chartData
+          : undefined;
 
-  setLastChartData(chartData ?? null);
+      setLastChartData(chartData ?? null);
 
-  const botResponse = {
-    id: crypto.randomUUID(), // More robust unique ID
-    text: answerText,
-    chartData,
-    sender: 'bot',
-    timestamp: new Date(),
-  };
-
-  // Functional updates are safer to prevent state-stale issues
-  setMessages(prev => [...prev, botResponse]);
-
-  if (activeChatId) {
-    // Fire and forget or await? Usually better to await if the next step depends on it
-    await saveChatMessage(activeChatId, 'assistant', [
-      {
-        response: answerText,
+      const botResponse = {
+        id: crypto.randomUUID(),
+        text: answerText,
         chartData,
-      },
-    ]);
+        sender: 'bot',
+        timestamp: new Date(),
+      };
 
-    if (userId) {
-      const updatedChats = await getUserChatSessions(userId);
-      setChats(updatedChats);
+      setMessages(prev => [...prev, botResponse]);
+
+      if (activeChatId) {
+        await saveChatMessage(activeChatId, 'assistant', [
+          {
+            response: answerText,
+            chartData,
+          },
+        ]);
+
+        if (userId) {
+          const updatedChats = await getUserChatSessions(userId);
+          setChats(updatedChats);
+        }
+      }
+    } catch (err) {
+      console.error('Send failed', err);
+    } finally {
+      setIsTyping(false);
     }
-  }
-
-} catch (err) {
-  // Logic for error display...
-} finally {
-  setIsTyping(false);
-}
   };
 
   // Handle get data
@@ -709,24 +774,48 @@ try {
               }}
             >
               {messages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center">
+                <div className="min-h-full flex flex-col items-center justify-center px-4 py-10">
                   {/* Logo */}
-                  <div className="mb-8">
-                    <img src={isLightMode ? logoLight : logoDark} alt="INGRES" className="w-16 h-16 object-contain" />
+                  <div className="mb-5">
+                    <img src={isLightMode ? logoLight : logoDark} alt="INGRES" className="w-24 h-24 object-contain" />
                   </div>
 
                   <h2
-                    className={`text-3xl font-bold mb-3 text-center ${isLightMode ? 'text-slate-900' : 'text-white'
-                      }`}
+                    className={`text-3xl font-bold text-center ${isLightMode ? 'text-slate-900' : 'text-white'} mb-5`}
                   >
                     How can I help you today?
                   </h2>
+
                   <p
-                    className={`text-center max-w-md ${isLightMode ? 'text-slate-500' : 'text-white/50'
-                      }`}
+                    className={`text-center max-w-md ${isLightMode ? 'text-slate-500' : 'text-white/50'} mb-4`}
                   >
                     Ask me anything about India's groundwater resources.
                   </p>
+
+                  {locationStatus !== 'pending' && (
+                    <p className="text-center text-sm font-medium text-cyan-100 mb-5">
+                      📍 Based on your location: {location?.city ? `${location.city}, ${location.state}` : location?.state || 'India'}
+                    </p>
+                  )}
+
+                  {suggestions.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-[800px] w-full">
+                      {suggestions.map((suggestion, index) => {
+                        const icon = SUGGESTION_ICONS[index % SUGGESTION_ICONS.length];
+                        return (
+                          <button
+                            key={suggestion}
+                            onClick={() => handleSend(suggestion)}
+                            className={`rounded-2xl border border-cyan-300/15 bg-[rgba(10,20,40,0.7)] p-4 text-left transition-all duration-300 hover:scale-[1.01] ${isLightMode ? 'hover:border-cyan-300/80 hover:bg-white/10' : 'hover:border-cyan-300/80 hover:bg-slate-800/30'}`}
+                          >
+                            <div className="text-2xl">{icon}</div>
+                            <div className="mt-2 text-base font-semibold text-white">{suggestion}</div>
+                            <div className="mt-1 text-xs text-cyan-100/80">{location?.city ? `${location.city}` : `${location?.state || 'India'}`}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-6 max-w-3xl mx-auto">
@@ -969,6 +1058,7 @@ try {
                       <MapIcon className={`w-5 h-5 ${isLightMode ? 'text-slate-500' : 'text-white/60'}`} />
                     </button>
 
+
                   {/* Input */}
                   <input
                     ref={inputRef}
@@ -989,7 +1079,7 @@ try {
 
                   {/* Send Button */}
                   <button
-                    onClick={handleSend}
+                    onClick={() => handleSend()}
                     disabled={!inputValue.trim()}
                     className={`px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${inputValue.trim()
                         ? 'bg-blue-600 hover:bg-blue-500 text-white'
