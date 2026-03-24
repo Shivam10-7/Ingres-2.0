@@ -113,8 +113,8 @@ Now provide a short, professional, and properly formatted HTML response:`;
   
 try {
     console.log("Response Generator Prompt:", RefinedPrompt);
-    const response = await LocalModel(RefinedPrompt);
-    //  const response = await ApiCaller(RefinedPrompt);
+    // const response = await LocalModel(RefinedPrompt);
+     const response = await ApiCaller(RefinedPrompt);
 
     return response.trim();
   } catch (error) {

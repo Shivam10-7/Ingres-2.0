@@ -590,8 +590,8 @@ try {
   }
     console.log("System Instruction for SQL Generation:");
     console.log("[Prompt going inside]"+sqlGenerator);
-    const SQLJresponse = await LocalModel(sqlGenerator, userQuery);
-    // const SQLJresponse = await ApiCaller(sqlGenerator, userQuery);
+    // const SQLJresponse = await LocalModel(sqlGenerator, userQuery);
+    const SQLJresponse = await ApiCaller(sqlGenerator, userQuery);
     // const SQLJresponse = await LocalModel(SQL_Prompt2.replace("{{USER_QUERY}}", userQuery));
     
     
