@@ -55,15 +55,58 @@ const MODES = [
 
 const SUGGESTION_ICONS = ['💧', '📊', '📍', '⚠️'];
 
-// Sample data for dropdowns
-const STATES = ['ANDHRA PRADESH', 'MAHARASHTRA', 'KARNATAKA', 'TAMIL NADU'];
-const DISTRICTS = ['KURNOOL', 'MUMBAI', 'BANGALORE', 'CHENNAI'];
-const BLOCKS = ['KURNOOL MANDAL', 'THANE', 'WHITEFIELD', 'VELACHERY'];
+const STATES = ['Gujarat', 'Rajasthan', 'Maharashtra', 'Madhya Pradesh'];
+const DISTRICTS = ['Ahmedabad', 'Vadodara', 'Surat', 'Rajkot'];
+const BLOCKS = ['All Blocks', 'Central', 'North', 'South'];
 
-// Sample response data
 const SAMPLE_DATA = [
-  { year: '2023', extractable: '1916.87', extraction: '555.64', stage: '28.99', category: 'Safe' },
-  { year: '2024', extractable: '--', extraction: '--', stage: '--', category: 'Unknown' },
+  {
+    year: '2024',
+    extractable: '120.4',
+    extraction: '82.1',
+    stage: '68.2',
+    category: 'Safe',
+  },
+  {
+    year: '2023',
+    extractable: '118.9',
+    extraction: '85.6',
+    stage: '72.0',
+    category: 'Safe',
+  },
+] as const;
+
+type SuggestionOption = {
+  label: string;
+  prompt: string;
+};
+
+type ChatMessageItem = {
+  id: string | number;
+  text: string;
+  sender: 'user' | 'bot';
+  timestamp: Date;
+  chartData?: any;
+  options?: SuggestionOption[];
+};
+
+const buildLocationSuggestions = (place: string): SuggestionOption[] => [
+  {
+    label: `groundwater_level (${place})`,
+    prompt: `Give me groundwater level of ${place}`,
+  },
+  {
+    label: `total_recharge (${place})`,
+    prompt: `Give me total recharge in ${place}`,
+  },
+  {
+    label: `stage (${place})`,
+    prompt: `Give me stage of groundwater extraction in ${place}`,
+  },
+  {
+    label: `categorization (${place})`,
+    prompt: `Give me groundwater categorization of ${place}`,
+  },
 ];
 
 const formatMessageText = (text: string) => {
@@ -96,7 +139,7 @@ function ChatPage() {
   const [selectedMode, setSelectedMode] = useState(MODES[0]);
   const [showModeDropdown, setShowModeDropdown] = useState(false);
   const [isLightMode, setIsLightMode] = useState(true);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [inputValue, setInputValue] = useState<string>('');
   const [isTyping, setIsTyping] = useState(false);
 
@@ -114,7 +157,7 @@ function ChatPage() {
 
   const [location, setLocation] = useState<{city?: string; state?: string; lat: number; lng: number} | null>(null);
   const [locationStatus, setLocationStatus] = useState<'pending' | 'granted' | 'denied'>('pending');
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<SuggestionOption[]>([]);
 
   //For Renaming & Deleting the ChatNames
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
@@ -154,7 +197,7 @@ function ChatPage() {
     setShowResults(false);
     const history = await getChatSessionHistory(chatId);
     if (history && history.messages) {
-      const formattedMessages = history.messages.map((m: any, i: number) => {
+      const formattedMessages: ChatMessageItem[] = history.messages.map((m: any, i: number) => {
         const content = m.content;
 
         let text = '';
@@ -183,7 +226,7 @@ function ChatPage() {
       setMessages(formattedMessages);
       const lastBotChart = [...formattedMessages]
         .reverse()
-        .find((msg: any) => msg.sender === 'bot' && msg.chartData);
+        .find((msg) => msg.sender === 'bot' && msg.chartData);
       setLastChartData(lastBotChart?.chartData ?? null);
     }
   };
@@ -331,12 +374,7 @@ function ChatPage() {
   useEffect(() => {
     const buildSuggestions = (city?: string, state?: string) => {
       const place = city || state || 'India';
-      setSuggestions([
-        `Give me groundwater level of ${place}`,
-        `Total recharge in ${place}`,
-        `Stage of groundwater extraction % in ${place}`,
-        `Groundwater categorization of ${place}`,
-      ]);
+      setSuggestions(buildLocationSuggestions(place));
 
       if (!city && !state) {
         setLocationStatus('denied');
@@ -384,39 +422,56 @@ function ChatPage() {
     navigator.geolocation.getCurrentPosition(onSuccess, onError, { timeout: 12000 });
   }, []);
 
-  const handleMapStateSelect = (stateName: string, data?: any) => {
-    if (!stateName) return; // on deselect, do nothing
+  const handleMapStateSelect = async (stateName: string, _data?: any) => {
+    if (!stateName) return;
 
-    const userMsg = {
+    const userMsg: ChatMessageItem = {
       id: crypto.randomUUID(),
-      text: `Selected state: ${stateName}`,
+      text: stateName,
       sender: 'user',
       timestamp: new Date(),
     };
     setMessages(prev => [...prev, userMsg]);
 
-    if (!data) return; // No response for missing data from map deselect path
+    setLastChartData(null);
 
-    const botMsg = {
+    const botMsg: ChatMessageItem = {
       id: crypto.randomUUID(),
-      text: `📊 ${stateName} groundwater summary:\n` +
-        `• status: ${data.status?.toUpperCase() ?? 'Unknown'}\n` +
-        `• rainfall: ${data.rain ?? 'N/A'} mm\n` +
-        `• extractable GW: ${data.ext?.toLocaleString() ?? 'N/A'} ham\n` +
-        `• extracted GW: ${data.extr?.toLocaleString() ?? 'N/A'} ham\n` +
-        `• stage: ${data.stage ?? 'N/A'}%`,
+      text: `Choose one option for ${stateName}:`,
       sender: 'bot',
       timestamp: new Date(),
+      options: buildLocationSuggestions(stateName),
     };
     setMessages(prev => [...prev, botMsg]);
+  };
 
-    setShowResults(true);
-    setIsVisualizationNeeded(false);
-    setIsDetailedResponseNeeded(false);
+  const handleMapDistrictSelect = async (districtName: string, stateName: string, _data?: any) => {
+    if (!districtName || !stateName) return;
+
+    const place = `${districtName}, ${stateName}`;
+
+    const userMsg: ChatMessageItem = {
+      id: crypto.randomUUID(),
+      text: place,
+      sender: 'user',
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, userMsg]);
+
+    setLastChartData(null);
+
+    const botMsg: ChatMessageItem = {
+      id: crypto.randomUUID(),
+      text: `Choose one option for ${place}:`,
+      sender: 'bot',
+      timestamp: new Date(),
+      options: buildLocationSuggestions(place),
+    };
+    setMessages(prev => [...prev, botMsg]);
   };
 
   const handleMapMessage = (text: string) => {
-    const botMsg = {
+    const botMsg: ChatMessageItem = {
       id: crypto.randomUUID(),
       text,
       sender: 'bot',
@@ -454,8 +509,9 @@ function ChatPage() {
     let activeChatId = currentChatId;
 
     setInputValue('');
+    setSuggestions([]);
 
-    const userMsg = {
+    const userMsg: ChatMessageItem = {
       id: Date.now(),
       text: textToSend,
       sender: 'user',
@@ -500,7 +556,7 @@ function ChatPage() {
 
       setLastChartData(chartData ?? null);
 
-      const botResponse = {
+      const botResponse: ChatMessageItem = {
         id: crypto.randomUUID(),
         text: answerText,
         chartData,
@@ -804,12 +860,12 @@ function ChatPage() {
                         const icon = SUGGESTION_ICONS[index % SUGGESTION_ICONS.length];
                         return (
                           <button
-                            key={suggestion}
-                            onClick={() => handleSend(suggestion)}
+                            key={suggestion.label}
+                            onClick={() => handleSend(suggestion.prompt)}
                             className={`rounded-2xl border border-cyan-300/15 bg-[rgba(10,20,40,0.7)] p-4 text-left transition-all duration-300 hover:scale-[1.01] ${isLightMode ? 'hover:border-cyan-300/80 hover:bg-white/10' : 'hover:border-cyan-300/80 hover:bg-slate-800/30'}`}
                           >
                             <div className="text-2xl">{icon}</div>
-                            <div className="mt-2 text-base font-semibold text-white">{suggestion}</div>
+                            <div className="mt-2 text-base font-semibold text-white">{suggestion.label}</div>
                             <div className="mt-1 text-xs text-cyan-100/80">{location?.city ? `${location.city}` : `${location?.state || 'India'}`}</div>
                           </button>
                         );
@@ -845,6 +901,27 @@ function ChatPage() {
                           <span className={`text-xs mt-2 block ${message.sender === 'user' ? 'text-white/70' : isLightMode ? 'text-slate-500' : 'text-white/40'}`}>
                             {formatTime(message.timestamp)}
                           </span>
+
+                          {message.options && message.options.length > 0 && (
+                            <div className="mt-3 max-h-64 overflow-y-auto space-y-2">
+                              {message.options.map((option, optionIndex) => (
+                                <button
+                                  key={`${message.id}-${option.label}`}
+                                  onClick={() => handleSend(option.prompt)}
+                                  className={`w-full rounded-xl border px-3 py-2 text-left transition-colors ${
+                                    isLightMode
+                                      ? 'border-slate-200 bg-slate-50 text-slate-800 hover:border-cyan-500 hover:bg-cyan-50'
+                                      : 'border-white/10 bg-white/5 text-white hover:border-cyan-300/70 hover:bg-white/10'
+                                  }`}
+                                >
+                                  <div className="flex items-start gap-2">
+                                    <span className="text-base leading-none">{SUGGESTION_ICONS[optionIndex % SUGGESTION_ICONS.length]}</span>
+                                    <span className="text-sm leading-5">{option.label}</span>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -907,6 +984,7 @@ function ChatPage() {
                       </div>
                     </div>
                   )}
+
                   <div ref={messagesEndRef} />
                 </div>
               )}
@@ -1102,6 +1180,7 @@ function ChatPage() {
             >
               <IndiaMapComponent
                 onStateSelect={handleMapStateSelect}
+                onDistrictSelect={handleMapDistrictSelect}
                 isVisible={isMapPanelOpen}
                 mapTheme={isLightMode ? 'light' : 'dark'}
               />
