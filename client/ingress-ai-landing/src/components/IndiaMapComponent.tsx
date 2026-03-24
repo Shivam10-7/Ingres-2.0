@@ -5,7 +5,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import '@/components/IndiaMapComponent.css';
 
 // Mapbox token - replace with your own
-mapboxgl.accessToken = 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
+mapboxgl.accessToken = '';
 
 // Groundwater database
 const GW: Record<string, any> = {
