@@ -86,6 +86,45 @@ const formatMessageText = (text: string) => {
   });
 };
 
+const TypewriterText = React.memo(({ text, isNew, onUpdate }: { text: string, isNew?: boolean, onUpdate?: () => void }) => {
+  const [displayedText, setDisplayedText] = React.useState(isNew ? '' : text);
+  const onUpdateRef = React.useRef(onUpdate);
+
+  React.useEffect(() => {
+    onUpdateRef.current = onUpdate;
+  }, [onUpdate]);
+
+  React.useEffect(() => {
+    if (!isNew) {
+      setDisplayedText(text);
+      return;
+    }
+
+    let currentIndex = 0;
+    let lastScroll = 0;
+    const interval = setInterval(() => {
+      const chunkSize = Math.floor(Math.random() * 3) + 2;
+      currentIndex += chunkSize;
+      if (currentIndex >= text.length) {
+        setDisplayedText(text);
+        clearInterval(interval);
+        if (onUpdateRef.current) onUpdateRef.current();
+      } else {
+        setDisplayedText(text.slice(0, currentIndex));
+        const now = Date.now();
+        if (onUpdateRef.current && now - lastScroll > 100) {
+          onUpdateRef.current();
+          lastScroll = now;
+        }
+      }
+    }, 15);
+
+    return () => clearInterval(interval);
+  }, [text, isNew]);
+
+  return <>{formatMessageText(displayedText)}</>;
+});
+
 function ChatPage() {
   
   const navigate = useNavigate();
@@ -390,6 +429,7 @@ try {
     chartData,
     sender: 'bot',
     timestamp: new Date(),
+    isNew: true,
   };
 
   // Functional updates are safer to prevent state-stale issues
@@ -676,11 +716,19 @@ try {
                         >
                           {message.text.includes('```') ? (
                             <pre className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'} bg-transparent`}>
-                              {formatMessageText(message.text)}
+                              {message.sender === 'bot' ? (
+                                <TypewriterText text={message.text} isNew={message.isNew} onUpdate={scrollToBottom} />
+                              ) : (
+                                formatMessageText(message.text)
+                              )}
                             </pre>
                           ) : (
                             <p className={`text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'}`}>
-                              {formatMessageText(message.text)}
+                              {message.sender === 'bot' ? (
+                                <TypewriterText text={message.text} isNew={message.isNew} onUpdate={scrollToBottom} />
+                              ) : (
+                                formatMessageText(message.text)
+                              )}
                             </p>
                           )}
                           <span className={`text-xs mt-2 block ${message.sender === 'user' ? 'text-white/70' : isLightMode ? 'text-slate-500' : 'text-white/40'}`}>
@@ -739,7 +787,13 @@ try {
                       <div className="w-8 h-8 flex items-center justify-center mr-3 shrink-0">
                         <img src={isLightMode ? logoLight : logoDark} alt="bot-typing" className="w-4 h-4 object-contain" />
                       </div>
-                      <div className={`px-5 py-4 rounded-2xl rounded-tl-sm ${isLightMode ? 'message-bot-light' : 'message-bot-dark'}`}>
+                      <div className={`px-5 py-4 rounded-2xl rounded-tl-sm flex flex-col gap-2 ${isLightMode ? 'message-bot-light' : 'message-bot-dark'}`}>
+                        {isVisualizationNeeded && (
+                          <div className="flex items-center gap-2 text-xs font-semibold text-blue-500 animate-pulse">
+                            <BarChart3 className="w-4 h-4" />
+                            <span>Fetching data & generating chart...</span>
+                          </div>
+                        )}
                         <div className="loading-dots">
                           <span></span>
                           <span></span>
