@@ -7,16 +7,16 @@ const PieChartPayloadd = require('./src/routes/ChartData/PieChart');
 const BarChartPayload = require('./src/routes/ChartData/BarChart');
 const LineChart  = require('./src/routes/ChartData/LineChart');// Ensure this is correctly imported for use in the tester route
 const mongoose = require('mongoose');
-const WebSocket = require('ws');
+// const WebSocket = require('ws');
 const Database = require('./src/routes/db/dataRetrive');
 const cookieParser = require('cookie-parser');
 const http = require('http');
 const chartDeterminer = require('./src/routes/Modules/ChartDeterminer'); // Ensure this is correctly imported for use in dataRetrive.js
 // Create an HTTP server using the Express app
-const server = http.createServer(app);
+// const server = http.createServer(app);
 const mysql = require("mysql2"); // Keep the import for the connection block
 const classifier = require('./src/routes/classifier');
-const { stat } = require('fs');
+// const { stat } = require('fs');
 
 mongoose.connect(process.env.MONGO_URI)
 .then(() => {
@@ -43,7 +43,7 @@ con.connect(function (err) {
 });
 
 // Attach WebSocket server to SAME HTTP server
-const wss = new WebSocket.Server({ server });
+// const wss = new WebSocket.Server({ server });
 
 app.use(express.json());
 app.use(cookieParser());
@@ -69,14 +69,14 @@ app.use(cors({
 }));
 
 // mongodb connection
-console.log("This is the mongo url node "+process.env.MONGO_URI)
- mongoose.connect(process.env.MONGO_URI)
- .then(() => console.log("MongoDB connected"))
- .catch((err) => console.log("MongoDB connection error:", err));
+// console.log("This is the mongo url node "+process.env.MONGO_URI)
+//  mongoose.connect(process.env.MONGO_URI)
+//  .then(() => console.log("MongoDB connected"))
+//  .catch((err) => console.log("MongoDB connection error:", err));
 
-app.get('/', (req, res) => {
-    res.send('Hello World!')
-})
+// app.get('/', (req, res) => {
+//     res.send('Hello World!')
+// })
 
 // this is the route for the authorization
 app.use('/auth', require('./src/routes/middleware/auth'));
@@ -85,7 +85,7 @@ app.use('/auth', require('./src/routes/middleware/auth'));
 app.use('/api/chats', require('./src/routes/chatRoutes'));
 
 // these are the routes that we get form the chat
-app.post('/chat', async (req, res) => { 
+app.post('/chat',AuthJwt, async (req, res) => { 
     // 1. Input Validation: Ensure 'query' actually exists before processing
     const { query, isDetailedResponseNeeded, isVisualizationNeeded } = req.body;
 
@@ -325,6 +325,6 @@ app.post('/dataQuery/test', async (req, res) => {
 //     clients.forEach((c) => c.send(text));
 // }, 1000);
 
-server.listen(8081, () => {
+app.listen(8081, () => {
     console.log("http://localhost:8081");
 })
