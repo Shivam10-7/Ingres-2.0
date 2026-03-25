@@ -69,7 +69,7 @@ Run the server from the `services/resovler` directory:
 
 ```powershell
 cd "d:\My_Project_Folder\Final_Year_project\INGRES2.0\Ingres-2.0\services\resovler"
-uvicorn api:app --reload --port 8001
+uvicorn api:app --reload --port 8000
 ```
 
 Server health check:

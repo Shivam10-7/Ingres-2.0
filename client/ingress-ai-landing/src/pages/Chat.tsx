@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import DOMPurify from 'dompurify';
 import {
   Plus,
   ChevronDown,
@@ -108,14 +109,14 @@ const buildLocationSuggestions = (place: string): SuggestionOption[] => [
 
 const formatMessageText = (text: string) => {
   if (!text) return null;
-  
+
   // Split by literal \n or actual newline
   const lines = text.split(/(?:\\n|\n)/);
-  
+
   return lines.map((line, lineIndex) => {
     // Split by **text**
     const parts = line.split(/\*\*(.*?)\*\*/g);
-    
+
     return (
       <React.Fragment key={lineIndex}>
         {parts.map((part, partIndex) => {
@@ -130,8 +131,52 @@ const formatMessageText = (text: string) => {
   });
 };
 
+const TypewriterText = React.memo(({ text, isNew, onUpdate, onComplete }: { text: string, isNew?: boolean, onUpdate?: () => void, onComplete?: () => void }) => {
+  const [displayedText, setDisplayedText] = React.useState(isNew ? '' : text);
+  const onUpdateRef = React.useRef(onUpdate);
+  const onCompleteRef = React.useRef(onComplete);
+
+  React.useEffect(() => {
+    onUpdateRef.current = onUpdate;
+  }, [onUpdate]);
+
+  React.useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  React.useEffect(() => {
+    if (!isNew) {
+      setDisplayedText(text);
+      return;
+    }
+
+    let currentIndex = 0;
+    let lastScroll = 0;
+    const interval = setInterval(() => {
+      const chunkSize = Math.floor(Math.random() * 3) + 2;
+      currentIndex += chunkSize;
+      if (currentIndex >= text.length) {
+        setDisplayedText(text);
+        clearInterval(interval);
+        if (onCompleteRef.current) onCompleteRef.current();
+      } else {
+        setDisplayedText(text.slice(0, currentIndex));
+        const now = Date.now();
+        if (onUpdateRef.current && now - lastScroll > 100) {
+          onUpdateRef.current();
+          lastScroll = now;
+        }
+      }
+    }, 15);
+
+    return () => clearInterval(interval);
+  }, [text, isNew]);
+
+  return <>{formatMessageText(displayedText)}</>;
+});
+
 function ChatPage() {
-  
+
   const navigate = useNavigate();
   const [selectedMode, setSelectedMode] = useState(MODES[0]);
   const [showModeDropdown, setShowModeDropdown] = useState(false);
@@ -152,7 +197,7 @@ function ChatPage() {
   const [isMapNeeded, setIsMapNeeded] = useState(false);
   const [lastChartData, setLastChartData] = useState<any>(null);
 
-  const [location, setLocation] = useState<{city?: string; state?: string; lat: number; lng: number} | null>(null);
+  const [location, setLocation] = useState<{ city?: string; state?: string; lat: number; lng: number } | null>(null);
   const [locationStatus, setLocationStatus] = useState<'pending' | 'granted' | 'denied'>('pending');
   const [suggestions, setSuggestions] = useState<SuggestionOption[]>([]);
   const [suggestionContextLabel, setSuggestionContextLabel] = useState('India');
@@ -219,6 +264,7 @@ function ChatPage() {
           chartData,
           sender: m.role === 'user' ? 'user' : 'bot',
           timestamp: new Date(m.timestamp || Date.now()),
+          isNew: false,
         };
       });
 
@@ -340,33 +386,33 @@ function ChatPage() {
 
   // Handle mode selection
   const handleModeSelect = (mode) => {
-  setSelectedMode(mode);
-  setShowModeDropdown(false);
+    setSelectedMode(mode);
+    setShowModeDropdown(false);
 
-  if (mode.id === "quick") {
-    setShowQuickModal(true);
-    setShowDataPanel(false);
-  } else {
-    setShowQuickModal(false);
-    setShowDataPanel(false);
-  }
+    if (mode.id === "quick") {
+      setShowQuickModal(true);
+      setShowDataPanel(false);
+    } else {
+      setShowQuickModal(false);
+      setShowDataPanel(false);
+    }
 
-  // ⭐ AUTO should reset everything
-  if (mode.id === "auto") {
-    setIsDetailedResponseNeeded(false);
-    setIsVisualizationNeeded(false);
-  }
+    // ⭐ AUTO should reset everything
+    if (mode.id === "auto") {
+      setIsDetailedResponseNeeded(false);
+      setIsVisualizationNeeded(false);
+    }
 
-  if (mode.id === "deep") {
-    setIsDetailedResponseNeeded(true);
-  }
+    if (mode.id === "deep") {
+      setIsDetailedResponseNeeded(true);
+    }
 
-  if (mode.id === "visualizer") {
-    setIsVisualizationNeeded(true);
-  }
+    if (mode.id === "visualizer") {
+      setIsVisualizationNeeded(true);
+    }
 
-  setShowResults(false);
-};
+    setShowResults(false);
+  };
 
   useEffect(() => {
     // Start loading the map immediately (hidden by default) so user-click is fast.
@@ -551,6 +597,15 @@ function ChatPage() {
     navigate('/landing');
   };
 
+  // Mark message as complete (transition from typewriter to HTML)
+  const markMessageComplete = (id: string) => {
+    setMessages(prev =>
+      prev.map(msg =>
+        msg.id === id ? { ...msg, isNew: false } : msg
+      )
+    );
+  };
+
   // Handle send message - actually call server
   // build a lightweight sql payload from the quick‑chat panel selections
   const buildSqlResponse = () => {
@@ -620,12 +675,13 @@ function ChatPage() {
 
       setLastChartData(chartData ?? null);
 
-      const botResponse: ChatMessageItem = {
-        id: crypto.randomUUID(),
+      const botResponse = {
+        id: crypto.randomUUID(), // More robust unique ID
         text: answerText,
         chartData,
         sender: 'bot',
         timestamp: new Date(),
+        isNew: true,
       };
 
       setMessages(prev => [...prev, botResponse]);
@@ -701,596 +757,607 @@ function ChatPage() {
       </div>
 
       <div className="relative flex h-screen w-full overflow-hidden">
-      {/* Crossfade gradients — CSS cannot interpolate between distinct gradient definitions */}
-      <div
-        aria-hidden
-        className={`pointer-events-none absolute inset-0 bg-gradient-radial-light transition-opacity duration-500 ease-out ${isLightMode ? 'opacity-100' : 'opacity-0'}`}
-      />
-      <div
-        aria-hidden
-        className={`pointer-events-none absolute inset-0 bg-gradient-radial transition-opacity duration-500 ease-out ${isLightMode ? 'opacity-0' : 'opacity-100'}`}
-      />
-      <div className="relative z-10 flex h-full min-h-0 w-full flex-1 flex-row overflow-hidden">
-      {/* Floating open-sidebar button (top-left), appears when sidebar is closed */}
-      {!sidebarOpen && (
-        <button
-          onClick={() => setSidebarOpen(true)}
-          aria-label="Open sidebar"
-          style={{
-            top: 'calc(env(safe-area-inset-top, 12px) + 12px)',
-            left: 'calc(env(safe-area-inset-left, 12px) + 12px)',
-            zIndex: 9999,
-            pointerEvents: 'auto',
-          }}
-          className={`fixed p-2 rounded-lg backdrop-blur-md focus:outline-none transition-colors duration-500 ease-out ${
-            isLightMode
-              ? 'bg-slate-200/90 hover:bg-slate-300/90'
-              : 'bg-black/40 hover:bg-black/50'
-          }`}
-        >
-          <Menu className={`w-5 h-5 transition-colors duration-500 ${isLightMode ? 'text-slate-700' : 'text-white/80'}`} />
-        </button>
-      )}
-      {/* Mobile backdrop — fades in/out with sidebar */}
-      <AnimatePresence>
-        {sidebarOpen && isMobile && (
-          <motion.div
-            key="sidebar-backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: SIDEBAR_DURATION * 0.85, ease: SIDEBAR_EASE }}
-            className="fixed inset-0 z-40 bg-black/35 md:hidden"
-            onClick={() => setSidebarOpen(false)}
-            aria-hidden
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Sidebar: mobile = slide drawer; desktop = width collapse so main area eases smoothly */}
-      {isMobile ? (
-        <AnimatePresence mode="sync">
-          {sidebarOpen && (
-            <motion.aside
-              key="chat-sidebar"
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              transition={{ duration: SIDEBAR_DURATION, ease: SIDEBAR_EASE }}
-              className={`relative flex flex-col h-full shrink-0 z-50 max-h-screen will-change-transform fixed inset-y-0 left-0 ${
-                isLightMode ? 'chat-sidebar-glass-light' : 'chat-sidebar-glass-dark'
-              }`}
+        {/* Crossfade gradients — CSS cannot interpolate between distinct gradient definitions */}
+        <div
+          aria-hidden
+          className={`pointer-events-none absolute inset-0 bg-gradient-radial-light transition-opacity duration-500 ease-out ${isLightMode ? 'opacity-100' : 'opacity-0'}`}
+        />
+        <div
+          aria-hidden
+          className={`pointer-events-none absolute inset-0 bg-gradient-radial transition-opacity duration-500 ease-out ${isLightMode ? 'opacity-0' : 'opacity-100'}`}
+        />
+        <div className="relative z-10 flex h-full min-h-0 w-full flex-1 flex-row overflow-hidden">
+          {/* Floating open-sidebar button (top-left), appears when sidebar is closed */}
+          {!sidebarOpen && (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open sidebar"
               style={{
-                width: `min(100vw, ${sidebarWidthPx}px)`,
-                minWidth: '18rem',
-                maxWidth: '28rem',
-                backfaceVisibility: 'hidden',
-                WebkitBackfaceVisibility: 'hidden',
+                top: 'calc(env(safe-area-inset-top, 12px) + 12px)',
+                left: 'calc(env(safe-area-inset-left, 12px) + 12px)',
+                zIndex: 9999,
+                pointerEvents: 'auto',
               }}
-            >
-              <ChatSidebarContent
-                isLightMode={isLightMode}
-                keyboardHeight={keyboardHeight}
-                chats={chats}
-                loadChat={loadChat}
-                handleNewChatClick={handleNewChatClick}
-                editingChatId={editingChatId}
-                setEditingChatId={setEditingChatId}
-                editedName={editedName}
-                setEditedName={setEditedName}
-                setChats={setChats}
-                menuOpenChatId={menuOpenChatId}
-                setMenuOpenChatId={setMenuOpenChatId}
-                setDeleteChatId={setDeleteChatId}
-                onCloseSidebar={() => setSidebarOpen(false)}
-              />
-            </motion.aside>
-          )}
-        </AnimatePresence>
-      ) : (
-        <motion.div
-          initial={false}
-          animate={{ width: sidebarOpen ? sidebarWidthPx : 0 }}
-          transition={{ duration: SIDEBAR_DURATION, ease: SIDEBAR_EASE }}
-          className="relative shrink-0 h-full overflow-hidden z-50 min-w-0"
-          style={{ pointerEvents: sidebarOpen ? 'auto' : 'none' }}
-        >
-          <aside
-            className={`relative flex flex-col h-full max-h-screen will-change-transform ${
-              isLightMode ? 'chat-sidebar-glass-light' : 'chat-sidebar-glass-dark'
-            }`}
-            style={{ width: sidebarWidthPx }}
-          >
-            <ChatSidebarContent
-              isLightMode={isLightMode}
-              keyboardHeight={keyboardHeight}
-              chats={chats}
-              loadChat={loadChat}
-              handleNewChatClick={handleNewChatClick}
-              editingChatId={editingChatId}
-              setEditingChatId={setEditingChatId}
-              editedName={editedName}
-              setEditedName={setEditedName}
-              setChats={setChats}
-              menuOpenChatId={menuOpenChatId}
-              setMenuOpenChatId={setMenuOpenChatId}
-              setDeleteChatId={setDeleteChatId}
-              onCloseSidebar={() => setSidebarOpen(false)}
-            />
-          </aside>
-        </motion.div>
-      )}
-
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col h-full relative min-w-0">
-        {/* Header with user profile and theme toggle */}
-        <header
-          className={`h-auto glass-panel border-b-0 flex items-center justify-between pr-6 py-4 shrink-0 transition-[background,backdrop-filter,box-shadow,border-color] duration-500 ease-out ${
-            sidebarOpen && !isMobile ? 'pl-6' : 'pl-16'
-          }`}
-        >
-          <div className="flex items-center">
-
-            <h1
-              className={`text-lg font-semibold transition-colors duration-500 ease-out ${isLightMode ? 'text-slate-800' : 'text-white'
+              className={`fixed p-2 rounded-lg backdrop-blur-md focus:outline-none transition-colors duration-500 ease-out ${isLightMode
+                  ? 'bg-slate-200/90 hover:bg-slate-300/90'
+                  : 'bg-black/40 hover:bg-black/50'
                 }`}
             >
-              INGRES ChatBOT
-              <span className="ml-2 text-xs font-normal text-blue-400">(Jal-Shakti RAG)</span>
-            </h1>
-          </div>
-
-          {/* Right side: User Profile and Theme Toggle */}
-          <div className="flex items-center gap-4">
-            {/* Light / Dark mode toggle */}
-            <button
-              onClick={() => setIsLightMode((prev) => !prev)}
-              className="inline-flex items-center gap-3 px-2 py-1 rounded-full bg-transparent hover:bg-white/10 transition-colors text-xs font-medium"
-              aria-label="Toggle light mode"
-            >
-              {/* Track */}
-              <span
-                className={`relative w-11 h-6 rounded-full transition-colors duration-300 ${isLightMode ? 'bg-slate-300/80' : 'bg-blue-600'
-                  }`}
-              >
-                {/* Thumb */}
-                <span
-                  className={`absolute top-[2px] left-[2px] w-5 h-5 rounded-full bg-white shadow-md flex items-center justify-center transition-transform duration-300 ${isLightMode ? 'translate-x-0' : 'translate-x-5'
-                    }`}
-                >
-                  {isLightMode ? (
-                    <Moon className="w-3 h-3 text-slate-500" />
-                  ) : (
-                    <Sun className="w-3 h-3 text-blue-500" />
-                  )}
-                </span>
-              </span>
-
-              {/* Label */}
-              <span
-                className={`whitespace-nowrap transition-colors duration-500 ease-out ${isLightMode ? 'text-slate-600' : 'text-white/70'
-                  }`}
-              >
-                {isLightMode ? 'Light Mode' : 'Dark Mode'}
-              </span>
+              <Menu className={`w-5 h-5 transition-colors duration-500 ${isLightMode ? 'text-slate-700' : 'text-white/80'}`} />
             </button>
-          </div>
-        </header>
-
-        {/* Chat Area */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* Main Chat Column */}
-          <div
-            className={`flex flex-col ${showDataPanel ? 'border-r border-white/5' : ''} transition-all duration-300`}
-            style={{ width: isMapPanelOpen ? '50%' : '100%', minWidth: 0 }}
-          >
-            {/* Messages */}
-            <div
-              className="flex-1 overflow-y-auto p-6 pb-32 md:pb-6"
-              style={{
-                paddingBottom: keyboardHeight ? `${keyboardHeight + 160}px` : undefined,
-                WebkitOverflowScrolling: 'touch',
-                touchAction: 'pan-y',
-              }}
-            >
-              {messages.length === 0 ? (
-                <div className="min-h-full flex flex-col items-center justify-center px-4 py-10">
-                  {/* Logo */}
-                  <div className="mb-5">
-                    <img src={isLightMode ? logoLight : logoDark} alt="INGRES" className="w-24 h-24 object-contain" />
-                  </div>
-
-                  <h2
-                    className={`text-3xl font-bold text-center ${isLightMode ? 'text-slate-900' : 'text-white'} mb-5`}
-                  >
-                    How can I help you today?
-                  </h2>
-
-                  <p
-                    className={`text-center max-w-md ${isLightMode ? 'text-slate-500' : 'text-white/50'} mb-4`}
-                  >
-                    Ask me anything about India's groundwater resources.
-                  </p>
-
-                  {locationStatus !== 'pending' && (
-                    <p className={`text-center text-sm font-medium mb-5 ${isLightMode ? 'text-slate-700' : 'text-cyan-100'}`}>
-                      📍 Based on your location: {location?.city ? `${location.city}, ${location.state}` : location?.state || 'India'}
-                    </p>
-                  )}
-
-                  {suggestions.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-[800px] w-full">
-                      {suggestions.map((suggestion, index) => {
-                        const icon = SUGGESTION_ICONS[index % SUGGESTION_ICONS.length];
-                        return (
-                          <button
-                            key={suggestion.label}
-                            onClick={() => handleSend(suggestion.prompt)}
-                            className={`rounded-2xl border border-cyan-300/15 bg-[rgba(10,20,40,0.7)] p-4 text-left transition-all duration-300 hover:scale-[1.01] ${isLightMode ? 'hover:border-cyan-300/80 hover:bg-white/10' : 'hover:border-cyan-300/80 hover:bg-slate-800/30'}`}
-                          >
-                            <div className="text-2xl">{icon}</div>
-                            <div className="mt-2 text-base font-semibold text-white">{suggestion.label}</div>
-                            <div className="mt-1 text-xs text-cyan-100/80">{location?.city ? `${location.city}` : `${location?.state || 'India'}`}</div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-6 max-w-3xl mx-auto">
-                  {messages.map((message) => (
-                    <React.Fragment key={message.id}>
-                      <div
-                        className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}
-                      >
-                        {message.sender === 'bot' && (
-                          <div className="w-8 h-8 flex items-center justify-center mr-3 shrink-0">
-                            <img src={isLightMode ? logoLight : logoDark} alt="bot" className="w-4 h-4 object-contain" />
-                          </div>
-                        )}
-                        <div
-                          className={`max-w-[80%] px-5 py-3 ${message.sender === 'user' ? 'message-user' : isLightMode ? 'message-bot-light' : 'message-bot-dark'
-                            }`}
-                        >
-                          {message.text.includes('```') ? (
-                            <pre className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'} bg-transparent`}>
-                              {formatMessageText(message.text)}
-                            </pre>
-                          ) : (
-                            <p className={`text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'}`}>
-                              {formatMessageText(message.text)}
-                            </p>
-                          )}
-                          <span className={`text-xs mt-2 block ${message.sender === 'user' ? 'text-white/70' : isLightMode ? 'text-slate-500' : 'text-white/40'}`}>
-                            {formatTime(message.timestamp)}
-                          </span>
-
-                          {message.options && message.options.length > 0 && (
-                            <div className="mt-3 max-h-64 overflow-y-auto space-y-2">
-                              {message.options.map((option, optionIndex) => (
-                                <button
-                                  key={`${message.id}-${option.label}`}
-                                  onClick={() => handleSend(option.prompt)}
-                                  className={`w-full rounded-xl border px-3 py-2 text-left transition-colors ${
-                                    isLightMode
-                                      ? 'border-slate-200 bg-slate-50 text-slate-800 hover:border-cyan-500 hover:bg-cyan-50'
-                                      : 'border-white/10 bg-white/5 text-white hover:border-cyan-300/70 hover:bg-white/10'
-                                  }`}
-                                >
-                                  <div className="flex items-start gap-2">
-                                    <span className="text-base leading-none">{SUGGESTION_ICONS[optionIndex % SUGGESTION_ICONS.length]}</span>
-                                    <span className="text-sm leading-5">{option.label}</span>
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-
-                        </div>
-                      </div>
-
-                      {message.chartData && (
-  <div
-    key={`${message.id}-chart`}
-    className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn my-4`}
-  >
-    <div
-      className={`
-        w-full md:max-w-[90%] lg:max-w-[85%] 
-        p-4 rounded-2xl border transition-colors duration-500 ease-out
-        ${message.sender === 'user' 
-          ? 'bg-blue-600 border-blue-500 text-white' 
-          : isLightMode 
-            ? 'bg-white border-slate-200 shadow-sm' 
-            : 'bg-slate-900 border-slate-800'
-        }
-      `}
-    >
-      {/* Increased height for better readability. 
-          The Renderer now fills this container. 
-      */}
-      <div className="h-[400px] w-full">
-        <EChartsRenderer 
-          option={message.chartData} 
-          theme={isLightMode ? 'light' : 'dark'}
-        />
-      </div>
-
-      <div className={`px-1 flex justify-between items-center mt-3 border-t pt-2 ${
-        message.sender === 'user' ? 'border-white/10' : 'border-slate-100/50'
-      }`}>
-        <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">
-          Analysis Report
-        </span>
-        <span className={`text-xs ${
-          message.sender === 'user' ? 'text-white/70' : 'opacity-50'
-        }`}>
-          {formatTime(message.timestamp)}
-        </span>
-      </div>
-    </div>
-  </div>
-)}
-                    </React.Fragment>
-                  ))}
-
-                  {isTyping && (
-                    <div className="flex justify-start animate-fadeIn">
-                      <div className="w-8 h-8 flex items-center justify-center mr-3 shrink-0">
-                        <img src={isLightMode ? logoLight : logoDark} alt="bot-typing" className="w-4 h-4 object-contain" />
-                      </div>
-                      <div className={`px-5 py-4 rounded-2xl rounded-tl-sm ${isLightMode ? 'message-bot-light' : 'message-bot-dark'}`}>
-                        <div className="loading-dots">
-                          <span></span>
-                          <span></span>
-                          <span></span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {!showInlineMapOptions && suggestions.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {suggestions.map((suggestion, index) => {
-                        const icon = SUGGESTION_ICONS[index % SUGGESTION_ICONS.length];
-                        return (
-                          <button
-                            key={`${suggestionContextLabel}-${suggestion.label}`}
-                            onClick={() => handleSend(suggestion.prompt)}
-                            className={`rounded-2xl border p-4 text-left transition-all duration-300 hover:scale-[1.01] ${
-                              isLightMode
-                                ? 'border-slate-200 bg-white hover:border-cyan-400 hover:bg-cyan-50'
-                                : 'border-cyan-300/15 bg-[rgba(10,20,40,0.7)] hover:border-cyan-300/80 hover:bg-slate-800/30'
-                            }`}
-                          >
-                            <div className="text-2xl">{icon}</div>
-                            <div className={`mt-2 text-base font-semibold ${isLightMode ? 'text-slate-900' : 'text-white'}`}>
-                              {suggestion.label}
-                            </div>
-                            <div className={`mt-1 text-xs ${isLightMode ? 'text-slate-500' : 'text-cyan-100/80'}`}>
-                              {suggestionContextLabel}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  <div ref={messagesEndRef} />
-                </div>
-              )}
-            </div>
-
-            {/* Input Area */}
-            <div
-              className="p-4 md:p-4 fixed md:static left-0 right-0 z-40"
-              style={{ bottom: keyboardHeight ? `${keyboardHeight + 16}px` : '16px', paddingBottom: 'calc(env(safe-area-inset-bottom, 12px) + 8px)' }}
-            >
-              <div className="max-w-3xl mx-auto px-2">
-                <div className={`rounded-2xl p-2 flex items-center gap-2 ${isLightMode ? 'glass-card' : 'glass-card-dark'}`}>
-                  {/* Plus Button with Mode Dropdown */}
-                  <div className="relative" ref={modeDropdownRef}>
-                    <button
-                      onClick={() => setShowModeDropdown(!showModeDropdown)}
-                      className={`p-2.5 rounded-xl transition-colors flex items-center gap-1 ${isLightMode ? 'hover:bg-slate-200/80' : 'hover:bg-white/10'
-                        }`}
-                    >
-                      <Plus
-                        className={`w-5 h-5 ${isLightMode ? 'text-slate-500' : 'text-white/60'
-                          }`}
-                      />
-                      <ChevronDown
-                        className={`w-3 h-3 transition-transform ${isLightMode ? 'text-slate-400' : 'text-white/40'
-                          } ${showModeDropdown ? 'rotate-180' : ''}`}
-                      />
-                    </button>
-
-                    {/* Mode Dropdown */}
-                    {showModeDropdown && (
-                      <div className="absolute bottom-full left-0 mb-2 w-64 mode-dropdown rounded-2xl p-2 z-50 animate-fadeIn">
-                        <div className="px-3 py-2 text-xs font-medium text-white/40 uppercase tracking-wider">
-                          Select Mode
-                        </div>
-                        {MODES.map((mode) => (
-                          <button
-                            key={mode.id}
-                            onClick={() => handleModeSelect(mode)}
-                            className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-200 ${
-                              selectedMode.id === mode.id
-                                ? 'bg-blue-500/20 border border-blue-500/30'
-                                : 'hover:bg-white/5'
-                            }`}
-                          >
-
-                          <div className="flex items-start gap-3">
-
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                            selectedMode.id === mode.id ? 'bg-blue-500' : 'bg-white/10'
-                          }`}>
-                            <mode.icon className="w-4 h-4 text-white" />
-                          </div>
-
-                          <div className="text-left">
-                            <p className={`text-sm font-medium ${
-                              selectedMode.id === mode.id ? 'text-white' : 'text-white/80'
-                            }`}>
-                              {mode.label}
-                            </p>
-
-                            <p className="text-xs text-white/50">{mode.description}</p>
-                          </div>
-
-                          </div>
-
-                          {/* Checkboxes only for specific modes */}
-                          {mode.id === "deep" && (
-                          <input
-                            type="checkbox"
-                            checked={isDetailedResponseNeeded}
-                            onChange={(e) => {
-                              e.stopPropagation()
-                              setIsDetailedResponseNeeded(e.target.checked)
-                            }}
-                            className="accent-blue-500"
-                          />
-                          )}
-
-                          {mode.id === "visualizer" && (
-                          <input
-                            type="checkbox"
-                            checked={isVisualizationNeeded}
-                            onChange={(e) => {
-                              e.stopPropagation()
-                              setIsVisualizationNeeded(e.target.checked)
-                            }}
-                            className="accent-blue-500"
-                          />
-                          )}
-
-                          </button>
-                          ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-
-                    {/* Show AUTO only when nothing else is selected */}
-                    {!isDetailedResponseNeeded && !isVisualizationNeeded && (
-                      <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 text-xs">
-                        <Sparkles className="w-4 h-4 text-blue-400" />
-                        Auto
-                      </div>
-                    )}
-
-                    {/* Deep Search badge */}
-                    {isDetailedResponseNeeded && (
-                      <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 text-xs">
-                        <SearchIcon className="w-4 h-4 text-blue-400" />
-                        Deep
-                      </div>
-                    )}
-
-                    {/* Visualization badge */}
-                    {isVisualizationNeeded && (
-                      <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 text-xs">
-                        <BarChart3 className="w-4 h-4 text-blue-400" />
-                        Charts
-                      </div>
-                    )}
-
-                    {/* Map badge */}
-                    {isMapNeeded && (
-                      <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 text-xs">
-                        <MapIcon className="w-4 h-4 text-blue-400" />
-                        Map
-                      </div>
-                    )}
-
-                    </div>
-
-                    {/* Map Panel Toggle Button */}
-                    <button
-                      onClick={() => {
-                        setIsMapPanelOpen((prev) => {
-                          const next = !prev;
-                          return next;
-                        });
-                        setIsMapNeeded((prev) => !prev);
-                        if (!isMapPanelOpen) {
-                          setSidebarOpen(false);
-                        }
-                      }}
-                      className={`p-2.5 rounded-xl transition-colors ${isLightMode ? 'hover:bg-slate-200/80' : 'hover:bg-white/10'}`}
-                      title="Toggle Map"
-                    >
-                      <MapIcon className={`w-5 h-5 ${isLightMode ? 'text-slate-500' : 'text-white/60'}`} />
-                    </button>
-
-
-                  {/* Input */}
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                    onFocus={() => {
-                      // ensure latest messages are visible when keyboard shows
-                      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-                    }}
-                    placeholder="Type your message..."
-                    className={`flex-1 bg-transparent text-sm py-3 px-2 focus:outline-none ${isLightMode
-                        ? 'text-slate-800 placeholder:text-slate-400'
-                        : 'text-white placeholder:text-white/40'
-                      }`}
-                  />
-
-                  {/* Send Button */}
-                  <button
-                    onClick={() => handleSend()}
-                    disabled={!inputValue.trim()}
-                    className={`px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${inputValue.trim()
-                        ? 'bg-blue-600 hover:bg-blue-500 text-white'
-                        : 'bg-white/5 text-white/30 cursor-not-allowed'
-                      }`}
-                  >
-                    Send
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Map Panel — mounted lazily on first open, then kept alive with CSS visibility */}
-          {isMapInitialized && (
-            <div
-              className="border-l border-white/10 relative overflow-hidden transition-all duration-300 shrink-0"
-              style={{ width: isMapPanelOpen ? '50%' : '0px', minWidth: isMapPanelOpen ? undefined : '0' }}
-              onTransitionEnd={() => window.dispatchEvent(new Event('resize'))}
-            >
-              <IndiaMapComponent
-                onStateSelect={handleMapStateSelect}
-                onDistrictSelect={handleMapDistrictSelect}
-                isVisible={isMapPanelOpen}
-                mapTheme={isLightMode ? 'light' : 'dark'}
+          )}
+          {/* Mobile backdrop — fades in/out with sidebar */}
+          <AnimatePresence>
+            {sidebarOpen && isMobile && (
+              <motion.div
+                key="sidebar-backdrop"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: SIDEBAR_DURATION * 0.85, ease: SIDEBAR_EASE }}
+                className="fixed inset-0 z-40 bg-black/35 md:hidden"
+                onClick={() => setSidebarOpen(false)}
+                aria-hidden
               />
-            </div>
+            )}
+          </AnimatePresence>
+
+          {/* Sidebar: mobile = slide drawer; desktop = width collapse so main area eases smoothly */}
+          {isMobile ? (
+            <AnimatePresence mode="sync">
+              {sidebarOpen && (
+                <motion.aside
+                  key="chat-sidebar"
+                  initial={{ x: '-100%' }}
+                  animate={{ x: 0 }}
+                  exit={{ x: '-100%' }}
+                  transition={{ duration: SIDEBAR_DURATION, ease: SIDEBAR_EASE }}
+                  className={`relative flex flex-col h-full shrink-0 z-50 max-h-screen will-change-transform fixed inset-y-0 left-0 ${isLightMode ? 'chat-sidebar-glass-light' : 'chat-sidebar-glass-dark'
+                    }`}
+                  style={{
+                    width: `min(100vw, ${sidebarWidthPx}px)`,
+                    minWidth: '18rem',
+                    maxWidth: '28rem',
+                    backfaceVisibility: 'hidden',
+                    WebkitBackfaceVisibility: 'hidden',
+                  }}
+                >
+                  <ChatSidebarContent
+                    isLightMode={isLightMode}
+                    keyboardHeight={keyboardHeight}
+                    chats={chats}
+                    loadChat={loadChat}
+                    handleNewChatClick={handleNewChatClick}
+                    editingChatId={editingChatId}
+                    setEditingChatId={setEditingChatId}
+                    editedName={editedName}
+                    setEditedName={setEditedName}
+                    setChats={setChats}
+                    menuOpenChatId={menuOpenChatId}
+                    setMenuOpenChatId={setMenuOpenChatId}
+                    setDeleteChatId={setDeleteChatId}
+                    onCloseSidebar={() => setSidebarOpen(false)}
+                  />
+                </motion.aside>
+              )}
+            </AnimatePresence>
+          ) : (
+            <motion.div
+              initial={false}
+              animate={{ width: sidebarOpen ? sidebarWidthPx : 0 }}
+              transition={{ duration: SIDEBAR_DURATION, ease: SIDEBAR_EASE }}
+              className="relative shrink-0 h-full overflow-hidden z-50 min-w-0"
+              style={{ pointerEvents: sidebarOpen ? 'auto' : 'none' }}
+            >
+              <aside
+                className={`relative flex flex-col h-full max-h-screen will-change-transform ${isLightMode ? 'chat-sidebar-glass-light' : 'chat-sidebar-glass-dark'
+                  }`}
+                style={{ width: sidebarWidthPx }}
+              >
+                <ChatSidebarContent
+                  isLightMode={isLightMode}
+                  keyboardHeight={keyboardHeight}
+                  chats={chats}
+                  loadChat={loadChat}
+                  handleNewChatClick={handleNewChatClick}
+                  editingChatId={editingChatId}
+                  setEditingChatId={setEditingChatId}
+                  editedName={editedName}
+                  setEditedName={setEditedName}
+                  setChats={setChats}
+                  menuOpenChatId={menuOpenChatId}
+                  setMenuOpenChatId={setMenuOpenChatId}
+                  setDeleteChatId={setDeleteChatId}
+                  onCloseSidebar={() => setSidebarOpen(false)}
+                />
+              </aside>
+            </motion.div>
           )}
 
-          {/* Data Query Panel - for Quick Chat mode */}
-          {showDataPanel && (
-            <div className={`w-96 quick-mode-panel flex flex-col animate-slideIn ${isLightMode ? 'quick-mode-panel-light' : 'quick-mode-panel-dark'
-              }`}>
-              <div className="p-4 border-b border-white/5">
-                <h3
-                  className={`text-sm font-semibold uppercase tracking-wider ${isLightMode ? 'text-slate-700' : 'text-white/80'
+          {/* Main Content */}
+          <main className="flex-1 flex flex-col h-full relative min-w-0">
+            {/* Header with user profile and theme toggle */}
+            <header
+              className={`h-auto glass-panel border-b-0 flex items-center justify-between pr-6 py-4 shrink-0 transition-[background,backdrop-filter,box-shadow,border-color] duration-500 ease-out ${sidebarOpen && !isMobile ? 'pl-6' : 'pl-16'
+                }`}
+            >
+              <div className="flex items-center">
+
+                <h1
+                  className={`text-lg font-semibold transition-colors duration-500 ease-out ${isLightMode ? 'text-slate-800' : 'text-white'
                     }`}
                 >
-                  Data Query
-                </h3>
+                  INGRES ChatBOT
+                  <span className="ml-2 text-xs font-normal text-blue-400">(Jal-Shakti RAG)</span>
+                </h1>
               </div>
+
+              {/* Right side: User Profile and Theme Toggle */}
+              <div className="flex items-center gap-4">
+                {/* Light / Dark mode toggle */}
+                <button
+                  onClick={() => setIsLightMode((prev) => !prev)}
+                  className="inline-flex items-center gap-3 px-2 py-1 rounded-full bg-transparent hover:bg-white/10 transition-colors text-xs font-medium"
+                  aria-label="Toggle light mode"
+                >
+                  {/* Track */}
+                  <span
+                    className={`relative w-11 h-6 rounded-full transition-colors duration-300 ${isLightMode ? 'bg-slate-300/80' : 'bg-blue-600'
+                      }`}
+                  >
+                    {/* Thumb */}
+                    <span
+                      className={`absolute top-[2px] left-[2px] w-5 h-5 rounded-full bg-white shadow-md flex items-center justify-center transition-transform duration-300 ${isLightMode ? 'translate-x-0' : 'translate-x-5'
+                        }`}
+                    >
+                      {isLightMode ? (
+                        <Moon className="w-3 h-3 text-slate-500" />
+                      ) : (
+                        <Sun className="w-3 h-3 text-blue-500" />
+                      )}
+                    </span>
+                  </span>
+
+                  {/* Label */}
+                  <span
+                    className={`whitespace-nowrap transition-colors duration-500 ease-out ${isLightMode ? 'text-slate-600' : 'text-white/70'
+                      }`}
+                  >
+                    {isLightMode ? 'Light Mode' : 'Dark Mode'}
+                  </span>
+                </button>
+              </div>
+            </header>
+
+            {/* Chat Area */}
+            <div className="flex-1 flex overflow-hidden">
+              {/* Main Chat Column */}
+              <div
+                className={`flex flex-col ${showDataPanel ? 'border-r border-white/5' : ''} transition-all duration-300`}
+                style={{ width: isMapPanelOpen ? '50%' : '100%', minWidth: 0 }}
+              >
+                {/* Messages */}
+                <div
+                  className="flex-1 overflow-y-auto p-6 pb-32 md:pb-6"
+                  style={{
+                    paddingBottom: keyboardHeight ? `${keyboardHeight + 160}px` : undefined,
+                    WebkitOverflowScrolling: 'touch',
+                    touchAction: 'pan-y',
+                  }}
+                >
+                  {messages.length === 0 ? (
+                    <div className="min-h-full flex flex-col items-center justify-center px-4 py-10">
+                      {/* Logo */}
+                      <div className="mb-5">
+                        <img src={isLightMode ? logoLight : logoDark} alt="INGRES" className="w-24 h-24 object-contain" />
+                      </div>
+
+                      <h2
+                        className={`text-3xl font-bold text-center ${isLightMode ? 'text-slate-900' : 'text-white'} mb-5`}
+                      >
+                        How can I help you today?
+                      </h2>
+
+                      <p
+                        className={`text-center max-w-md ${isLightMode ? 'text-slate-500' : 'text-white/50'} mb-4`}
+                      >
+                        Ask me anything about India's groundwater resources.
+                      </p>
+
+                      {locationStatus !== 'pending' && (
+                        <p className={`text-center text-sm font-medium mb-5 ${isLightMode ? 'text-slate-700' : 'text-cyan-100'}`}>
+                          📍 Based on your location: {location?.city ? `${location.city}, ${location.state}` : location?.state || 'India'}
+                        </p>
+                      )}
+
+                      {suggestions.length > 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-[800px] w-full">
+                          {suggestions.map((suggestion, index) => {
+                            const icon = SUGGESTION_ICONS[index % SUGGESTION_ICONS.length];
+                            return (
+                              <button
+                                key={suggestion.label}
+                                onClick={() => handleSend(suggestion.prompt)}
+                                className={`rounded-2xl border border-cyan-300/15 bg-[rgba(10,20,40,0.7)] p-4 text-left transition-all duration-300 hover:scale-[1.01] ${isLightMode ? 'hover:border-cyan-300/80 hover:bg-white/10' : 'hover:border-cyan-300/80 hover:bg-slate-800/30'}`}
+                              >
+                                <div className="text-2xl">{icon}</div>
+                                <div className="mt-2 text-base font-semibold text-white">{suggestion.label}</div>
+                                <div className="mt-1 text-xs text-cyan-100/80">{location?.city ? `${location.city}` : `${location?.state || 'India'}`}</div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-6 max-w-3xl mx-auto">
+                      {messages.map((message) => (
+                        <React.Fragment key={message.id}>
+                          <div
+                            className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}
+                          >
+                            {message.sender === 'bot' && (
+                              <div className="w-8 h-8 flex items-center justify-center mr-3 shrink-0">
+                                <img src={isLightMode ? logoLight : logoDark} alt="bot" className="w-4 h-4 object-contain" />
+                              </div>
+                            )}
+                            <div
+                              className={`max-w-[80%] px-5 py-3 ${message.sender === 'user' ? 'message-user' : isLightMode ? 'message-bot-light' : 'message-bot-dark'
+                                }`}
+                            >
+                              {message.text.includes('```') ? (
+                                <pre className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'} bg-transparent`}>
+                                  {message.sender === 'bot' ? (
+                                    message.isNew ? (
+                                      <TypewriterText text={message.text} isNew={message.isNew} onUpdate={scrollToBottom} onComplete={() => markMessageComplete(message.id)} />
+                                    ) : (
+                                      formatMessageText(message.text)
+                                    )
+                                  ) : (
+                                    formatMessageText(message.text)
+                                  )}
+                                </pre>
+                              ) : (
+                                <div className={`text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'}`}>
+                                  {message.sender === 'bot' ? (
+                                    message.isNew ? (
+                                      <TypewriterText text={message.text} isNew={message.isNew} onUpdate={scrollToBottom} onComplete={() => markMessageComplete(message.id)} />
+                                    ) : (
+                                      <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(message.text) }} />
+                                    )
+                                  ) : (
+                                    formatMessageText(message.text)
+                                  )}
+                                </div>
+                              )}
+                              <span className={`text-xs mt-2 block ${message.sender === 'user' ? 'text-white/70' : isLightMode ? 'text-slate-500' : 'text-white/40'}`}>
+                                {formatTime(message.timestamp)}
+                              </span>
+
+                              {message.options && message.options.length > 0 && (
+                                <div className="mt-3 max-h-64 overflow-y-auto space-y-2">
+                                  {message.options.map((option, optionIndex) => (
+                                    <button
+                                      key={`${message.id}-${option.label}`}
+                                      onClick={() => handleSend(option.prompt)}
+                                      className={`w-full rounded-xl border px-3 py-2 text-left transition-colors ${isLightMode
+                                          ? 'border-slate-200 bg-slate-50 text-slate-800 hover:border-cyan-500 hover:bg-cyan-50'
+                                          : 'border-white/10 bg-white/5 text-white hover:border-cyan-300/70 hover:bg-white/10'
+                                        }`}
+                                    >
+                                      <div className="flex items-start gap-2">
+                                        <span className="text-base leading-none">{SUGGESTION_ICONS[optionIndex % SUGGESTION_ICONS.length]}</span>
+                                        <span className="text-sm leading-5">{option.label}</span>
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+
+                            </div>
+                          </div>
+
+                          {message.chartData && (
+                            <div
+                              key={`${message.id}-chart`}
+                              className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn my-4`}
+                            >
+                              <div
+                                className={`
+        w-full md:max-w-[90%] lg:max-w-[85%] 
+        p-4 rounded-2xl border transition-colors duration-500 ease-out
+        ${message.sender === 'user'
+                                    ? 'bg-blue-600 border-blue-500 text-white'
+                                    : isLightMode
+                                      ? 'bg-white border-slate-200 shadow-sm'
+                                      : 'bg-slate-900 border-slate-800'
+                                  }
+      `}
+                              >
+                                {/* Increased height for better readability. 
+          The Renderer now fills this container. 
+      */}
+                                <div className="h-[400px] w-full">
+                                  <EChartsRenderer
+                                    option={message.chartData}
+                                    theme={isLightMode ? 'light' : 'dark'}
+                                  />
+                                </div>
+
+                                <div className={`px-1 flex justify-between items-center mt-3 border-t pt-2 ${message.sender === 'user' ? 'border-white/10' : 'border-slate-100/50'
+                                  }`}>
+                                  <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">
+                                    Analysis Report
+                                  </span>
+                                  <span className={`text-xs ${message.sender === 'user' ? 'text-white/70' : 'opacity-50'
+                                    }`}>
+                                    {formatTime(message.timestamp)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </React.Fragment>
+                      ))}
+
+                      {isTyping && (
+                        <div className="flex justify-start animate-fadeIn">
+                          <div className="w-8 h-8 flex items-center justify-center mr-3 shrink-0">
+                            <img src={isLightMode ? logoLight : logoDark} alt="bot-typing" className="w-4 h-4 object-contain" />
+                          </div>
+                          <div className={`px-5 py-4 rounded-2xl rounded-tl-sm flex flex-col gap-2 ${isLightMode ? 'message-bot-light' : 'message-bot-dark'}`}>
+                            {isVisualizationNeeded && (
+                              <div className="flex items-center gap-2 text-xs font-semibold text-blue-500 animate-pulse">
+                                <BarChart3 className="w-4 h-4" />
+                                <span>Fetching data & generating chart...</span>
+                              </div>
+                            )}
+                            <div className="loading-dots">
+                              <span></span>
+                              <span></span>
+                              <span></span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {!showInlineMapOptions && suggestions.length > 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {suggestions.map((suggestion, index) => {
+                            const icon = SUGGESTION_ICONS[index % SUGGESTION_ICONS.length];
+                            return (
+                              <button
+                                key={`${suggestionContextLabel}-${suggestion.label}`}
+                                onClick={() => handleSend(suggestion.prompt)}
+                                className={`rounded-2xl border p-4 text-left transition-all duration-300 hover:scale-[1.01] ${isLightMode
+                                    ? 'border-slate-200 bg-white hover:border-cyan-400 hover:bg-cyan-50'
+                                    : 'border-cyan-300/15 bg-[rgba(10,20,40,0.7)] hover:border-cyan-300/80 hover:bg-slate-800/30'
+                                  }`}
+                              >
+                                <div className="text-2xl">{icon}</div>
+                                <div className={`mt-2 text-base font-semibold ${isLightMode ? 'text-slate-900' : 'text-white'}`}>
+                                  {suggestion.label}
+                                </div>
+                                <div className={`mt-1 text-xs ${isLightMode ? 'text-slate-500' : 'text-cyan-100/80'}`}>
+                                  {suggestionContextLabel}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      <div ref={messagesEndRef} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Input Area */}
+                <div
+                  className="p-4 md:p-4 fixed md:static left-0 right-0 z-40"
+                  style={{ bottom: keyboardHeight ? `${keyboardHeight + 16}px` : '16px', paddingBottom: 'calc(env(safe-area-inset-bottom, 12px) + 8px)' }}
+                >
+                  <div className="max-w-3xl mx-auto px-2">
+                    <div className={`rounded-2xl p-2 flex items-center gap-2 ${isLightMode ? 'glass-card' : 'glass-card-dark'}`}>
+                      {/* Plus Button with Mode Dropdown */}
+                      <div className="relative" ref={modeDropdownRef}>
+                        <button
+                          onClick={() => setShowModeDropdown(!showModeDropdown)}
+                          className={`p-2.5 rounded-xl transition-colors flex items-center gap-1 ${isLightMode ? 'hover:bg-slate-200/80' : 'hover:bg-white/10'
+                            }`}
+                        >
+                          <Plus
+                            className={`w-5 h-5 ${isLightMode ? 'text-slate-500' : 'text-white/60'
+                              }`}
+                          />
+                          <ChevronDown
+                            className={`w-3 h-3 transition-transform ${isLightMode ? 'text-slate-400' : 'text-white/40'
+                              } ${showModeDropdown ? 'rotate-180' : ''}`}
+                          />
+                        </button>
+
+                        {/* Mode Dropdown */}
+                        {showModeDropdown && (
+                          <div className="absolute bottom-full left-0 mb-2 w-64 mode-dropdown rounded-2xl p-2 z-50 animate-fadeIn">
+                            <div className="px-3 py-2 text-xs font-medium text-white/40 uppercase tracking-wider">
+                              Select Mode
+                            </div>
+                            {MODES.map((mode) => (
+                              <button
+                                key={mode.id}
+                                onClick={() => handleModeSelect(mode)}
+                                className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-200 ${selectedMode.id === mode.id
+                                    ? 'bg-blue-500/20 border border-blue-500/30'
+                                    : 'hover:bg-white/5'
+                                  }`}
+                              >
+
+                                <div className="flex items-start gap-3">
+
+                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${selectedMode.id === mode.id ? 'bg-blue-500' : 'bg-white/10'
+                                    }`}>
+                                    <mode.icon className="w-4 h-4 text-white" />
+                                  </div>
+
+                                  <div className="text-left">
+                                    <p className={`text-sm font-medium ${selectedMode.id === mode.id ? 'text-white' : 'text-white/80'
+                                      }`}>
+                                      {mode.label}
+                                    </p>
+
+                                    <p className="text-xs text-white/50">{mode.description}</p>
+                                  </div>
+
+                                </div>
+
+                                {/* Checkboxes only for specific modes */}
+                                {mode.id === "deep" && (
+                                  <input
+                                    type="checkbox"
+                                    checked={isDetailedResponseNeeded}
+                                    onChange={(e) => {
+                                      e.stopPropagation()
+                                      setIsDetailedResponseNeeded(e.target.checked)
+                                    }}
+                                    className="accent-blue-500"
+                                  />
+                                )}
+
+                                {mode.id === "visualizer" && (
+                                  <input
+                                    type="checkbox"
+                                    checked={isVisualizationNeeded}
+                                    onChange={(e) => {
+                                      e.stopPropagation()
+                                      setIsVisualizationNeeded(e.target.checked)
+                                    }}
+                                    className="accent-blue-500"
+                                  />
+                                )}
+
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+
+                        {/* Show AUTO only when nothing else is selected */}
+                        {!isDetailedResponseNeeded && !isVisualizationNeeded && (
+                          <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 text-xs">
+                            <Sparkles className="w-4 h-4 text-blue-400" />
+                            Auto
+                          </div>
+                        )}
+
+                        {/* Deep Search badge */}
+                        {isDetailedResponseNeeded && (
+                          <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 text-xs">
+                            <SearchIcon className="w-4 h-4 text-blue-400" />
+                            Deep
+                          </div>
+                        )}
+
+                        {/* Visualization badge */}
+                        {isVisualizationNeeded && (
+                          <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 text-xs">
+                            <BarChart3 className="w-4 h-4 text-blue-400" />
+                            Charts
+                          </div>
+                        )}
+
+                        {/* Map badge */}
+                        {isMapNeeded && (
+                          <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/5 text-xs">
+                            <MapIcon className="w-4 h-4 text-blue-400" />
+                            Map
+                          </div>
+                        )}
+
+                      </div>
+
+                      {/* Map Panel Toggle Button */}
+                      <button
+                        onClick={() => {
+                          setIsMapPanelOpen((prev) => {
+                            const next = !prev;
+                            return next;
+                          });
+                          setIsMapNeeded((prev) => !prev);
+                          if (!isMapPanelOpen) {
+                            setSidebarOpen(false);
+                          }
+                        }}
+                        className={`p-2.5 rounded-xl transition-colors ${isLightMode ? 'hover:bg-slate-200/80' : 'hover:bg-white/10'}`}
+                        title="Toggle Map"
+                      >
+                        <MapIcon className={`w-5 h-5 ${isLightMode ? 'text-slate-500' : 'text-white/60'}`} />
+                      </button>
+
+
+                      {/* Input */}
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                        onFocus={() => {
+                          // ensure latest messages are visible when keyboard shows
+                          setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+                        }}
+                        placeholder="Type your message..."
+                        className={`flex-1 bg-transparent text-sm py-3 px-2 focus:outline-none ${isLightMode
+                          ? 'text-slate-800 placeholder:text-slate-400'
+                          : 'text-white placeholder:text-white/40'
+                          }`}
+                      />
+
+                      {/* Send Button */}
+                      <button
+                        onClick={() => handleSend()}
+                        disabled={!inputValue.trim()}
+                        className={`px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${inputValue.trim()
+                          ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                          : 'bg-white/5 text-white/30 cursor-not-allowed'
+                          }`}
+                      >
+                        Send
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Map Panel — mounted lazily on first open, then kept alive with CSS visibility */}
+              {isMapInitialized && (
+                <div
+                  className="border-l border-white/10 relative overflow-hidden transition-all duration-300 shrink-0"
+                  style={{ width: isMapPanelOpen ? '50%' : '0px', minWidth: isMapPanelOpen ? undefined : '0' }}
+                  onTransitionEnd={() => window.dispatchEvent(new Event('resize'))}
+                >
+                  <IndiaMapComponent
+                    onStateSelect={handleMapStateSelect}
+                    onDistrictSelect={handleMapDistrictSelect}
+                    isVisible={isMapPanelOpen}
+                    mapTheme={isLightMode ? 'light' : 'dark'}
+                  />
+                </div>
+              )}
+
+              {/* Data Query Panel - for Quick Chat mode */}
+              {showDataPanel && (
+                <div className={`w-96 quick-mode-panel flex flex-col animate-slideIn ${isLightMode ? 'quick-mode-panel-light' : 'quick-mode-panel-dark'
+                  }`}>
+                  <div className="p-4 border-b border-white/5">
+                    <h3
+                      className={`text-sm font-semibold uppercase tracking-wider ${isLightMode ? 'text-slate-700' : 'text-white/80'
+                        }`}
+                    >
+                      Data Query
+                    </h3>
+                  </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {/* State Dropdown */}
@@ -1371,59 +1438,59 @@ function ChatPage() {
                   </div>
                 </div>
 
-                {/* Years */}
-                <div>
-                  <label
-                    className={`text-sm mb-2 block ${isLightMode ? 'text-slate-600' : 'text-white/60'
-                      }`}
-                  >
-                    Years
-                  </label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={year2023}
-                        onChange={(e) => setYear2023(e.target.checked)}
-                        className={isLightMode ? 'custom-checkbox-light' : 'custom-checkbox'}
-                      />
-                      <span
-                        className={`text-sm ${isLightMode ? 'text-slate-700' : 'text-white/80'
+                    {/* Years */}
+                    <div>
+                      <label
+                        className={`text-sm mb-2 block ${isLightMode ? 'text-slate-600' : 'text-white/60'
                           }`}
                       >
-                        2023
-                      </span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={year2024}
-                        onChange={(e) => setYear2024(e.target.checked)}
-                        className={isLightMode ? 'custom-checkbox-light' : 'custom-checkbox'}
-                      />
-                      <span
-                        className={`text-sm ${isLightMode ? 'text-slate-700' : 'text-white/80'
+                        Years
+                      </label>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={year2023}
+                            onChange={(e) => setYear2023(e.target.checked)}
+                            className={isLightMode ? 'custom-checkbox-light' : 'custom-checkbox'}
+                          />
+                          <span
+                            className={`text-sm ${isLightMode ? 'text-slate-700' : 'text-white/80'
+                              }`}
+                          >
+                            2023
+                          </span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={year2024}
+                            onChange={(e) => setYear2024(e.target.checked)}
+                            className={isLightMode ? 'custom-checkbox-light' : 'custom-checkbox'}
+                          />
+                          <span
+                            className={`text-sm ${isLightMode ? 'text-slate-700' : 'text-white/80'
+                              }`}
+                          >
+                            2024
+                          </span>
+                        </label>
+                      </div>
+                      <p
+                        className={`text-xs mt-2 ${isLightMode ? 'text-slate-400' : 'text-white/40'
                           }`}
                       >
-                        2024
-                      </span>
-                    </label>
-                  </div>
-                  <p
-                    className={`text-xs mt-2 ${isLightMode ? 'text-slate-400' : 'text-white/40'
-                      }`}
-                  >
-                    Select none to use the latest year.
-                  </p>
-                </div>
+                        Select none to use the latest year.
+                      </p>
+                    </div>
 
-                {/* Get Data Button */}
-                <button
-                  onClick={handleGetData}
-                  className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 rounded-xl transition-all duration-200 shadow-lg shadow-blue-600/20"
-                >
-                  Get Data
-                </button>
+                    {/* Get Data Button */}
+                    <button
+                      onClick={handleGetData}
+                      className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 rounded-xl transition-all duration-200 shadow-lg shadow-blue-600/20"
+                    >
+                      Get Data
+                    </button>
 
                 {/* Results */}
                 {showResults && (
@@ -1437,56 +1504,56 @@ function ChatPage() {
                       <span>{selectedBlock || 'Not selected'}</span>
                     </div>
 
-                    {/* Data Table */}
-                    <div className={`rounded-xl overflow-hidden ${isLightMode ? 'glass-card' : 'quick-mode-table-dark'}`}>
-                      <table className="data-table text-sm">
-                        <thead>
-                          <tr>
-                            <th>Year</th>
-                            <th>Annual Extractable (Ham)</th>
-                            <th>Total Extraction (Ham)</th>
-                            <th>Stage (%)</th>
-                            <th>Categorization</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {SAMPLE_DATA.map((row, index) => (
-                            <tr key={index}>
-                              <td className={isLightMode ? 'text-slate-800' : 'text-white/80'}>{row.year}</td>
-                              <td className={isLightMode ? 'text-slate-600' : 'text-white/60'}>{row.extractable}</td>
-                              <td className={isLightMode ? 'text-slate-600' : 'text-white/60'}>{row.extraction}</td>
-                              <td className={isLightMode ? 'text-slate-600' : 'text-white/60'}>{row.stage}</td>
-                              <td>
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${row.category === 'Safe'
-                                    ? 'bg-green-500/20 text-green-400'
-                                    : 'bg-yellow-500/20 text-yellow-400'
-                                  }`}>
-                                  {row.category}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                        {/* Data Table */}
+                        <div className={`rounded-xl overflow-hidden ${isLightMode ? 'glass-card' : 'quick-mode-table-dark'}`}>
+                          <table className="data-table text-sm">
+                            <thead>
+                              <tr>
+                                <th>Year</th>
+                                <th>Annual Extractable (Ham)</th>
+                                <th>Total Extraction (Ham)</th>
+                                <th>Stage (%)</th>
+                                <th>Categorization</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {SAMPLE_DATA.map((row, index) => (
+                                <tr key={index}>
+                                  <td className={isLightMode ? 'text-slate-800' : 'text-white/80'}>{row.year}</td>
+                                  <td className={isLightMode ? 'text-slate-600' : 'text-white/60'}>{row.extractable}</td>
+                                  <td className={isLightMode ? 'text-slate-600' : 'text-white/60'}>{row.extraction}</td>
+                                  <td className={isLightMode ? 'text-slate-600' : 'text-white/60'}>{row.stage}</td>
+                                  <td>
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${row.category === 'Safe'
+                                      ? 'bg-green-500/20 text-green-400'
+                                      : 'bg-yellow-500/20 text-yellow-400'
+                                      }`}>
+                                      {row.category}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Quick Chat modal for mobile */}
-          {showQuickModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-              <div className="absolute inset-0 bg-black/50" onClick={() => setShowQuickModal(false)} />
-              <div className={`relative w-full max-w-md mx-auto rounded-xl p-4 z-10 max-h-[90vh] overflow-auto ${isLightMode ? 'quick-mode-panel-light' : 'quick-mode-panel-dark'
-                }`}>
-                <div className="flex items-start justify-between">
-                  <h3 className={`text-sm font-semibold uppercase tracking-wider ${isLightMode ? 'text-slate-800' : 'text-white/80'}`}>Quick Chat - Data Query</h3>
-                  <button onClick={() => setShowQuickModal(false)} className="p-2 rounded-lg hover:bg-white/5">
-                    <X className="w-4 h-4 text-white/60" />
-                  </button>
                 </div>
+              )}
+
+              {/* Quick Chat modal for mobile */}
+              {showQuickModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+                  <div className="absolute inset-0 bg-black/50" onClick={() => setShowQuickModal(false)} />
+                  <div className={`relative w-full max-w-md mx-auto rounded-xl p-4 z-10 max-h-[90vh] overflow-auto ${isLightMode ? 'quick-mode-panel-light' : 'quick-mode-panel-dark'
+                    }`}>
+                    <div className="flex items-start justify-between">
+                      <h3 className={`text-sm font-semibold uppercase tracking-wider ${isLightMode ? 'text-slate-800' : 'text-white/80'}`}>Quick Chat - Data Query</h3>
+                      <button onClick={() => setShowQuickModal(false)} className="p-2 rounded-lg hover:bg-white/5">
+                        <X className="w-4 h-4 text-white/60" />
+                      </button>
+                    </div>
 
                 <div className="mt-4 space-y-4">
                   <div>
@@ -1540,37 +1607,37 @@ function ChatPage() {
                     </div>
                   </div>
 
-                  <div>
-                    <label className={`text-sm mb-2 block ${isLightMode ? 'text-slate-700' : 'text-white/60'}`}>Years</label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={year2023}
-                          onChange={(e) => setYear2023(e.target.checked)}
-                          className={isLightMode ? 'custom-checkbox-light' : 'custom-checkbox'}
-                        />
-                        <span className={`text-sm ${isLightMode ? 'text-slate-800' : 'text-white/80'}`}>2023</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={year2024}
-                          onChange={(e) => setYear2024(e.target.checked)}
-                          className={isLightMode ? 'custom-checkbox-light' : 'custom-checkbox'}
-                        />
-                        <span className={`text-sm ${isLightMode ? 'text-slate-800' : 'text-white/80'}`}>2024</span>
-                      </label>
-                    </div>
-                    <p className={`text-xs mt-2 ${isLightMode ? 'text-slate-500' : 'text-white/40'}`}>Select none to use the latest year.</p>
-                  </div>
+                      <div>
+                        <label className={`text-sm mb-2 block ${isLightMode ? 'text-slate-700' : 'text-white/60'}`}>Years</label>
+                        <div className="flex gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={year2023}
+                              onChange={(e) => setYear2023(e.target.checked)}
+                              className={isLightMode ? 'custom-checkbox-light' : 'custom-checkbox'}
+                            />
+                            <span className={`text-sm ${isLightMode ? 'text-slate-800' : 'text-white/80'}`}>2023</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={year2024}
+                              onChange={(e) => setYear2024(e.target.checked)}
+                              className={isLightMode ? 'custom-checkbox-light' : 'custom-checkbox'}
+                            />
+                            <span className={`text-sm ${isLightMode ? 'text-slate-800' : 'text-white/80'}`}>2024</span>
+                          </label>
+                        </div>
+                        <p className={`text-xs mt-2 ${isLightMode ? 'text-slate-500' : 'text-white/40'}`}>Select none to use the latest year.</p>
+                      </div>
 
-                  <button
-                    onClick={() => { handleGetData(); /* keep modal open on mobile so results are visible */ }}
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 rounded-xl transition-all duration-200 shadow-lg shadow-blue-600/20"
-                  >
-                    Get Data
-                  </button>
+                      <button
+                        onClick={() => { handleGetData(); /* keep modal open on mobile so results are visible */ }}
+                        className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 rounded-xl transition-all duration-200 shadow-lg shadow-blue-600/20"
+                      >
+                        Get Data
+                      </button>
 
                   {showResults && (
                     <div className="animate-fadeIn">
@@ -1582,101 +1649,101 @@ function ChatPage() {
                         <span>{selectedBlock || 'Not selected'}</span>
                       </div>
 
-                      <div className={`rounded-xl overflow-hidden ${isLightMode ? 'glass-card' : 'quick-mode-table-dark'}`}>
-                        <table className="data-table text-sm">
-                          <thead>
-                            <tr>
-                              <th>Year</th>
-                              <th>Annual Extractable (Ham)</th>
-                              <th>Total Extraction (Ham)</th>
-                              <th>Stage (%)</th>
-                              <th>Categorization</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {SAMPLE_DATA.map((row, index) => (
-                              <tr key={index}>
-                                <td className={isLightMode ? 'text-slate-800' : 'text-white/80'}>{row.year}</td>
-                                <td className={isLightMode ? 'text-slate-600' : 'text-white/60'}>{row.extractable}</td>
-                                <td className={isLightMode ? 'text-slate-600' : 'text-white/60'}>{row.extraction}</td>
-                                <td className={isLightMode ? 'text-slate-600' : 'text-white/60'}>{row.stage}</td>
-                                <td>
-                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${row.category === 'Safe'
-                                      ? 'bg-green-500/20 text-green-400'
-                                      : 'bg-yellow-500/20 text-yellow-400'
-                                    }`}>
-                                    {row.category}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                          <div className={`rounded-xl overflow-hidden ${isLightMode ? 'glass-card' : 'quick-mode-table-dark'}`}>
+                            <table className="data-table text-sm">
+                              <thead>
+                                <tr>
+                                  <th>Year</th>
+                                  <th>Annual Extractable (Ham)</th>
+                                  <th>Total Extraction (Ham)</th>
+                                  <th>Stage (%)</th>
+                                  <th>Categorization</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {SAMPLE_DATA.map((row, index) => (
+                                  <tr key={index}>
+                                    <td className={isLightMode ? 'text-slate-800' : 'text-white/80'}>{row.year}</td>
+                                    <td className={isLightMode ? 'text-slate-600' : 'text-white/60'}>{row.extractable}</td>
+                                    <td className={isLightMode ? 'text-slate-600' : 'text-white/60'}>{row.extraction}</td>
+                                    <td className={isLightMode ? 'text-slate-600' : 'text-white/60'}>{row.stage}</td>
+                                    <td>
+                                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${row.category === 'Safe'
+                                        ? 'bg-green-500/20 text-green-400'
+                                        : 'bg-yellow-500/20 text-yellow-400'
+                                        }`}>
+                                        {row.category}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
-          )}
-        </div>
 
-          {deleteChatId && (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+            {deleteChatId && (
+              <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
 
-      <div
-          className={`rounded-xl p-6 w-80 shadow-xl
+                <div
+                  className={`rounded-xl p-6 w-80 shadow-xl
           ${isLightMode
-            ? "bg-white text-slate-800"
-            : "bg-[#0f172a] text-white"
-          }`}
-        >
+                      ? "bg-white text-slate-800"
+                      : "bg-[#0f172a] text-white"
+                    }`}
+                >
 
-        <h2 className="text-lg font-semibold mb-4">
-          Delete Chat?
-        </h2>
+                  <h2 className="text-lg font-semibold mb-4">
+                    Delete Chat?
+                  </h2>
 
-        <p className="text-sm font-semi mb-6">
-          This action cannot be undone.
-        </p>
+                  <p className="text-sm font-semi mb-6">
+                    This action cannot be undone.
+                  </p>
 
-        <div className="flex justify-end gap-3">
+                  <div className="flex justify-end gap-3">
 
-          <button
-            onClick={() => setDeleteChatId(null)}
-            className={`px-4 py-2 rounded-lg
+                    <button
+                      onClick={() => setDeleteChatId(null)}
+                      className={`px-4 py-2 rounded-lg
               ${isLightMode
-                ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                : "bg-white/10 hover:bg-white/20 text-white"
-              }`}
-          >
-            Cancel
-          </button>
+                          ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                          : "bg-white/10 hover:bg-white/20 text-white"
+                        }`}
+                    >
+                      Cancel
+                    </button>
 
-          <button
-            onClick={() => {
-              handleDeleteChat(deleteChatId)
-              setDeleteChatId(null)
-            }}
-            className={`px-4 py-2 rounded-lg
+                    <button
+                      onClick={() => {
+                        handleDeleteChat(deleteChatId)
+                        setDeleteChatId(null)
+                      }}
+                      className={`px-4 py-2 rounded-lg
               ${isLightMode
-                ? "bg-red-500 hover:bg-red-600 text-white"
-                : "bg-red-500 hover:bg-red-600 text-white"
-              }`}
-          >
-            Delete
-          </button>
+                          ? "bg-red-500 hover:bg-red-600 text-white"
+                          : "bg-red-500 hover:bg-red-600 text-white"
+                        }`}
+                    >
+                      Delete
+                    </button>
 
+                  </div>
+
+                </div>
+
+              </div>
+            )}
+          </main>
         </div>
-
       </div>
-
-    </div>
-  )}
-      </main>
-    </div>
-  </div>
-  </>
+    </>
   );
 }
 export default ChatPage;

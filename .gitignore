@@ -1,9 +1,0 @@
-node_modules
-.venv/
-
-myvenv/
-venv/
-ENV/
-env/            
-
-.env
