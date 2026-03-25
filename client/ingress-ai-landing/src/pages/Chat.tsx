@@ -28,6 +28,7 @@ import {
 import {
   sendGeminiRagRequest,
   sendChatRequest,
+  getGwraLocations,
   getUserChatSessions,
   createNewChatSession,
   getChatSessionHistory,
@@ -36,7 +37,7 @@ import {
 } from '@/lib/api';
 import { ChatSidebarContent } from '@/components/ChatSidebarContent';
 import { EChartsRenderer } from '@/components/EChartsRenderer';
-import IndiaMapComponent, { GW as GW_DATA } from '@/components/IndiaMapComponent';
+import IndiaMapComponent from '@/components/IndiaMapComponent';
 const logoLight = '/logo_LIGHT.png';
 const logoDark = '/logo_DARK.png';
 import '@/chat/index.css';
@@ -54,10 +55,6 @@ const MODES = [
 ];
 
 const SUGGESTION_ICONS = ['💧', '📊', '📍', '⚠️'];
-
-const STATES = ['Gujarat', 'Rajasthan', 'Maharashtra', 'Madhya Pradesh'];
-const DISTRICTS = ['Ahmedabad', 'Vadodara', 'Surat', 'Rajkot'];
-const BLOCKS = ['All Blocks', 'Central', 'North', 'South'];
 
 const SAMPLE_DATA = [
   {
@@ -240,9 +237,12 @@ function ChatPage() {
   };
   const [showDataPanel, setShowDataPanel] = useState(false);
   const [showResults, setShowResults] = useState(false);
-  const [selectedState, setSelectedState] = useState(STATES[0]);
-  const [selectedDistrict, setSelectedDistrict] = useState(DISTRICTS[0]);
-  const [selectedBlock, setSelectedBlock] = useState(BLOCKS[0]);
+  const [stateOptions, setStateOptions] = useState<string[]>([]);
+  const [cityOptions, setCityOptions] = useState<string[]>([]);
+  const [blockOptions, setBlockOptions] = useState<string[]>([]);
+  const [selectedState, setSelectedState] = useState('');
+  const [selectedDistrict, setSelectedDistrict] = useState('');
+  const [selectedBlock, setSelectedBlock] = useState('');
   const [year2023, setYear2023] = useState(true);
   const [year2024, setYear2024] = useState(true);
   const messagesEndRef = useRef(null);
@@ -372,6 +372,59 @@ function ChatPage() {
     // Start loading the map immediately (hidden by default) so user-click is fast.
     setIsMapInitialized(true);
   }, []);
+
+  useEffect(() => {
+    const loadStates = async () => {
+      const response = await getGwraLocations();
+      const nextStates = response.states ?? [];
+
+      setStateOptions(nextStates);
+
+      if (nextStates.length > 0) {
+        setSelectedState((current) => (current && nextStates.includes(current) ? current : nextStates[0]));
+      }
+    };
+
+    loadStates();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedState) {
+      setCityOptions([]);
+      setSelectedDistrict('');
+      setBlockOptions([]);
+      setSelectedBlock('');
+      return;
+    }
+
+    const loadCities = async () => {
+      const response = await getGwraLocations(selectedState);
+      const nextCities = response.cities ?? [];
+
+      setCityOptions(nextCities);
+      setSelectedDistrict((current) => (current && nextCities.includes(current) ? current : nextCities[0] ?? ''));
+    };
+
+    loadCities();
+  }, [selectedState]);
+
+  useEffect(() => {
+    if (!selectedState || !selectedDistrict) {
+      setBlockOptions([]);
+      setSelectedBlock('');
+      return;
+    }
+
+    const loadAssessmentUnits = async () => {
+      const response = await getGwraLocations(selectedState, selectedDistrict);
+      const nextBlocks = response.assessmentUnits ?? [];
+
+      setBlockOptions(nextBlocks);
+      setSelectedBlock((current) => (current && nextBlocks.includes(current) ? current : nextBlocks[0] ?? ''));
+    };
+
+    loadAssessmentUnits();
+  }, [selectedState, selectedDistrict]);
 
   useEffect(() => {
     const buildSuggestions = (city?: string, state?: string) => {
@@ -1255,7 +1308,7 @@ function ChatPage() {
                       className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
                         }`}
                     >
-                      {STATES.map((state) => (
+                      {stateOptions.map((state) => (
                         <option key={state} value={state} className={isLightMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{state}</option>
                       ))}
                     </select>
@@ -1272,7 +1325,7 @@ function ChatPage() {
                     className={`text-sm mb-2 block ${isLightMode ? 'text-slate-600' : 'text-white/60'
                       }`}
                   >
-                    District
+                    City / District
                   </label>
                   <div className="relative">
                     <select
@@ -1281,7 +1334,7 @@ function ChatPage() {
                       className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
                         }`}
                     >
-                      {DISTRICTS.map((district) => (
+                      {cityOptions.map((district) => (
                         <option key={district} value={district} className={isLightMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{district}</option>
                       ))}
                     </select>
@@ -1307,7 +1360,7 @@ function ChatPage() {
                       className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
                         }`}
                     >
-                      {BLOCKS.map((block) => (
+                      {blockOptions.map((block) => (
                         <option key={block} value={block} className={isLightMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{block}</option>
                       ))}
                     </select>
@@ -1379,9 +1432,9 @@ function ChatPage() {
                     <div className="flex items-center gap-1 text-xs text-blue-500 mb-4 flex-wrap">
                       <span>{selectedState}</span>
                       <ChevronRight className="w-3 h-3" />
-                      <span>{selectedDistrict}</span>
+                      <span>{selectedDistrict || 'Not selected'}</span>
                       <ChevronRight className="w-3 h-3" />
-                      <span>{selectedBlock}</span>
+                      <span>{selectedBlock || 'Not selected'}</span>
                     </div>
 
                     {/* Data Table */}
@@ -1445,7 +1498,7 @@ function ChatPage() {
                         className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
                           }`}
                       >
-                        {STATES.map((state) => (
+                        {stateOptions.map((state) => (
                           <option key={state} value={state} className={isLightMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{state}</option>
                         ))}
                       </select>
@@ -1454,7 +1507,7 @@ function ChatPage() {
                   </div>
 
                   <div>
-                    <label className={`text-sm mb-2 block ${isLightMode ? 'text-slate-700' : 'text-white/60'}`}>District</label>
+                    <label className={`text-sm mb-2 block ${isLightMode ? 'text-slate-700' : 'text-white/60'}`}>City / District</label>
                     <div className="relative">
                       <select
                         value={selectedDistrict}
@@ -1462,7 +1515,7 @@ function ChatPage() {
                         className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
                           }`}
                       >
-                        {DISTRICTS.map((district) => (
+                        {cityOptions.map((district) => (
                           <option key={district} value={district} className={isLightMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{district}</option>
                         ))}
                       </select>
@@ -1479,7 +1532,7 @@ function ChatPage() {
                         className={`w-full rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${isLightMode ? 'glass-input-light text-slate-800' : 'glass-input-quick-dark text-white'
                           }`}
                       >
-                        {BLOCKS.map((block) => (
+                        {blockOptions.map((block) => (
                           <option key={block} value={block} className={isLightMode ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}>{block}</option>
                         ))}
                       </select>
@@ -1524,9 +1577,9 @@ function ChatPage() {
                       <div className="flex items-center gap-1 text-xs text-blue-400 mb-4 flex-wrap">
                         <span>{selectedState}</span>
                         <ChevronRight className="w-3 h-3" />
-                        <span>{selectedDistrict}</span>
+                        <span>{selectedDistrict || 'Not selected'}</span>
                         <ChevronRight className="w-3 h-3" />
-                        <span>{selectedBlock}</span>
+                        <span>{selectedBlock || 'Not selected'}</span>
                       </div>
 
                       <div className={`rounded-xl overflow-hidden ${isLightMode ? 'glass-card' : 'quick-mode-table-dark'}`}>

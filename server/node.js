@@ -17,6 +17,12 @@ const server = http.createServer(app);
 const mysql = require("mysql2"); // Keep the import for the connection block
 const classifier = require('./src/routes/classifier');
 const { stat } = require('fs');
+const {
+    getStates,
+    getCitiesByState,
+    getAssessmentUnits,
+} = require('./src/routes/Modules/gwraLocations');
+const { getGwraMapData } = require('./src/routes/Modules/gwraMapData');
 
 mongoose.connect(process.env.MONGO_URI)
 .then(() => {
@@ -83,6 +89,47 @@ app.use('/auth', require('./src/routes/middleware/auth'));
 
 // routes for chat history
 app.use('/api/chats', require('./src/routes/chatRoutes'));
+
+app.get('/api/gwra/locations', (req, res) => {
+    try {
+        const { state, city } = req.query;
+
+        if (state && city) {
+            return res.status(200).json({
+                state,
+                city,
+                assessmentUnits: getAssessmentUnits(state, city),
+            });
+        }
+
+        if (state) {
+            return res.status(200).json({
+                state,
+                cities: getCitiesByState(state),
+            });
+        }
+
+        return res.status(200).json({
+            states: getStates(),
+        });
+    } catch (error) {
+        console.error('[GWRA Locations] Failed to load location data:', error);
+        return res.status(500).json({
+            error: 'Failed to load GWRA location data',
+        });
+    }
+});
+
+app.get('/api/gwra/map-data', (_req, res) => {
+    try {
+        return res.status(200).json(getGwraMapData());
+    } catch (error) {
+        console.error('[GWRA Map Data] Failed to load map data:', error);
+        return res.status(500).json({
+            error: 'Failed to load GWRA map data',
+        });
+    }
+});
 
 // these are the routes that we get form the chat
 app.post('/chat', async (req, res) => { 
