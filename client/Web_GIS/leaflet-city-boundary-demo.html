@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Leaflet City Boundary</title>
+    <!-- Leaflet CDN (your pasted HTML was missing these includes) -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+      #map {
+        height: 600px;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+
+    <script>
+      // 1. Initialize Map
+      var map = L.map("map").setView([48.8566, 2.3522], 12); // Centered on Paris
+
+      // 2. Add Base Map (OpenStreetMap)
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap contributors",
+      }).addTo(map);
+
+      // 3. Load GeoJSON City Boundary
+      // Replace this sample polygon with your real city GeoJSON.
+      // Note: GeoJSON coordinates are [longitude, latitude].
+      var cityBoundaryData = {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            properties: {},
+            geometry: {
+              type: "Polygon",
+              coordinates: [
+                [
+                  [2.25, 48.8],
+                  [2.46, 48.8],
+                  [2.46, 48.92],
+                  [2.25, 48.92],
+                  [2.25, 48.8],
+                ],
+              ],
+            },
+          },
+        ],
+      };
+
+      // 4. Style and Add Boundary to Map
+      L.geoJSON(cityBoundaryData, {
+        style: function () {
+          return {
+            color: "blue",
+            weight: 3,
+            opacity: 0.7,
+            fillColor: "lightblue",
+            fillOpacity: 0.2,
+          };
+        },
+      }).addTo(map);
+    </script>
+  </body>
+</html>
+

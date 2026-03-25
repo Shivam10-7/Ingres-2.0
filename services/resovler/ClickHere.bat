@@ -1,36 +1,18 @@
 @echo off
-setlocal
+set ROOT=E:\_\C++ project\SIH Prototype\Ingres-2.0
 
-REM Change to the script directory and then to the resolver service folder.
-pushd "%~dp0"
-cd /d "%~dp0resovler"
+echo Starting all services...
 
-REM Use the batch activate script (works from cmd). If using PowerShell, run the PowerShell activate script instead.
-if exist ".\myvenv\Scripts\activate.bat" (
-    call ".\myvenv\Scripts\activate.bat"
-) else if exist ".\myvenv\Scripts\Activate.ps1" (
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "& '.\myvenv\Scripts\Activate.ps1'"
-) else (
-    echo ERROR: virtualenv activation script not found in %cd%\myvenv\Scripts
-    popd
-    pause
-    exit /b 1
-)
+:: --- Terminal 1: Frontend ---
+start "Frontend - ingress-ai-landing" powershell -NoExit -Command ^
+"cd '%ROOT%\client\ingress-ai-landing'; npm run dev"
 
-if exist ".\myvenv\Scripts\activate.bat" (
-    call ".\myvenv\Scripts\activate.bat"
-) else if exist ".\myvenv\Scripts\Activate.ps1" (
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "& '.\myvenv\Scripts\Activate.ps1'"
-) else (
-    echo ERROR: virtualenv activation script not found in %cd%\myvenv\Scripts
-    popd
-    pause
-    exit /b 1
-)
+:: --- Terminal 2: Server ---
+start "Backend - Node Server" powershell -NoExit -Command ^
+"cd '%ROOT%\server'; node node.js"
 
-echo Starting FastAPI server...
-uvicorn api:app --reload --port 8000
+:: --- Terminal 3: Python Service ---
+start "Resolver - FastAPI" powershell -NoExit -Command ^
+"cd '%ROOT%\services\resovler'; .\myvenv\Scripts\Activate.ps1; uvicorn api:app --reload --port 8000"
 
-REM Restore original directory
-popd
-pause
+echo All terminals launched.

@@ -1,21 +1,34 @@
-const {GoogleGenAI} = require("@google/genai");
+const { GoogleGenAI } = require("@google/genai");
 const dotenv = require("dotenv");
+
 dotenv.config();
+
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
 
-async function ApiCaller(SystemInstruction) {
+async function ApiCaller(SystemInstruction, Userquery) {
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash"||"gemini-3-flash-preview",
-    contents: SystemInstruction,
-    // contents: system_instruction.replace("{{USER_QUERY}}", "What is the stage of groundwater extraction in Punjab?"),
-    // config:{
-    //     system_instruction: system_instruction
-    // }
+    model: "gemini-2.5-flash",
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: `${SystemInstruction}\n\n${Userquery}`
+          }
+        ]
+      }
+    ],
+    generationConfig: {
+      temperature: 0.1
+    }
   });
-  console.log("Response from Gemini API:", response.text);
-  return response.text;
+
+  const text = response.candidates?.[0]?.content?.parts?.[0]?.text;
+
+  console.log("Response from Gemini API:", text);
+  return text;
 }
 
-module.exports =  ApiCaller ;
+module.exports = ApiCaller;
