@@ -40,6 +40,7 @@ import {
 import { ChatSidebarContent } from '@/components/ChatSidebarContent';
 import { EChartsRenderer } from '@/components/EChartsRenderer';
 import IndiaMapComponent from '@/components/IndiaMapComponent';
+import gwraMapDataJson from '../../../../Data/GWRA_MapData.json';
 const logoLight = '/logo_LIGHT.png';
 const logoDark = '/logo_DARK.png';
 import '@/chat/index.css';
@@ -95,6 +96,13 @@ type MapSelection = {
   district?: string;
 };
 
+const LOCAL_GWRA_MAP_DATA = gwraMapDataJson as {
+  source?: string;
+  generatedAt?: string;
+  states?: Record<string, GwraMapSummary>;
+  districts?: Record<string, GwraMapSummary>;
+};
+
 const buildLocationSuggestions = (place: string): SuggestionOption[] => [
   {
     label: `groundwater_level (${place})`,
@@ -145,9 +153,14 @@ const isSupportedMapQueryText = (value = '') => {
   const normalized = value.toLowerCase().trim();
   return (
     normalized.includes('groundwater level') ||
+    normalized.includes('groundwater_level') ||
     normalized.includes('total recharge') ||
+    normalized.includes('total_recharge') ||
+    normalized.includes('extractable') ||
+    normalized.includes('extraction') ||
     normalized.includes('stage of groundwater extraction') ||
     normalized.includes('categorization') ||
+    normalized.includes('category') ||
     normalized.includes('stage')
   );
 };
@@ -471,7 +484,10 @@ function ChatPage() {
 
   useEffect(() => {
     const loadMapData = async () => {
-      const response = await getGwraMapData();
+      const response =
+        LOCAL_GWRA_MAP_DATA && Object.keys(LOCAL_GWRA_MAP_DATA.states ?? {}).length > 0
+          ? LOCAL_GWRA_MAP_DATA
+          : await getGwraMapData();
       const nextStates = response.states ?? {};
       const nextDistricts = response.districts ?? {};
       mapStatesDataRef.current = nextStates;
@@ -795,16 +811,28 @@ function ChatPage() {
       return `For **${placeLabel}**, **GWRA_MapData.json** does not contain a separate groundwater-level field. The closest available metric is **stage of groundwater extraction = ${formatMapNumber(summary.stage)}%**.`;
     }
 
-    if (normalizedQuery.includes('total recharge')) {
+    if (normalizedQuery.includes('groundwater_level')) {
+      return `For **${placeLabel}**, **GWRA_MapData.json** does not contain a separate groundwater-level field. The closest available metric is **stage of groundwater extraction = ${formatMapNumber(summary.stage)}%**.`;
+    }
+
+    if (normalizedQuery.includes('total recharge') || normalizedQuery.includes('total_recharge')) {
       return `For **${placeLabel}**, **total annual groundwater recharge = ${formatMapNumber(summary.recharge, 'Ham')}**.`;
+    }
+
+    if (normalizedQuery.includes('extractable')) {
+      return `For **${placeLabel}**, **annual extractable groundwater resource = ${formatMapNumber(summary.extractable, 'Ham')}**.`;
+    }
+
+    if (normalizedQuery.includes('extraction')) {
+      return `For **${placeLabel}**, **total groundwater extraction = ${formatMapNumber(summary.extraction, 'Ham')}**.`;
     }
 
     if (normalizedQuery.includes('stage of groundwater extraction') || normalizedQuery.includes('stage')) {
       return `For **${placeLabel}**, **stage of groundwater extraction = ${formatMapNumber(summary.stage)}%**. This is based on **extraction = ${formatMapNumber(summary.extraction, 'Ham')}** and **extractable = ${formatMapNumber(summary.extractable, 'Ham')}**.`;
     }
 
-    if (normalizedQuery.includes('categorization')) {
-      return `For **${placeLabel}**, **categorization = ${formatStatusLabel(summary.status)}**.`;
+    if (normalizedQuery.includes('categorization') || normalizedQuery.includes('category')) {
+      return `For **${placeLabel}**, **categorization = ${summary.worstCategory || formatStatusLabel(summary.status)}**.`;
     }
 
     return null;
@@ -851,7 +879,10 @@ function ChatPage() {
         (isMapNeeded || isMapPanelOpen || !!mapSelection || selectedMode.id === 'auto');
 
       if (shouldUseMapData && Object.keys(mapStatesDataRef.current).length === 0) {
-        const response = await getGwraMapData();
+        const response =
+          LOCAL_GWRA_MAP_DATA && Object.keys(LOCAL_GWRA_MAP_DATA.states ?? {}).length > 0
+            ? LOCAL_GWRA_MAP_DATA
+            : await getGwraMapData();
         const nextStates = response.states ?? {};
         const nextDistricts = response.districts ?? {};
         mapStatesDataRef.current = nextStates;
@@ -938,6 +969,14 @@ function ChatPage() {
       }
     } catch (err) {
       console.error('Send failed', err);
+      const fallbackMessage: ChatMessageItem = {
+        id: crypto.randomUUID(),
+        text: 'I could not complete that request from the server, but the map-selection flow is now configured to answer directly from **GWRA_MapData.json** when the query matches the supported groundwater attributes.',
+        sender: 'bot',
+        timestamp: new Date(),
+        isNew: true,
+      };
+      setMessages(prev => [...prev, fallbackMessage]);
     } finally {
       setIsTyping(false);
     }
