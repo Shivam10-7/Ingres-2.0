@@ -149,6 +149,81 @@ const formatStatusLabel = (value = '') =>
     .trim()
     .replace(/\b\w/g, (char) => char.toUpperCase());
 
+const roundMapMetric = (value: number) => Math.round(value * 100) / 100;
+
+const categoryFromRank = (rank: number) => {
+  if (rank >= 4) return 'Over Exploited';
+  if (rank >= 3) return 'Critical';
+  if (rank >= 2) return 'Semi Critical';
+  return 'Safe';
+};
+
+const statusFromRank = (rank: number) => {
+  if (rank >= 3) return 'critical';
+  if (rank >= 2) return 'caution';
+  return 'safe';
+};
+
+const buildDerivedStateSummaries = (districtData: Record<string, GwraMapSummary>) => {
+  const groupedStates = new Map<string, {
+    name: string;
+    recharge: number;
+    extractable: number;
+    extraction: number;
+    stage: number;
+    categoryRank: number;
+    districtCount: number;
+  }>();
+
+  Object.values(districtData).forEach((entry) => {
+    const stateName = entry.state?.trim();
+    if (!stateName) return;
+
+    const existing = groupedStates.get(stateName) ?? {
+      name: stateName,
+      recharge: 0,
+      extractable: 0,
+      extraction: 0,
+      stage: 0,
+      categoryRank: 0,
+      districtCount: 0,
+    };
+
+    existing.recharge += Number(entry.recharge) || 0;
+    existing.extractable += Number(entry.extractable) || 0;
+    existing.extraction += Number(entry.extraction) || 0;
+    existing.stage += Number(entry.stage) || 0;
+    existing.categoryRank += Number(entry.categoryRank) || 0;
+    existing.districtCount += 1;
+
+    groupedStates.set(stateName, existing);
+  });
+
+  const derivedStates: Record<string, GwraMapSummary> = {};
+
+  groupedStates.forEach((entry, stateName) => {
+    if (!entry.districtCount) return;
+
+    const averageRank = entry.categoryRank / entry.districtCount;
+    const roundedRank = Math.min(4, Math.max(1, Math.round(averageRank)));
+
+    derivedStates[stateName] = {
+      name: entry.name,
+      state: '',
+      recharge: roundMapMetric(entry.recharge / entry.districtCount),
+      extractable: roundMapMetric(entry.extractable / entry.districtCount),
+      extraction: roundMapMetric(entry.extraction / entry.districtCount),
+      stage: roundMapMetric(entry.stage / entry.districtCount),
+      unitCount: entry.districtCount,
+      categoryRank: roundedRank,
+      worstCategory: categoryFromRank(roundedRank),
+      status: statusFromRank(roundedRank),
+    };
+  });
+
+  return derivedStates;
+};
+
 const isSupportedMapQueryText = (value = '') => {
   const normalized = value.toLowerCase().trim();
   return (
@@ -265,6 +340,7 @@ function ChatPage() {
   const [mapDistrictsData, setMapDistrictsData] = useState<Record<string, GwraMapSummary>>({});
   const mapStatesDataRef = useRef<Record<string, GwraMapSummary>>({});
   const mapDistrictsDataRef = useRef<Record<string, GwraMapSummary>>({});
+  const derivedStateNamesRef = useRef<Set<string>>(new Set());
 
   //For Renaming & Deleting the ChatNames
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
@@ -488,10 +564,16 @@ function ChatPage() {
         LOCAL_GWRA_MAP_DATA && Object.keys(LOCAL_GWRA_MAP_DATA.states ?? {}).length > 0
           ? LOCAL_GWRA_MAP_DATA
           : await getGwraMapData();
-      const nextStates = response.states ?? {};
       const nextDistricts = response.districts ?? {};
+      const derivedStates = buildDerivedStateSummaries(nextDistricts);
+      const nextStates =
+        Object.keys(derivedStates).length > 0
+          ? derivedStates
+          : response.states ?? {};
+
       mapStatesDataRef.current = nextStates;
       mapDistrictsDataRef.current = nextDistricts;
+      derivedStateNamesRef.current = new Set(Object.keys(derivedStates));
       setMapStatesData(nextStates);
       setMapDistrictsData(nextDistricts);
     };
@@ -802,37 +884,44 @@ function ChatPage() {
     const placeLabel = districtSummary
       ? `${districtSummary.name}, ${districtSummary.state}`
       : stateSummary?.name || requestedPlace;
+    const isDerivedStateSummary =
+      !districtSummary &&
+      !!stateSummary &&
+      derivedStateNamesRef.current.has(stateSummary.name);
+    const stateAverageNote = isDerivedStateSummary
+      ? ' This state-level value is computed as the average of all district entries for that state in **GWRA_MapData.json**.'
+      : '';
 
     if (!summary) {
       return `I could not find a matching entry in **GWRA_MapData.json** for **${requestedPlace}**.`;
     }
 
     if (normalizedQuery.includes('groundwater level')) {
-      return `For **${placeLabel}**, **GWRA_MapData.json** does not contain a separate groundwater-level field. The closest available metric is **stage of groundwater extraction = ${formatMapNumber(summary.stage)}%**.`;
+      return `For **${placeLabel}**, **GWRA_MapData.json** does not contain a separate groundwater-level field. The closest available metric is **stage of groundwater extraction = ${formatMapNumber(summary.stage)}%**.${stateAverageNote}`;
     }
 
     if (normalizedQuery.includes('groundwater_level')) {
-      return `For **${placeLabel}**, **GWRA_MapData.json** does not contain a separate groundwater-level field. The closest available metric is **stage of groundwater extraction = ${formatMapNumber(summary.stage)}%**.`;
+      return `For **${placeLabel}**, **GWRA_MapData.json** does not contain a separate groundwater-level field. The closest available metric is **stage of groundwater extraction = ${formatMapNumber(summary.stage)}%**.${stateAverageNote}`;
     }
 
     if (normalizedQuery.includes('total recharge') || normalizedQuery.includes('total_recharge')) {
-      return `For **${placeLabel}**, **total annual groundwater recharge = ${formatMapNumber(summary.recharge, 'Ham')}**.`;
+      return `For **${placeLabel}**, **total annual groundwater recharge = ${formatMapNumber(summary.recharge, 'Ham')}**.${stateAverageNote}`;
     }
 
     if (normalizedQuery.includes('extractable')) {
-      return `For **${placeLabel}**, **annual extractable groundwater resource = ${formatMapNumber(summary.extractable, 'Ham')}**.`;
+      return `For **${placeLabel}**, **annual extractable groundwater resource = ${formatMapNumber(summary.extractable, 'Ham')}**.${stateAverageNote}`;
     }
 
     if (normalizedQuery.includes('extraction')) {
-      return `For **${placeLabel}**, **total groundwater extraction = ${formatMapNumber(summary.extraction, 'Ham')}**.`;
+      return `For **${placeLabel}**, **total groundwater extraction = ${formatMapNumber(summary.extraction, 'Ham')}**.${stateAverageNote}`;
     }
 
     if (normalizedQuery.includes('stage of groundwater extraction') || normalizedQuery.includes('stage')) {
-      return `For **${placeLabel}**, **stage of groundwater extraction = ${formatMapNumber(summary.stage)}%**. This is based on **extraction = ${formatMapNumber(summary.extraction, 'Ham')}** and **extractable = ${formatMapNumber(summary.extractable, 'Ham')}**.`;
+      return `For **${placeLabel}**, **stage of groundwater extraction = ${formatMapNumber(summary.stage)}%**. This is based on **extraction = ${formatMapNumber(summary.extraction, 'Ham')}** and **extractable = ${formatMapNumber(summary.extractable, 'Ham')}**.${stateAverageNote}`;
     }
 
     if (normalizedQuery.includes('categorization') || normalizedQuery.includes('category')) {
-      return `For **${placeLabel}**, **categorization = ${summary.worstCategory || formatStatusLabel(summary.status)}**.`;
+      return `For **${placeLabel}**, **categorization = ${summary.worstCategory || formatStatusLabel(summary.status)}**.${stateAverageNote}`;
     }
 
     return null;
@@ -883,10 +972,15 @@ function ChatPage() {
           LOCAL_GWRA_MAP_DATA && Object.keys(LOCAL_GWRA_MAP_DATA.states ?? {}).length > 0
             ? LOCAL_GWRA_MAP_DATA
             : await getGwraMapData();
-        const nextStates = response.states ?? {};
         const nextDistricts = response.districts ?? {};
+        const derivedStates = buildDerivedStateSummaries(nextDistricts);
+        const nextStates =
+          Object.keys(derivedStates).length > 0
+            ? derivedStates
+            : response.states ?? {};
         mapStatesDataRef.current = nextStates;
         mapDistrictsDataRef.current = nextDistricts;
+        derivedStateNamesRef.current = new Set(Object.keys(derivedStates));
         setMapStatesData(nextStates);
         setMapDistrictsData(nextDistricts);
       }
