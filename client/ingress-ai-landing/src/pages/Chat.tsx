@@ -1432,7 +1432,7 @@ function ChatPage() {
                                         }`}
                                     >
                                       <div className="flex items-start gap-2">
-                                        <span className="text-base leading-none">{SUGGESTION_ICONS[optionIndex % SUGGESTION_ICONS.length]}</span>
+                                        <span className="text-base leading-none">{['💧', '📊', '📍', '⚠️'][optionIndex % 4]}</span>
                                         <span className="text-sm leading-5">{option.label}</span>
                                       </div>
                                     </button>
