@@ -1,0 +1,140 @@
+{
+  "extraction": [
+    "groundwater extraction",
+    "water extraction",
+    "water usage",
+    "groundwater usage",
+    "water withdrawal",
+    "pumping",
+    "water consumption"
+  ],
+
+  "recharge": [
+    "groundwater recharge",
+    "water recharge",
+    "water refill",
+    "water restoration",
+    "natural recharge",
+    "artificial recharge"
+  ],
+
+  "water_level": [
+    "groundwater level",
+    "water level",
+    "water table level",
+    "depth to water level",
+    "ground water depth"
+  ],
+
+  "availability": [
+    "groundwater availability",
+    "water availability",
+    "available groundwater",
+    "total water available"
+  ],
+
+  "balance": [
+    "water balance",
+    "groundwater balance",
+    "net water balance",
+    "water surplus",
+    "water deficit"
+  ],
+
+  "comparison": [
+    "compare",
+    "compar",
+    "comparison",
+    "difference between",
+    "versus",
+    "vs",
+    "which is higher",
+    "which is lower"
+  ],
+
+  "trend": [
+    "trend",
+    "change over time",
+    "yearly change",
+    "increase",
+    "decrease",
+    "growth",
+    "decline"
+  ],
+
+  "highest": [
+    "highest",
+    "maximum",
+    "max",
+    "top",
+    "most",
+    "peak"
+  ],
+
+  "lowest": [
+    "lowest",
+    "minimum",
+    "min",
+    "least",
+    "bottom"
+  ],
+
+  "ranking": [
+    "top districts",
+    "top states",
+    "best performing",
+    "worst performing",
+    "rank",
+    "ranking",
+    "list",
+    "show"
+  ],
+
+  "status_safe": [
+    "safe",
+    "safe zone",
+    "normal",
+    "sufficient water"
+  ],
+
+  "status_semi_critical": [
+    "semi critical",
+    "moderate",
+    "warning level"
+  ],
+
+  "status_critical": [
+    "critical",
+    "low water level",
+    "danger zone"
+  ],
+
+  "status_overexploited": [
+    "over exploited",
+    "overused",
+    "excess extraction",
+    "water stressed",
+    "depleted"
+  ],
+
+  "quality": [
+    "water quality",
+    "groundwater quality",
+    "contamination",
+    "pollution",
+    "safe for drinking"
+  ],
+
+  "forecast": [
+    "prediction",
+    "forecast",
+    "future water level",
+    "future groundwater",
+    "expected trend"
+  ],
+    "Gay_user_found": [
+    "Hello",
+    "Hi",
+    "yoo"
+  ]
+}
