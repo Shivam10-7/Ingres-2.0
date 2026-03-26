@@ -26,12 +26,27 @@ for group_intents in INTENT_DB.values():
 # These keywords guarantee an intent fires regardless of semantic score
 
 HARD_TRIGGERS: Dict[str, List[str]] = {
-    "comparison": ["compare", "vs", "versus", "difference between", "and"],
-    "highest":    ["highest", "maximum", "max", "top", "most"],
-    "lowest":     ["lowest", "minimum", "min", "least"],
-    "trend":      ["trend", "increase", "decrease", "over time", "over the years", "growth", "decline"],
-    "forecast":   ["forecast", "predict", "future", "projected", "expected"],
-    "ranking":    ["rank", "ranking", "list", "show all", "top districts", "top states"],
+    "comparison":          ["compare", "vs", "versus", "difference between"],
+    "highest":             ["highest", "maximum", "max", "top", "most"],
+    "lowest":              ["lowest", "minimum", "min", "least"],
+    "trend":               ["trend", "increase", "decrease", "over time", "over the years", "growth", "decline"],
+    "forecast":            ["forecast", "predict", "future", "projected", "expected"],
+    "ranking":             ["rank", "ranking", "list", "show all", "top districts", "top states", "show me all"],
+    # ---- Status hard triggers (semantic alone is unreliable for short status terms) ----
+    "status_overexploited": ["over exploited", "overexploited", "overused", "depleted", "water stressed", "over extracted"],
+    "status_critical":      ["critical", "danger zone", "alarming"],
+    "status_semi_critical": ["semi critical", "semicritical", "moderate", "warning"],
+    "status_safe":          ["safe zone", "normal zone", "sufficient water"],
+}
+
+# ================= PER-GROUP THRESHOLDS =================
+# Status intents use short, specific phrases → lower semantic threshold needed
+
+GROUP_THRESHOLDS: Dict[str, float] = {
+    "metric":    0.50,
+    "operation": 0.50,
+    "status":    0.38,   # lower — status phrases score weakly via embeddings
+    "general":   0.55,
 }
 
 # ================= BUILD LOCATION INDEX =================
@@ -73,12 +88,6 @@ STOPWORDS = {
     "what", "how", "is", "are", "a", "an"
 }
 
-# Semantic threshold: only consider intents above this score
-SEMANTIC_THRESHOLD = 0.45
-
-# If best intent in a group scores above this, that group's intent fires
-GROUP_THRESHOLD = 0.50
-
 # ================= UTIL FUNCTIONS =================
 
 def generate_phrases(tokens: List[str]) -> List[str]:
@@ -110,9 +119,8 @@ def apply_hard_triggers(terms: List[str], intent_scores: Dict[str, float]) -> Di
 def detect_intents_by_group(intent_scores: Dict[str, float]) -> List[str]:
     """
     For each group in INTENT_DB, pick the best-scoring intent if it
-    exceeds GROUP_THRESHOLD. This allows one intent per group to fire,
-    enabling natural multi-intent combinations like:
-        comparison (operation) + recharge (metric) + water_level (metric)
+    exceeds that group's threshold. Uses GROUP_THRESHOLDS for per-group
+    sensitivity (status group has lower threshold since its phrases are short).
     """
     detected = []
 
@@ -125,17 +133,18 @@ def detect_intents_by_group(intent_scores: Dict[str, float]) -> List[str]:
         if not group_scores:
             continue
 
+        threshold   = GROUP_THRESHOLDS.get(group_name, 0.50)
         best_intent = max(group_scores, key=group_scores.get)
         best_score  = group_scores[best_intent]
 
-        if best_score >= GROUP_THRESHOLD:
+        if best_score >= threshold:
             detected.append(best_intent)
 
         # For metric group: also allow a secondary metric if it's strong enough
         # e.g. "compare extraction and recharge" → both extraction + recharge fire
         if group_name == "metric":
             for intent, score in sorted(group_scores.items(), key=lambda x: x[1], reverse=True):
-                if intent != best_intent and score >= GROUP_THRESHOLD and (best_score - score) < 0.12:
+                if intent != best_intent and score >= threshold and (best_score - score) < 0.12:
                     detected.append(intent)
 
     return list(dict.fromkeys(detected))  # preserve order, remove duplicates
