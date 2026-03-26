@@ -66,6 +66,7 @@ export async function sendChatRequest(
   try {
     const response = await fetch(`${API_BASE_URL}/chat`, {
       method: 'POST',
+      credentials: 'include', // Include cookies for session management
       headers: {
         'Content-Type': 'application/json',
       },
