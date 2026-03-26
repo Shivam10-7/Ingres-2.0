@@ -23,3 +23,11 @@ use : for Intent Extraction and Location classification
 
 2. / 
 use :health status
+
+{
+  status: 'resolved',
+  entities: [ { type: 'district', district: 'Pune', state: 'MAHARASHTRA' } ],
+  action: 'ok',
+  intent: 'resolve_location',
+  description: 'Resolved 1 location(s) from your query.'
+}

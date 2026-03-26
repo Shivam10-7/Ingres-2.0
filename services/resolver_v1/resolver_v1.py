@@ -256,8 +256,30 @@ def extract_intent_and_location(query: str) -> Dict:
     ]
 
     # ================= FINAL OUTPUT =================
+    # Status rules:
+    # - `resolved`: exactly one match found
+    # - `ambigous`: more than one match found
+    # - `not found`: no matches found
+    intent_status: str
+    if len(detected_intents) == 0:
+        intent_status = "not found"
+    elif len(detected_intents) == 1:
+        intent_status = "resolved"
+    else:
+        intent_status = "ambigous"
+
+    resolution_status: str
+    if len(final_locations) == 0:
+        resolution_status = "not found"
+    elif len(final_locations) == 1:
+        resolution_status = "resolved"
+    else:
+        resolution_status = "ambigous"
+
     return {
-        "query":     query,
-        "intents":   detected_intents,
-        "locations": final_locations
+        "query":             query,
+        "intent_status":     intent_status,
+        "status":           resolution_status,
+        "intents":          detected_intents,
+        "locations":        final_locations
     }
