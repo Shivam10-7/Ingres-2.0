@@ -23,6 +23,10 @@ import {
   Sun,
   Moon,
   Map as MapIcon,
+  Droplets,
+  BarChart2,
+  MapPin,
+  AlertTriangle,
 } from 'lucide-react';
 
 import {
@@ -57,7 +61,7 @@ const MODES = [
   { id: 'visualizer', label: 'Visualizer', description: 'Charts & graphs', icon: BarChart3 },
 ];
 
-const SUGGESTION_ICONS = ['💧', '📊', '📍', '⚠️'];
+
 
 const SAMPLE_DATA = [
   {
@@ -79,6 +83,8 @@ const SAMPLE_DATA = [
 type SuggestionOption = {
   label: string;
   prompt: string;
+  desc: string;
+  icon: React.FC<any>;
 };
 
 type ChatMessageItem = {
@@ -105,20 +111,28 @@ const LOCAL_GWRA_MAP_DATA = gwraMapDataJson as {
 
 const buildLocationSuggestions = (place: string): SuggestionOption[] => [
   {
-    label: `groundwater_level (${place})`,
+    label: `Groundwater Level`,
     prompt: `Give me groundwater level of ${place}`,
+    desc: `Check the stage of development in ${place}`,
+    icon: Droplets,
   },
   {
-    label: `total_recharge (${place})`,
+    label: `Total Recharge`,
     prompt: `Give me total recharge in ${place}`,
+    desc: `View annual replenishable water in ${place}`,
+    icon: BarChart2,
   },
   {
-    label: `stage (${place})`,
+    label: `Extraction Stage`,
     prompt: `Give me stage of groundwater extraction in ${place}`,
+    desc: `Current utilization percentage in ${place}`,
+    icon: MapPin,
   },
   {
-    label: `categorization (${place})`,
+    label: `Categorization`,
     prompt: `Give me groundwater categorization of ${place}`,
+    desc: `See the safety category for ${place}`,
+    icon: AlertTriangle,
   },
 ];
 
@@ -341,6 +355,9 @@ function ChatPage() {
   const mapStatesDataRef = useRef<Record<string, GwraMapSummary>>({});
   const mapDistrictsDataRef = useRef<Record<string, GwraMapSummary>>({});
   const derivedStateNamesRef = useRef<Set<string>>(new Set());
+  
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [isMapUsed, setIsMapUsed] = useState(false);
 
   //For Renaming & Deleting the ChatNames
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
@@ -378,6 +395,10 @@ function ChatPage() {
     setCurrentChatId(chatId);
     setMessages([]); // clear current ui
     setShowResults(false);
+    setSuggestions([]);
+    setIsMapUsed(false);
+    setIsChatLoading(true);
+
     const history = await getChatSessionHistory(chatId);
     if (history && history.messages) {
       const formattedMessages: ChatMessageItem[] = history.messages.map((m: any, i: number) => {
@@ -413,12 +434,17 @@ function ChatPage() {
         .find((msg) => msg.sender === 'bot' && msg.chartData);
       setLastChartData(lastBotChart?.chartData ?? null);
     }
+    
+    setIsChatLoading(false);
   };
 
   const handleNewChatClick = () => {
     setCurrentChatId(null);
     setMessages([]);
     setShowResults(false);
+    setSuggestions([]);
+    setIsMapUsed(false);
+    setIsChatLoading(false);
   };
   const [showDataPanel, setShowDataPanel] = useState(false);
   const [showResults, setShowResults] = useState(false);
@@ -695,6 +721,7 @@ function ChatPage() {
     setSuggestionContextLabel(stateName);
     setSuggestions(buildLocationSuggestions(stateName));
     setShowInlineMapOptions(false);
+    setIsMapUsed(true);
   };
 
   const handleMapDistrictSelect = async (districtName: string, stateName: string, _data?: any) => {
@@ -707,6 +734,7 @@ function ChatPage() {
     setSuggestionContextLabel(place);
     setSuggestions(buildLocationSuggestions(place));
     setShowInlineMapOptions(false);
+    setIsMapUsed(true);
   };
 
   const handleMapMessage = (text: string) => {
@@ -1283,7 +1311,17 @@ function ChatPage() {
                     touchAction: 'pan-y',
                   }}
                 >
-                  {messages.length === 0 ? (
+                  {isChatLoading ? (
+                    <div className="min-h-full flex flex-col items-center justify-center px-4 py-10 animate-fadeIn fade-in">
+                      <div className="relative w-14 h-14 mb-4">
+                        <div className={`absolute inset-0 border-[3px] rounded-full ${isLightMode ? 'border-blue-100' : 'border-blue-900/30'}`}></div>
+                        <div className={`absolute inset-0 border-[3px] rounded-full border-t-transparent animate-spin ${isLightMode ? 'border-blue-600' : 'border-blue-500'}`}></div>
+                      </div>
+                      <div className={`text-sm font-medium animate-pulse ${isLightMode ? 'text-slate-500' : 'text-blue-200/70'}`}>
+                        Fetching chat data...
+                      </div>
+                    </div>
+                  ) : messages.length === 0 ? (
                     <div className="min-h-full flex flex-col items-center justify-center px-4 py-10">
                       {/* Logo */}
                       <div className="mb-5">
@@ -1309,18 +1347,28 @@ function ChatPage() {
                       )}
 
                       {suggestions.length > 0 && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-[800px] w-full">
-                          {suggestions.map((suggestion, index) => {
-                            const icon = SUGGESTION_ICONS[index % SUGGESTION_ICONS.length];
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-[800px] w-full mt-2">
+                          {suggestions.map((suggestion) => {
+                            const IconCmp = suggestion.icon;
                             return (
                               <button
                                 key={suggestion.label}
                                 onClick={() => handleSend(suggestion.prompt)}
-                                className={`rounded-2xl border border-cyan-300/15 bg-[rgba(10,20,40,0.7)] p-4 text-left transition-all duration-300 hover:scale-[1.01] ${isLightMode ? 'hover:border-cyan-300/80 hover:bg-white/10' : 'hover:border-cyan-300/80 hover:bg-slate-800/30'}`}
+                                className={`rounded-xl border p-4 text-left transition-all duration-300 hover:-translate-y-1 ${
+                                  isLightMode 
+                                    ? 'border-slate-200 bg-white hover:border-blue-400 hover:shadow-md' 
+                                    : 'border-white/10 bg-[#0B1221] hover:border-cyan-400/50 hover:bg-[#111C33]'
+                                }`}
                               >
-                                <div className="text-2xl">{icon}</div>
-                                <div className="mt-2 text-base font-semibold text-white">{suggestion.label}</div>
-                                <div className="mt-1 text-xs text-cyan-100/80">{location?.city ? `${location.city}` : `${location?.state || 'India'}`}</div>
+                                <div className={`mb-3 ${isLightMode ? 'text-blue-600' : 'text-cyan-400'}`}>
+                                  <IconCmp className="w-5 h-5" />
+                                </div>
+                                <div className={`text-sm font-semibold mb-1 ${isLightMode ? 'text-slate-800' : 'text-white'}`}>
+                                  {suggestion.label}
+                                </div>
+                                <div className={`text-xs ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                  {suggestion.desc}
+                                </div>
                               </button>
                             );
                           })}
@@ -1459,25 +1507,28 @@ function ChatPage() {
                         </div>
                       )}
 
-                      {!showInlineMapOptions && suggestions.length > 0 && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {suggestions.map((suggestion, index) => {
-                            const icon = SUGGESTION_ICONS[index % SUGGESTION_ICONS.length];
+                      {!isChatLoading && messages.length > 0 && !showInlineMapOptions && isMapUsed && suggestions.length > 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                          {suggestions.map((suggestion) => {
+                            const IconCmp = suggestion.icon;
                             return (
                               <button
                                 key={`${suggestionContextLabel}-${suggestion.label}`}
                                 onClick={() => handleSend(suggestion.prompt)}
-                                className={`rounded-2xl border p-4 text-left transition-all duration-300 hover:scale-[1.01] ${isLightMode
-                                    ? 'border-slate-200 bg-white hover:border-cyan-400 hover:bg-cyan-50'
-                                    : 'border-cyan-300/15 bg-[rgba(10,20,40,0.7)] hover:border-cyan-300/80 hover:bg-slate-800/30'
-                                  }`}
+                                className={`rounded-xl border p-4 text-left transition-all duration-300 hover:-translate-y-1 ${
+                                  isLightMode 
+                                    ? 'border-slate-200 bg-white hover:border-blue-400 hover:shadow-md' 
+                                    : 'border-white/10 bg-[#0B1221] hover:border-cyan-400/50 hover:bg-[#111C33]'
+                                }`}
                               >
-                                <div className="text-2xl">{icon}</div>
-                                <div className={`mt-2 text-base font-semibold ${isLightMode ? 'text-slate-900' : 'text-white'}`}>
+                                <div className={`mb-3 ${isLightMode ? 'text-blue-600' : 'text-cyan-400'}`}>
+                                  <IconCmp className="w-5 h-5" />
+                                </div>
+                                <div className={`text-sm font-semibold mb-1 ${isLightMode ? 'text-slate-800' : 'text-white'}`}>
                                   {suggestion.label}
                                 </div>
-                                <div className={`mt-1 text-xs ${isLightMode ? 'text-slate-500' : 'text-cyan-100/80'}`}>
-                                  {suggestionContextLabel}
+                                <div className={`text-xs ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                  {suggestion.desc}
                                 </div>
                               </button>
                             );
