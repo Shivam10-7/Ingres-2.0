@@ -1,0 +1,197 @@
+Here’s a **clean, professional documentation-ready write-up** for your JalSathi project. You can directly use this in your **report / PPT / viva**.
+
+---
+
+# 📘 **Project Title: JalSathi – Intelligent Groundwater Data Chatbot**
+
+---
+
+# 🎯 **1. Project Overview**
+
+The main objective of the project is to create a chatbot system that can understand natural language queries related to groundwater data and provide accurate, structured responses.
+
+The system allows users to ask questions such as:
+
+* “Groundwater level in Pune”
+* “Compare extraction and recharge in Nagpur and Pune”
+
+and converts them into meaningful outputs using data processing and AI techniques.
+
+---
+
+# 🚀 **2. Motivation**
+
+* Current groundwater portals are **complex and not user-friendly**
+* Users require **technical knowledge** to query data
+* No support for **natural language queries**
+* Lack of **real-time intelligent insights**
+
+👉 JalSathi solves this by enabling **simple, conversational access to groundwater data**
+
+---
+
+# 🧠 **3. System Architecture**
+
+```text
+User Query
+   ↓
+Intent & Entity Extraction (Resolver)
+   ↓
+Query Understanding (Intent Classification + Location Detection)
+   ↓
+Query Planning (Mapping to SQL)
+   ↓
+Database Execution
+   ↓
+Response Generation (JSON / Visualization)
+```
+
+---
+
+# ⚙️ **4. Technology Stack**
+
+## 🔹 Frontend
+
+* (Planned) Web UI / Chat Interface
+* React / HTML / JS
+
+## 🔹 Backend
+
+* Python
+* FastAPI (API layer)
+
+## 🔹 Database
+
+* Structured groundwater dataset (State → District → Block)
+* JSON + SQL database (planned)
+
+## 🔹 AI / NLP
+
+* sentence-transformers (MiniLM model)
+* PyTorch
+* RapidFuzz
+
+---
+
+# 🔍 **5. Methodology**
+
+## 🔹 Step 1: Data Preparation
+
+* Hierarchical JSON created:
+
+  * State → District → Assessment Unit
+* Intent database (`intent_db.json`) created with domain-specific phrases
+
+---
+
+## 🔹 Step 2: Intent Detection
+
+* Query converted into embeddings using MiniLM
+* Compared with predefined intent phrases using cosine similarity
+* Top intent selected using ranking + threshold filtering
+
+---
+
+## 🔹 Step 3: Location Extraction
+
+* Tokenization + phrase generation (uni, bi, tri-grams)
+* Exact match using sets
+* Fuzzy matching using RapidFuzz
+* Stopword filtering to remove noise
+* Hierarchy mapping (Unit → District → State)
+
+---
+
+## 🔹 Step 4: Output Generation
+
+* Structured JSON returned:
+
+```json
+{
+  "intents": ["water_level"],
+  "locations": [
+    {
+      "type": "district",
+      "value": "PUNE",
+      "state": "MAHARASHTRA"
+    }
+  ]
+}
+```
+
+---
+
+## 🔹 Step 5: API Integration
+
+* FastAPI used to expose endpoints
+* `/extract` endpoint processes user queries
+* Swagger UI for testing
+
+---
+
+# ⚡ **6. Key Features Implemented**
+
+* ✅ Natural Language Query Processing
+* ✅ Multi-intent detection
+* ✅ Fuzzy location matching (handles typos)
+* ✅ Hierarchical data mapping
+* ✅ API-based architecture
+* ✅ Clean JSON output for further processing
+
+---
+
+# ⚠️ **7. Challenges Faced**
+
+### 🔹 1. SQL Query Generation
+
+Understanding user intent and converting it into accurate SQL queries was challenging.
+
+### 🔹 2. LLM Limitations
+
+LLMs are probabilistic and may produce inconsistent results, so deterministic logic was added.
+
+### 🔹 3. Location Resolution
+
+Handling multiple locations and fuzzy matching without noise required optimization.
+
+---
+
+# 🚀 **8. Current Status (Up-to-date Work)**
+
+* ✅ Resolver module (Intent + Location extraction) completed
+* ✅ Intent database designed and integrated
+* ✅ Fuzzy matching optimized
+* ✅ FastAPI server implemented
+* ✅ Basic testing completed with sample queries
+
+---
+
+# 🔮 **9. Future Enhancements**
+
+* 🌍 Multilingual support (Hindi / Marathi)
+* 🔊 Text-to-Speech output
+* 👤 Role-based responses (Admin / Public)
+* 📱 WhatsApp / SMS integration
+* 📊 Data visualization (graphs, maps)
+* 🤖 Full NL → SQL query engine
+
+---
+
+# 🏁 **10. Conclusion**
+
+JalSathi provides an intelligent and user-friendly interface for accessing groundwater data using natural language queries. The system bridges the gap between complex datasets and non-technical users by combining AI-based intent detection with efficient data processing techniques.
+
+---
+
+# 🧾 **One-Line Closing Statement**
+
+**“JalSathi transforms complex groundwater data into simple, conversational insights for better decision-making.”**
+
+---
+
+If you want, I can next:
+👉 Convert this into **PPT slides**
+👉 Translate into **Marathi (MSW format)**
+👉 Add **diagrams / flowcharts**
+
+Just tell 👍

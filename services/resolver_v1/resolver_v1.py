@@ -8,15 +8,33 @@ from sentence_transformers import SentenceTransformer, util
 
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
-# Load Intent DB
 with open("intent_db.json") as f:
-    INTENTS = json.load(f)
+    INTENT_DB = json.load(f)
 
-# Load Location DB
 with open("db.json") as f:
     DB = json.load(f)
 
-# ================= BUILD INDEX =================
+# ================= BUILD FLAT INTENT MAP =================
+# Flatten grouped intent_db into: { intent_name: [phrases] }
+
+INTENTS: Dict[str, List[str]] = {}
+for group_intents in INTENT_DB.values():
+    for intent_name, phrases in group_intents.items():
+        INTENTS[intent_name] = phrases
+
+# ================= HARD TRIGGER KEYWORDS =================
+# These keywords guarantee an intent fires regardless of semantic score
+
+HARD_TRIGGERS: Dict[str, List[str]] = {
+    "comparison": ["compare", "vs", "versus", "difference between", "and"],
+    "highest":    ["highest", "maximum", "max", "top", "most"],
+    "lowest":     ["lowest", "minimum", "min", "least"],
+    "trend":      ["trend", "increase", "decrease", "over time", "over the years", "growth", "decline"],
+    "forecast":   ["forecast", "predict", "future", "projected", "expected"],
+    "ranking":    ["rank", "ranking", "list", "show all", "top districts", "top states"],
+}
+
+# ================= BUILD LOCATION INDEX =================
 
 STATE_SET, DISTRICT_SET, UNIT_SET = set(), set(), set()
 DISTRICT_TO_STATE, UNIT_TO_DISTRICT, UNIT_TO_STATE = {}, {}, {}
@@ -36,11 +54,11 @@ for state_obj in DB["states"]:
             UNIT_TO_DISTRICT[u] = district
             UNIT_TO_STATE[u] = state
 
-STATE_LIST = list(STATE_SET)
+STATE_LIST    = list(STATE_SET)
 DISTRICT_LIST = list(DISTRICT_SET)
-UNIT_LIST = list(UNIT_SET)
+UNIT_LIST     = list(UNIT_SET)
 
-# ================= INTENT EMBEDDINGS =================
+# ================= PRECOMPUTE INTENT EMBEDDINGS =================
 
 intent_embeddings = {
     intent: model.encode(phrases, convert_to_tensor=True)
@@ -51,37 +69,76 @@ intent_embeddings = {
 
 STOPWORDS = {
     "water", "ground", "level", "data", "show", "give", "me",
-    "of", "in", "for", "and", "the", "table","city"
+    "of", "in", "for", "and", "the", "table", "city", "tell",
+    "what", "how", "is", "are", "a", "an"
 }
 
-INTENT_TYPE = {
-    "extraction": "metric",
-    "recharge": "metric",
-    "water_level": "metric",
+# Semantic threshold: only consider intents above this score
+SEMANTIC_THRESHOLD = 0.45
 
-    "highest": "operation",
-    "lowest": "operation",
-    "comparison": "operation",
-
-    "status_safe": "status",
-    "status_critical": "status",
-    "status_overexploited": "status",
-
-    "forecast": "analysis"
-}
+# If best intent in a group scores above this, that group's intent fires
+GROUP_THRESHOLD = 0.50
 
 # ================= UTIL FUNCTIONS =================
 
 def generate_phrases(tokens: List[str]) -> List[str]:
-    """Generate uni + bi + tri grams"""
-    bigrams = [" ".join([tokens[i], tokens[i+1]]) for i in range(len(tokens)-1)]
-    trigrams = [" ".join([tokens[i], tokens[i+1], tokens[i+2]]) for i in range(len(tokens)-2)]
+    """Generate unigrams + bigrams + trigrams from token list."""
+    bigrams  = [" ".join(tokens[i:i+2]) for i in range(len(tokens) - 1)]
+    trigrams = [" ".join(tokens[i:i+3]) for i in range(len(tokens) - 2)]
     return tokens + bigrams + trigrams
 
 
 def fuzzy_match(word: str, choices: List[str], threshold: int = 92):
-    match, score, _ = process.extractOne(word, choices)
-    return match if score >= threshold else None
+    """Fuzzy match a word against a list of choices. Returns match or None."""
+    result = process.extractOne(word, choices)
+    if result and result[1] >= threshold:
+        return result[0]
+    return None
+
+
+def apply_hard_triggers(terms: List[str], intent_scores: Dict[str, float]) -> Dict[str, float]:
+    """
+    Boost intent scores to 0.95 if any hard-trigger keyword is found in terms.
+    This ensures deterministic intents always fire.
+    """
+    for intent, keywords in HARD_TRIGGERS.items():
+        if any(kw in terms for kw in keywords):
+            intent_scores[intent] = max(intent_scores.get(intent, 0), 0.95)
+    return intent_scores
+
+
+def detect_intents_by_group(intent_scores: Dict[str, float]) -> List[str]:
+    """
+    For each group in INTENT_DB, pick the best-scoring intent if it
+    exceeds GROUP_THRESHOLD. This allows one intent per group to fire,
+    enabling natural multi-intent combinations like:
+        comparison (operation) + recharge (metric) + water_level (metric)
+    """
+    detected = []
+
+    for group_name, group_intents in INTENT_DB.items():
+        group_scores = {
+            intent: intent_scores.get(intent, 0.0)
+            for intent in group_intents
+        }
+
+        if not group_scores:
+            continue
+
+        best_intent = max(group_scores, key=group_scores.get)
+        best_score  = group_scores[best_intent]
+
+        if best_score >= GROUP_THRESHOLD:
+            detected.append(best_intent)
+
+        # For metric group: also allow a secondary metric if it's strong enough
+        # e.g. "compare extraction and recharge" → both extraction + recharge fire
+        if group_name == "metric":
+            for intent, score in sorted(group_scores.items(), key=lambda x: x[1], reverse=True):
+                if intent != best_intent and score >= GROUP_THRESHOLD and (best_score - score) < 0.12:
+                    detected.append(intent)
+
+    return list(dict.fromkeys(detected))  # preserve order, remove duplicates
 
 
 # ================= MAIN FUNCTION =================
@@ -92,51 +149,40 @@ def extract_intent_and_location(query: str) -> Dict:
 
     # -------- TOKENIZATION --------
     tokens = re.findall(r"\b\w+\b", query_clean)
-    terms = generate_phrases(tokens)
+    terms  = generate_phrases(tokens)
 
     # ================= INTENT DETECTION =================
+
     query_embedding = model.encode(query, convert_to_tensor=True)
 
-    intent_scores = {}
+    # Step 1: Compute semantic similarity scores
+    intent_scores: Dict[str, float] = {}
 
     for intent, emb in intent_embeddings.items():
         score = float(util.cos_sim(query_embedding, emb).max())
 
-        # Phrase boost
+        # Exact phrase boost (tighter than before — only full phrase matches)
         if any(term in INTENTS[intent] for term in terms):
-            score += 0.15
+            score = min(score + 0.12, 1.0)
 
         intent_scores[intent] = round(score, 3)
 
-    # -------- SORT INTENTS --------
-    sorted_intents = sorted(intent_scores.items(), key=lambda x: x[1], reverse=True)
+    # Step 2: Apply hard keyword triggers (deterministic override)
+    intent_scores = apply_hard_triggers(terms, intent_scores)
 
-    # -------- TAKE BEST INTENT --------
-    detected_intents = []
-
-    best_intent, best_score = sorted_intents[0]
-
-    # Rule 1: Always take top intent if strong
-    if best_score >= 0.5:
-        detected_intents.append(best_intent)
-
-    # Rule 2: Take second intent ONLY if very close
-    if len(sorted_intents) > 1:
-        second_intent, second_score = sorted_intents[1]
-
-        if second_score >= 0.5 and (best_score - second_score) < 0.1:
-            detected_intents.append(second_intent)
+    # Step 3: Group-aware multi-intent selection
+    detected_intents = detect_intents_by_group(intent_scores)
 
     # ================= LOCATION EXTRACTION =================
+
     found = []
 
     for word in terms:
 
-        # Skip noise
         if word in STOPWORDS or len(word) <= 3:
             continue
 
-        # ---- Exact Match ----
+        # ---- Exact Match (fastest path) ----
         if word in STATE_SET:
             found.append({"type": "state", "value": word.upper()})
             continue
@@ -158,11 +204,11 @@ def extract_intent_and_location(query: str) -> Dict:
             })
             continue
 
-        # ---- Fuzzy Match ----
+        # ---- Fuzzy Match (fallback for typos) ----
         for typ, dataset in [
-            ("state", STATE_LIST),
+            ("state",    STATE_LIST),
             ("district", DISTRICT_LIST),
-            ("unit", UNIT_LIST)
+            ("unit",     UNIT_LIST)
         ]:
             match = fuzzy_match(word, dataset)
 
@@ -186,23 +232,23 @@ def extract_intent_and_location(query: str) -> Dict:
                     })
                 break
 
-    # -------- REMOVE DUPLICATES --------
-    unique_locations = [dict(t) for t in {tuple(d.items()) for d in found}]
+    # -------- DEDUPLICATION --------
+    unique_locations = list({tuple(sorted(d.items())): d for d in found}.values())
 
-    # -------- PRIORITY CLEANUP --------
-    final_locations = []
+    # -------- PRIORITY: prefer districts over states --------
+    # If any district found, drop plain state entries whose state matches
+    district_states = {
+        loc["state"] for loc in unique_locations if loc["type"] == "district"
+    }
 
-    for loc in unique_locations:
-        if loc["type"] == "district":
-            final_locations = [loc]
-            break
-    else:
-        final_locations = unique_locations
+    final_locations = [
+        loc for loc in unique_locations
+        if not (loc["type"] == "state" and loc["value"] in district_states)
+    ]
 
     # ================= FINAL OUTPUT =================
     return {
-        "query": query,
-        "intents": detected_intents,
-        # "intent_scores": intent_scores,   
+        "query":     query,
+        "intents":   detected_intents,
         "locations": final_locations
     }
