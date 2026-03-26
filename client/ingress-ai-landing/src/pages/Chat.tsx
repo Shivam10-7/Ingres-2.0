@@ -691,27 +691,10 @@ function ChatPage() {
     if (!stateName) return;
     setMapSelection({ state: stateName });
 
-    const userMsg: ChatMessageItem = {
-      id: crypto.randomUUID(),
-      text: stateName,
-      sender: 'user',
-      timestamp: new Date(),
-    };
-    setMessages(prev => [...prev, userMsg]);
-
     setLastChartData(null);
     setSuggestionContextLabel(stateName);
     setSuggestions(buildLocationSuggestions(stateName));
-    setShowInlineMapOptions(true);
-
-    const botMsg: ChatMessageItem = {
-      id: crypto.randomUUID(),
-      text: `Choose one option for ${stateName}:`,
-      sender: 'bot',
-      timestamp: new Date(),
-      options: buildLocationSuggestions(stateName),
-    };
-    setMessages(prev => [...prev, botMsg]);
+    setShowInlineMapOptions(false);
   };
 
   const handleMapDistrictSelect = async (districtName: string, stateName: string, _data?: any) => {
@@ -720,27 +703,10 @@ function ChatPage() {
 
     const place = `${districtName}, ${stateName}`;
 
-    const userMsg: ChatMessageItem = {
-      id: crypto.randomUUID(),
-      text: place,
-      sender: 'user',
-      timestamp: new Date(),
-    };
-    setMessages(prev => [...prev, userMsg]);
-
     setLastChartData(null);
     setSuggestionContextLabel(place);
     setSuggestions(buildLocationSuggestions(place));
-    setShowInlineMapOptions(true);
-
-    const botMsg: ChatMessageItem = {
-      id: crypto.randomUUID(),
-      text: `Choose one option for ${place}:`,
-      sender: 'bot',
-      timestamp: new Date(),
-      options: buildLocationSuggestions(place),
-    };
-    setMessages(prev => [...prev, botMsg]);
+    setShowInlineMapOptions(false);
   };
 
   const handleMapMessage = (text: string) => {
@@ -1203,6 +1169,7 @@ function ChatPage() {
                     editedName={editedName}
                     setEditedName={setEditedName}
                     setChats={setChats}
+                    currentChatId={currentChatId}
                     menuOpenChatId={menuOpenChatId}
                     setMenuOpenChatId={setMenuOpenChatId}
                     setDeleteChatId={setDeleteChatId}
@@ -1235,6 +1202,7 @@ function ChatPage() {
                   editedName={editedName}
                   setEditedName={setEditedName}
                   setChats={setChats}
+                  currentChatId={currentChatId}
                   menuOpenChatId={menuOpenChatId}
                   setMenuOpenChatId={setMenuOpenChatId}
                   setDeleteChatId={setDeleteChatId}
@@ -1582,27 +1550,39 @@ function ChatPage() {
 
                                 {/* Checkboxes only for specific modes */}
                                 {mode.id === "deep" && (
-                                  <input
-                                    type="checkbox"
-                                    checked={isDetailedResponseNeeded}
-                                    onChange={(e) => {
-                                      e.stopPropagation()
-                                      setIsDetailedResponseNeeded(e.target.checked)
+                                  <div
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setIsDetailedResponseNeeded(!isDetailedResponseNeeded);
                                     }}
-                                    className="accent-blue-500"
-                                  />
+                                    className={`relative w-8 h-[18px] rounded-full p-0.5 cursor-pointer transition-colors shrink-0 ${
+                                      isDetailedResponseNeeded ? 'bg-blue-500' : 'bg-white/20 hover:bg-white/30'
+                                    }`}
+                                  >
+                                    <div
+                                      className={`w-3.5 h-3.5 bg-white rounded-full shadow-sm transition-transform ${
+                                        isDetailedResponseNeeded ? 'translate-x-[14px]' : 'translate-x-0'
+                                      }`}
+                                    />
+                                  </div>
                                 )}
 
                                 {mode.id === "visualizer" && (
-                                  <input
-                                    type="checkbox"
-                                    checked={isVisualizationNeeded}
-                                    onChange={(e) => {
-                                      e.stopPropagation()
-                                      setIsVisualizationNeeded(e.target.checked)
+                                  <div
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setIsVisualizationNeeded(!isVisualizationNeeded);
                                     }}
-                                    className="accent-blue-500"
-                                  />
+                                    className={`relative w-8 h-[18px] rounded-full p-0.5 cursor-pointer transition-colors shrink-0 ${
+                                      isVisualizationNeeded ? 'bg-blue-500' : 'bg-white/20 hover:bg-white/30'
+                                    }`}
+                                  >
+                                    <div
+                                      className={`w-3.5 h-3.5 bg-white rounded-full shadow-sm transition-transform ${
+                                        isVisualizationNeeded ? 'translate-x-[14px]' : 'translate-x-0'
+                                      }`}
+                                    />
+                                  </div>
                                 )}
 
                               </button>

@@ -838,3 +838,44 @@
   0%, 100% { box-shadow: 0 0 8px var(--glow-soft); }
   50%       { box-shadow: 0 0 20px var(--glow); }
 }
+
+/* ── LIGHT MODE OVERRIDES ─────────────────────────────────── */
+.map-container.light-mode {
+  --text: #0f172a;
+  --text2: #334155;
+  --muted: #475569;
+  --border: rgba(15, 23, 42, 0.15);
+  --border2: rgba(15, 23, 42, 0.25);
+  --accent: #0284c7;
+  --panel: #ffffff;
+  --panel2: #f8fafc;
+}
+
+.map-container.light-mode .mapBadge {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1), 0 0 0 1px var(--border);
+}
+
+.map-container.light-mode .mb-z {
+  color: #0f172a;
+}
+
+.map-container.light-mode .tt-inner {
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15), 0 0 0 1px var(--border);
+}
+
+.map-container.light-mode .tt-inner::before {
+  background: linear-gradient(90deg, transparent, rgba(5, 12, 156, 0.4), transparent);
+}
+
+.map-container.light-mode :global(.mapboxgl-popup-content) {
+  background: rgba(255, 255, 255, 0.98) !important;
+  color: var(--text) !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15), 0 0 0 1px var(--border) !important;
+}
+
+.map-container.light-mode :global(.mapboxgl-popup-tip) {
+  border-top-color: rgba(255, 255, 255, 0.98) !important;
+}
+

@@ -23,6 +23,7 @@ export type ChatSidebarContentProps = {
   editedName: string;
   setEditedName: (v: string) => void;
   setChats: React.Dispatch<React.SetStateAction<ChatSession[]>>;
+  currentChatId: string | null;
   menuOpenChatId: string | null;
   setMenuOpenChatId: (id: string | null) => void;
   setDeleteChatId: (id: string | null) => void;
@@ -40,6 +41,7 @@ export function ChatSidebarContent({
   editedName,
   setEditedName,
   setChats,
+  currentChatId,
   menuOpenChatId,
   setMenuOpenChatId,
   setDeleteChatId,
@@ -102,8 +104,10 @@ export function ChatSidebarContent({
           {chats.map((chat) => (
             <div
               key={chat._id}
-              className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
-                isLightMode ? 'hover:bg-slate-200/70' : 'hover:bg-white/5'
+              className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 border ${
+                currentChatId === chat.chatId
+                  ? (isLightMode ? 'bg-slate-200/50 border-blue-500/50 shadow-sm' : 'bg-white/10 border-blue-400/50 shadow-sm')
+                  : (isLightMode ? 'border-transparent hover:bg-slate-200/70' : 'border-transparent hover:bg-white/5')
               }`}
             >
               <button onClick={() => loadChat(chat.chatId)} className="flex items-center gap-3 flex-1 text-left">

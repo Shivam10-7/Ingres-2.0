@@ -298,7 +298,12 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
 
   const showStateTooltip = useCallback((name: string) => {
     const d = getStateData(name);
-    const glowColor = d ? statusGlowColor(d.status) : MAP_HOVER_ACCENT;
+    let glowColor = MAP_HOVER_ACCENT;
+    if (d) {
+      if (mapTheme === 'light') glowColor = d.status === 'critical' ? '#1e3a8a' : d.status === 'caution' ? '#1d4ed8' : '#0284c7';
+      else glowColor = statusGlowColor(d.status);
+    } else if (mapTheme === 'light') glowColor = '#0369a1';
+
     const badge = d
       ? `<span class="badge b-${d.status}">${d.status.toUpperCase()}</span>`
       : '';
@@ -321,7 +326,12 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
 
   const showDistrictTooltip = useCallback((district: string, state: string) => {
     const d = getDistrictData(district, state);
-    const glowColor = d ? statusGlowColor(d.status) : MAP_HOVER_ACCENT;
+    let glowColor = MAP_HOVER_ACCENT;
+    if (d) {
+      if (mapTheme === 'light') glowColor = d.status === 'critical' ? '#1e3a8a' : d.status === 'caution' ? '#1d4ed8' : '#0284c7';
+      else glowColor = statusGlowColor(d.status);
+    } else if (mapTheme === 'light') glowColor = '#0369a1';
+
     const badge = d
       ? `<span class="badge b-${d.status}">${d.status.toUpperCase()}</span>`
       : '';
@@ -929,7 +939,12 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
         const district = feat.properties.district as string;
         const state    = feat.properties.st_nm    as string;
         const gwData   = getDistrictData(district, state);
-        const glowColor = gwData ? statusGlowColor(gwData.status) : MAP_HOVER_ACCENT;
+        
+        let glowColor = MAP_HOVER_ACCENT;
+        if (gwData) {
+          if (mapTheme === 'light') glowColor = gwData.status === 'critical' ? '#1e3a8a' : gwData.status === 'caution' ? '#1d4ed8' : '#0284c7';
+          else glowColor = statusGlowColor(gwData.status);
+        } else if (mapTheme === 'light') glowColor = '#0369a1';
 
         if (selectedDistrictIdRef.current === id) {
           map.current!.setFeatureState({ source: 'city-boundaries', id }, { selected: false });
@@ -1113,7 +1128,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
   // ─── RENDER ───────────────────────────────────────────────────────────────
   return (
     <div
-      className="map-container h-full w-full relative"
+      className={`map-container h-full w-full relative ${mapTheme === 'light' ? 'light-mode' : ''}`}
       style={{ display: isVisible ? 'block' : 'none' }}
     >
       {/* Vignette overlay — cinematic edge darkening */}
@@ -1146,11 +1161,11 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
           {hierarchyLevel === 'district' && <><span className="mb-icon" style={{ color: statusGlowColor('caution') }}>◆</span> <span className="mb-z">{currentDistrict}</span></>}
         </div>
         <div className="mb-coords">
-          <span style={{color:'rgba(199,236,255,0.55)'}}>Z</span> {zoom}
+          <span style={{color: mapTheme === 'light' ? 'rgba(5,12,156,0.6)' : 'rgba(199,236,255,0.55)'}}>Z</span> <span style={{color: mapTheme === 'light' ? '#000' : 'inherit'}}>{zoom}</span>
           &nbsp;·&nbsp;
-          <span style={{color:'rgba(199,236,255,0.55)'}}>N</span> {coords.lat}°
+          <span style={{color: mapTheme === 'light' ? 'rgba(5,12,156,0.6)' : 'rgba(199,236,255,0.55)'}}>N</span> <span style={{color: mapTheme === 'light' ? '#000' : 'inherit'}}>{coords.lat}°</span>
           &nbsp;
-          <span style={{color:'rgba(199,236,255,0.55)'}}>E</span> {coords.lng}°
+          <span style={{color: mapTheme === 'light' ? 'rgba(5,12,156,0.6)' : 'rgba(199,236,255,0.55)'}}>E</span> <span style={{color: mapTheme === 'light' ? '#000' : 'inherit'}}>{coords.lng}°</span>
         </div>
         {hierarchyLevel !== 'india' && (
           <button onClick={resetMap} className="mb-reset-btn">
