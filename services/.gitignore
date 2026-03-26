@@ -6,3 +6,4 @@ venv
 *.pyo
 /myvenv
 myvenv
+myvenv/

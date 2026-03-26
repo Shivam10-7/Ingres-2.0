@@ -1,15 +1,41 @@
 const jwt = require('jsonwebtoken');
 
 function AuthJwt(req, res, next) {
-    const token = req.cookies.jwt;  // <-- direct read
+    console.log("Middleware START");
+    try {
+        let token;
 
-    if (!token) return res.sendStatus(401);
+        // 1. Get token from cookie
+        if (req.cookies && req.cookies.jwt) {
+            token = req.cookies.jwt;
+        }
 
-    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-        if (err) return res.sendStatus(403);
-        req.user = user;
+        // 2. Fallback: Authorization header
+        else if (req.headers.authorization?.startsWith("Bearer ")) {
+            token = req.headers.authorization.split(" ")[1];
+        }
+
+        if (!token) {
+            return res.status(401).json({ error: "Access denied. No token provided." });
+        }
+        console.log("TOKEN:", token);
+        // 3. Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        // ✅ 4. Attach decoded data to request
+        req.user = {
+            userId: decoded.userId,
+            email: decoded.email,
+        };
+        console.log("Middleware BEFORE NEXT");
         next();
-    });
-}
+
+    } catch (err) {
+        console.error("AUTH ERROR:", err);
+
+        return res.status(401).json({
+            error: "Invalid or expired token",
+        });
+    }
+};
 
 module.exports = AuthJwt;
