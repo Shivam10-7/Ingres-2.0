@@ -24,7 +24,7 @@
                                           "worstCategory":  "Over Exploited",
                                           "categoryRank":  4,
                                           "stage":  29.98,
-                                          "status":  "critical"
+                                          "status":  "semi-critical"
                                       },
                    "Arunachal Pradesh":  {
                                              "name":  "Arunachal Pradesh",
@@ -84,7 +84,7 @@
                                         "worstCategory":  "Critical",
                                         "categoryRank":  3,
                                         "stage":  47.32,
-                                        "status":  "critical"
+                                        "status":  "semi-critical"
                                     },
                    "Dadra And Nagar Haveli":  {
                                                   "name":  "Dadra And Nagar Haveli",
@@ -144,7 +144,7 @@
                                    "worstCategory":  "Over Exploited",
                                    "categoryRank":  4,
                                    "stage":  54.21,
-                                   "status":  "critical"
+                                   "status":  "semi-critical"
                                },
                    "Haryana":  {
                                    "name":  "Haryana",
@@ -216,7 +216,7 @@
                                   "worstCategory":  "Critical",
                                   "categoryRank":  3,
                                   "stage":  53.78,
-                                  "status":  "critical"
+                                  "status":  "semi-critical"
                               },
                    "Ladakh":  {
                                   "name":  "Ladakh",
@@ -252,7 +252,7 @@
                                           "worstCategory":  "Over Exploited",
                                           "categoryRank":  4,
                                           "stage":  58.4,
-                                          "status":  "critical"
+                                          "status":  "semi-critical"
                                       },
                    "Maharashtra":  {
                                        "name":  "Maharashtra",
@@ -264,7 +264,7 @@
                                        "worstCategory":  "Over Exploited",
                                        "categoryRank":  4,
                                        "stage":  52.99,
-                                       "status":  "critical"
+                                       "status":  "semi-critical"
                                    },
                    "Manipur":  {
                                    "name":  "Manipur",
@@ -420,7 +420,7 @@
                                          "worstCategory":  "Over Exploited",
                                          "categoryRank":  4,
                                          "stage":  70.45,
-                                         "status":  "critical"
+                                         "status":  "semi-critical"
                                      },
                    "Uttarakhand":  {
                                        "name":  "Uttarakhand",

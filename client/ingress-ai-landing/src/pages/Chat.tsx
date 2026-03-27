@@ -753,6 +753,8 @@ function ChatPage() {
     setMessages(prev => [...prev, botMsg]);
   };
 
+  const isMapModeActive = isMapNeeded;
+
   // Handle logout
   const handleLogout = async () => {
     try {
@@ -943,6 +945,8 @@ function ChatPage() {
   };
 
   const handleSend = async (overrideText?: string) => {
+    if (isMapModeActive && !overrideText) return;
+
     const textToSend = overrideText?.trim() || inputValue.trim();
     if (!textToSend) return;
 
@@ -1708,18 +1712,19 @@ function ChatPage() {
                           // ensure latest messages are visible when keyboard shows
                           setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
                         }}
-                        placeholder="Type your message..."
+                        placeholder={isMapModeActive ? 'Custom prompts are temporarily disabled in map mode' : 'Type your message...'}
+                        disabled={isMapModeActive}
                         className={`flex-1 bg-transparent text-sm py-3 px-2 focus:outline-none ${isLightMode
-                          ? 'text-slate-800 placeholder:text-slate-400'
-                          : 'text-white placeholder:text-white/40'
+                          ? 'text-slate-800 placeholder:text-slate-400 disabled:text-slate-400 disabled:placeholder:text-slate-400'
+                          : 'text-white placeholder:text-white/40 disabled:text-white/40 disabled:placeholder:text-white/30'
                           }`}
                       />
 
                       {/* Send Button */}
                       <button
                         onClick={() => handleSend()}
-                        disabled={!inputValue.trim()}
-                        className={`px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${inputValue.trim()
+                        disabled={isMapModeActive || !inputValue.trim()}
+                        className={`px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${!isMapModeActive && inputValue.trim()
                           ? 'bg-blue-600 hover:bg-blue-500 text-white'
                           : 'bg-white/5 text-white/30 cursor-not-allowed'
                           }`}

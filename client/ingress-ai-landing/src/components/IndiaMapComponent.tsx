@@ -174,6 +174,57 @@ function formatHam(value?: number | null) {
   });
 }
 
+function normalizeCategoryValue(value?: string | null) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getEntrySeverity(entry?: Partial<GwraMapSummary> | null): 'safe' | 'caution' | 'critical' | 'unknown' {
+  if (!entry) return 'unknown';
+
+  if (typeof entry.categoryRank === 'number' && !Number.isNaN(entry.categoryRank)) {
+    if (entry.categoryRank >= 3) return 'critical';
+    if (entry.categoryRank >= 2) return 'caution';
+    return 'safe';
+  }
+
+  const normalizedCategory = normalizeCategoryValue(entry.worstCategory);
+  if (normalizedCategory === 'safe') return 'safe';
+  if (normalizedCategory === 'semi critical') return 'caution';
+  if (normalizedCategory === 'critical' || normalizedCategory === 'over exploited') return 'critical';
+
+  const normalizedStatus = normalizeCategoryValue(entry.status);
+  if (normalizedStatus === 'safe') return 'safe';
+  if (normalizedStatus === 'caution' || normalizedStatus === 'semi critical') return 'caution';
+  if (normalizedStatus === 'critical' || normalizedStatus === 'over exploited') return 'critical';
+
+  return 'unknown';
+}
+
+function getEntryStatusLabel(entry?: Partial<GwraMapSummary> | null) {
+  if (!entry) return 'UNKNOWN';
+
+  const normalizedStatus = normalizeCategoryValue(entry.status);
+  if (normalizedStatus === 'safe') return 'Safe';
+  if (normalizedStatus === 'caution' || normalizedStatus === 'semi critical') return 'Semi Critical';
+  if (normalizedStatus === 'critical') return 'Critical';
+  if (normalizedStatus === 'over exploited') return 'Over Exploited';
+
+  const normalizedCategory = normalizeCategoryValue(entry.worstCategory);
+  if (normalizedCategory) {
+    return normalizedCategory.replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  const severity = getEntrySeverity(entry);
+  if (severity === 'caution') return 'Semi Critical';
+  if (severity === 'critical') return 'Critical';
+  if (severity === 'safe') return 'Safe';
+  return 'Unknown';
+}
+
 function geomBounds(geom: any): [number, number, number, number] {
   let minLng = 180, minLat = 90, maxLng = -180, maxLat = -90;
   function processCoords(coords: any) {
@@ -298,9 +349,10 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
 
   const showStateTooltip = useCallback((name: string) => {
     const d = getStateData(name);
-    const glowColor = d ? statusGlowColor(d.status) : MAP_HOVER_ACCENT;
+    const severity = getEntrySeverity(d);
+    const glowColor = d ? statusGlowColor(severity) : MAP_HOVER_ACCENT;
     const badge = d
-      ? `<span class="badge b-${d.status}">${d.status.toUpperCase()}</span>`
+      ? `<span class="badge b-${severity}">${getEntryStatusLabel(d).toUpperCase()}</span>`
       : '';
     if (ttInnerRef.current) {
       ttInnerRef.current.innerHTML = `
@@ -321,9 +373,10 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
 
   const showDistrictTooltip = useCallback((district: string, state: string) => {
     const d = getDistrictData(district, state);
-    const glowColor = d ? statusGlowColor(d.status) : MAP_HOVER_ACCENT;
+    const severity = getEntrySeverity(d);
+    const glowColor = d ? statusGlowColor(severity) : MAP_HOVER_ACCENT;
     const badge = d
-      ? `<span class="badge b-${d.status}">${d.status.toUpperCase()}</span>`
+      ? `<span class="badge b-${severity}">${getEntryStatusLabel(d).toUpperCase()}</span>`
       : '';
     if (ttInnerRef.current) {
       ttInnerRef.current.innerHTML = `
@@ -423,7 +476,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
           p._name = p.NAME_1 || p.ST_NM || p.name || p.state || 'Unknown';
           // Pre-attach status for paint expressions
           const gwData = getStateData(p._name);
-          p._status = gwData?.status || 'unknown';
+          p._status = getEntrySeverity(gwData);
         });
       } catch (e) {
         console.error('State GeoJSON load failed', e);
@@ -744,7 +797,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
             ...f,
             properties: {
               ...f.properties,
-              gw_status: gw?.status || 'unknown',
+              gw_status: getEntrySeverity(gw),
               gw_stage: gw?.stage ?? null,
               gw_recharge: gw?.recharge ?? null,
               gw_extractable: gw?.extractable ?? null,
@@ -929,7 +982,8 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
         const district = feat.properties.district as string;
         const state    = feat.properties.st_nm    as string;
         const gwData   = getDistrictData(district, state);
-        const glowColor = gwData ? statusGlowColor(gwData.status) : MAP_HOVER_ACCENT;
+        const severity = getEntrySeverity(gwData);
+        const glowColor = gwData ? statusGlowColor(severity) : MAP_HOVER_ACCENT;
 
         if (selectedDistrictIdRef.current === id) {
           map.current!.setFeatureState({ source: 'city-boundaries', id }, { selected: false });
@@ -958,11 +1012,11 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
           ? `<span class="popup-status-badge" style="
                display:inline-block;margin-top:8px;padding:3px 10px;border-radius:12px;
                font-size:9px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;
-               background:${gwData.status==='critical'?'rgba(255,77,109,0.15)':gwData.status==='caution'?'rgba(245,166,35,0.15)':'rgba(0,229,160,0.15)'};
+               background:${severity==='critical'?'rgba(255,77,109,0.15)':severity==='caution'?'rgba(245,166,35,0.15)':'rgba(0,229,160,0.15)'};
                color:${glowColor};
                border:1px solid ${glowColor}40;
                box-shadow: 0 0 8px ${glowColor}30;
-             ">${gwData.status.toUpperCase()}</span>`
+             ">${getEntryStatusLabel(gwData).toUpperCase()}</span>`
           : '';
 
         activePopup.current = new mapboxgl.Popup({
@@ -1073,7 +1127,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
           ...f,
           properties: {
             ...f.properties,
-            gw_status: gw?.status || 'unknown',
+            gw_status: getEntrySeverity(gw),
             gw_stage: gw?.stage ?? null,
             gw_recharge: gw?.recharge ?? null,
             gw_extractable: gw?.extractable ?? null,
