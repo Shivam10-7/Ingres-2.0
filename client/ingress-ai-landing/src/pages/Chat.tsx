@@ -77,7 +77,12 @@ const MODES = [
   },
 ];
 
-const SUGGESTION_ICONS = ["💧", "📊", "📍", "⚠️"];
+const SUGGESTION_ICONS = [
+  <Database className="w-6 h-6 text-blue-500" />,
+  <BarChart3 className="w-6 h-6 text-blue-500" />,
+  <MapIcon className="w-6 h-6 text-blue-500" />,
+  <Shield className="w-6 h-6 text-blue-500" />,
+];
 
 const STATES = ["Gujarat", "Rajasthan", "Maharashtra", "Madhya Pradesh"];
 const DISTRICTS = ["Ahmedabad", "Vadodara", "Surat", "Rajkot"];
@@ -116,19 +121,19 @@ type ChatMessageItem = {
 
 const buildLocationSuggestions = (place: string): SuggestionOption[] => [
   {
-    label: `groundwater_level (${place})`,
+    label: `Ground Water-Level (${place})`,
     prompt: `Give me groundwater level of ${place}`,
   },
   {
-    label: `total_recharge (${place})`,
+    label: `Total Recharge (${place})`,
     prompt: `Give me total recharge in ${place}`,
   },
   {
-    label: `stage (${place})`,
+    label: `Stage (${place})`,
     prompt: `Give me stage of groundwater extraction in ${place}`,
   },
   {
-    label: `categorization (${place})`,
+    label: `Categorization (${place})`,
     prompt: `Give me groundwater categorization of ${place}`,
   },
 ];
@@ -1041,13 +1046,30 @@ function ChatPage() {
                               <button
                                 key={suggestion.label}
                                 onClick={() => handleSend(suggestion.prompt)}
-                                className={`rounded-2xl border border-cyan-300/15 bg-[rgba(10,20,40,0.7)] p-4 text-left transition-all duration-300 hover:scale-[1.01] ${isLightMode ? "hover:border-cyan-300/80 hover:bg-white/10" : "hover:border-cyan-300/80 hover:bg-slate-800/30"}`}
+                                className={`rounded-2xl border p-5 text-left transition-all duration-200 shadow-sm
+${
+  isLightMode
+    ? "border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50"
+    : "border-cyan-300/15 bg-[rgba(10,20,40,0.7)] hover:border-cyan-300/80 hover:bg-slate-800/30"
+}`}
                               >
-                                <div className="text-2xl">{icon}</div>
-                                <div className="mt-2 text-base font-semibold text-white">
+                                <div className="text-blue-100">{icon}</div>
+                                <div
+                                  className={`mt-2 text-base font-semibold ${
+                                    isLightMode
+                                      ? "text-slate-900"
+                                      : "text-white"
+                                  }`}
+                                >
                                   {suggestion.label}
                                 </div>
-                                <div className="mt-1 text-xs text-cyan-100/80">
+                                <div
+                                  className={`mt-1 text-xs ${
+                                    isLightMode
+                                      ? "text-slate-500"
+                                      : "text-cyan-100/80"
+                                  }`}
+                                >
                                   {location?.city
                                     ? `${location.city}`
                                     : `${location?.state || "India"}`}
@@ -1271,7 +1293,7 @@ function ChatPage() {
                                     : "border-cyan-300/15 bg-[rgba(10,20,40,0.7)] hover:border-cyan-300/80 hover:bg-slate-800/30"
                                 }`}
                               >
-                                <div className="text-2xl">{icon}</div>
+                                <div className="text-blue-100">{icon}</div>
                                 <div
                                   className={`mt-2 text-base font-semibold ${isLightMode ? "text-slate-900" : "text-white"}`}
                                 >
