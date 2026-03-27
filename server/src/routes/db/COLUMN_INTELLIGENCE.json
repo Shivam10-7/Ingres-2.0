@@ -1,0 +1,161 @@
+{
+  "table": "ingresdata2025",
+
+  "dimensions": {
+    "state": {
+      "type": "geography",
+      "level": "state"
+    },
+    "district": {
+      "type": "geography",
+      "level": "district"
+    },
+    "assessment unit name": {
+      "type": "geography",
+      "level": "block"
+    },
+    "assessment unit type": {
+      "type": "classification"
+    },
+    "categorization": {
+      "type": "status",
+      "allowed_values": [
+        "safe",
+        "semi-critical",
+        "critical",
+        "over-exploited",
+        "saline"
+      ]
+    }
+  },
+
+  "measures": {
+    "total area of assessment unit (ha)": {
+      "category": "area",
+      "unit": "ha"
+    },
+    "recharge worthy area(ha)": {
+      "category": "area",
+      "unit": "ha"
+    },
+
+    "recharge from rainfall-monsoon season": {
+      "category": "recharge",
+      "unit": "ham",
+      "season": "monsoon"
+    },
+    "recharge from other sources- monsoon season": {
+      "category": "recharge",
+      "unit": "ham",
+      "season": "monsoon"
+    },
+    "recharge from rainfall-non monsoon season": {
+      "category": "recharge",
+      "unit": "ham",
+      "season": "non-monsoon"
+    },
+    "recharge from other sources- non monsoon season": {
+      "category": "recharge",
+      "unit": "ham",
+      "season": "non-monsoon"
+    },
+
+    "total annual ground water (ham) recharge": {
+      "category": "recharge",
+      "unit": "ham",
+      "is_total": true,
+      "components": [
+        "recharge from rainfall-monsoon season",
+        "recharge from other sources- monsoon season",
+        "recharge from rainfall-non monsoon season",
+        "recharge from other sources- non monsoon season"
+      ]
+    },
+
+    "total natural discharges (ham)": {
+      "category": "loss",
+      "unit": "ham"
+    },
+
+    "annual extractable ground water resource (ham)": {
+      "category": "availability",
+      "unit": "ham",
+      "derived_from": [
+        "total annual ground water (ham) recharge",
+        "total natural discharges (ham)"
+      ]
+    },
+
+    "ground water extraction for irrigation use (ham)": {
+      "category": "extraction",
+      "unit": "ham",
+      "type": "irrigation"
+    },
+    "ground water extraction for industrial use (ham)": {
+      "category": "extraction",
+      "unit": "ham",
+      "type": "industrial"
+    },
+    "ground water extraction for domestic use (ham)": {
+      "category": "extraction",
+      "unit": "ham",
+      "type": "domestic"
+    },
+
+    "total extraction (ham)": {
+      "category": "extraction",
+      "unit": "ham",
+      "is_total": true,
+      "components": [
+        "ground water extraction for irrigation use (ham)",
+        "ground water extraction for industrial use (ham)",
+        "ground water extraction for domestic use (ham)"
+      ]
+    },
+
+    "annual gw allocation for domestic use as on 2025 (ham)": {
+      "category": "planning",
+      "unit": "ham"
+    },
+
+    "net ground water availability for future use (ham)": {
+      "category": "availability",
+      "unit": "ham"
+    },
+
+    "stage of ground water extraction (%)": {
+      "category": "ratio",
+      "unit": "percent",
+      "is_derived": true,
+      "formula": "total extraction / annual extractable resource"
+    }
+  },
+
+  "relationships": {
+    "no_mixing_rules": [
+      {
+        "total": "total extraction (ham)",
+        "components": [
+          "ground water extraction for irrigation use (ham)",
+          "ground water extraction for industrial use (ham)",
+          "ground water extraction for domestic use (ham)"
+        ]
+      },
+      {
+        "total": "total annual ground water (ham) recharge",
+        "components": [
+          "recharge from rainfall-monsoon season",
+          "recharge from other sources- monsoon season",
+          "recharge from rainfall-non monsoon season",
+          "recharge from other sources- non monsoon season"
+        ]
+      }
+    ]
+  },
+
+  "units": {
+    "ham": ["recharge", "extraction", "availability"],
+    "ha": ["area"],
+    "percent": ["ratio"]
+  }
+}
