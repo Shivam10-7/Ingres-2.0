@@ -60,7 +60,7 @@
                                  "worstCategory":  "Over Exploited",
                                  "categoryRank":  4,
                                  "stage":  45.54,
-                                 "status":  "critical"
+                                 "status":  "semi-critical"
                              },
                    "Chandigarh":  {
                                       "name":  "Chandigarh",
@@ -156,7 +156,7 @@
                                    "worstCategory":  "Over Exploited",
                                    "categoryRank":  4,
                                    "stage":  135.96,
-                                   "status":  "critical"
+                                   "status":  "Over Exploited"
                                },
                    "Himachal Pradesh":  {
                                             "name":  "Himachal Pradesh",
@@ -192,7 +192,7 @@
                                      "worstCategory":  "Over Exploited",
                                      "categoryRank":  4,
                                      "stage":  31.43,
-                                     "status":  "critical"
+                                     "status":  "semi-critical"
                                  },
                    "Karnataka":  {
                                      "name":  "Karnataka",
@@ -348,7 +348,7 @@
                                   "worstCategory":  "Over Exploited",
                                   "categoryRank":  4,
                                   "stage":  156.87,
-                                  "status":  "critical"
+                                  "status":  "Over Exploited"
                               },
                    "Rajasthan":  {
                                      "name":  "Rajasthan",
@@ -360,7 +360,7 @@
                                      "worstCategory":  "Over Exploited",
                                      "categoryRank":  4,
                                      "stage":  149.86,
-                                     "status":  "critical"
+                                     "status":  "Over Exploited"
                                  },
                    "Sikkim":  {
                                   "name":  "Sikkim",
@@ -444,7 +444,7 @@
                                        "worstCategory":  "Critical",
                                        "categoryRank":  3,
                                        "stage":  45.63,
-                                       "status":  "critical"
+                                       "status":  "safe"
                                    }
                },
     "districts":  {

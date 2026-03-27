@@ -185,21 +185,21 @@ function normalizeCategoryValue(value?: string | null) {
 function getEntrySeverity(entry?: Partial<GwraMapSummary> | null): 'safe' | 'caution' | 'critical' | 'unknown' {
   if (!entry) return 'unknown';
 
-  if (typeof entry.categoryRank === 'number' && !Number.isNaN(entry.categoryRank)) {
-    if (entry.categoryRank >= 3) return 'critical';
-    if (entry.categoryRank >= 2) return 'caution';
-    return 'safe';
-  }
+  const normalizedStatus = normalizeCategoryValue(entry.status);
+  if (normalizedStatus === 'safe') return 'safe';
+  if (normalizedStatus === 'caution' || normalizedStatus === 'semi critical') return 'caution';
+  if (normalizedStatus === 'critical' || normalizedStatus === 'over exploited') return 'critical';
 
   const normalizedCategory = normalizeCategoryValue(entry.worstCategory);
   if (normalizedCategory === 'safe') return 'safe';
   if (normalizedCategory === 'semi critical') return 'caution';
   if (normalizedCategory === 'critical' || normalizedCategory === 'over exploited') return 'critical';
 
-  const normalizedStatus = normalizeCategoryValue(entry.status);
-  if (normalizedStatus === 'safe') return 'safe';
-  if (normalizedStatus === 'caution' || normalizedStatus === 'semi critical') return 'caution';
-  if (normalizedStatus === 'critical' || normalizedStatus === 'over exploited') return 'critical';
+  if (typeof entry.categoryRank === 'number' && !Number.isNaN(entry.categoryRank)) {
+    if (entry.categoryRank >= 3) return 'critical';
+    if (entry.categoryRank >= 2) return 'caution';
+    return 'safe';
+  }
 
   return 'unknown';
 }
