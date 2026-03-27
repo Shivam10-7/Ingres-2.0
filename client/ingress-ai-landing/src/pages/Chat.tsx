@@ -636,7 +636,7 @@ function ChatPage() {
 
   useEffect(() => {
     const buildSuggestions = (city?: string, state?: string) => {
-      const place = city || state || 'India';
+      const place = city && state ? `${city}, ${state}` : city || state || 'India';
       setSuggestionContextLabel(place);
       setSuggestions(buildLocationSuggestions(place));
       setShowInlineMapOptions(false);
@@ -818,9 +818,13 @@ function ChatPage() {
     const normalizedQuery = normalizeMapName(query);
     const stateEntries = Object.values(mapStatesDataRef.current);
     const districtEntries = Object.values(mapDistrictsDataRef.current);
+    const normalizedLocationCity = normalizeMapName(location?.city || '');
 
     const matchedState =
       stateEntries.find((entry) => normalizedQuery.includes(normalizeMapName(entry.name))) ||
+      (normalizedLocationCity && normalizedQuery.includes(normalizedLocationCity) && location?.state
+        ? findStateSummary(location.state)
+        : null) ||
       (mapSelection?.state ? findStateSummary(mapSelection.state) : null);
 
     if (matchedState) {
@@ -849,7 +853,10 @@ function ChatPage() {
 
     const selectedPlace = mapSelection?.district && mapSelection?.state
       ? `${mapSelection.district}, ${mapSelection.state}`
-      : mapSelection?.state ?? suggestionContextLabel;
+      : mapSelection?.state ??
+      (location?.city && location?.state
+        ? `${location.city}, ${location.state}`
+        : location?.state ?? suggestionContextLabel);
 
     const fallbackPlace =
       query.match(/([A-Za-z .&()-]+,\s*[A-Za-z .&()-]+)\s*$/)?.[1]?.trim() ||
@@ -857,8 +864,16 @@ function ChatPage() {
       selectedPlace;
 
     const districtStateMatch = fallbackPlace.match(/^(.*?),\s*(.+)$/);
-    const districtName = districtStateMatch?.[1]?.trim() || mapSelection?.district;
-    const stateName = districtStateMatch?.[2]?.trim() || mapSelection?.state || fallbackPlace;
+    const districtName =
+      districtStateMatch?.[1]?.trim() ||
+      mapSelection?.district ||
+      (normalizedLocationCity && normalizedQuery.includes(normalizedLocationCity) ? location?.city : undefined);
+    const stateName =
+      districtStateMatch?.[2]?.trim() ||
+      mapSelection?.state ||
+      (normalizedLocationCity && normalizedQuery.includes(normalizedLocationCity) ? location?.state : undefined) ||
+      location?.state ||
+      fallbackPlace;
 
     return {
       requestedPlace: fallbackPlace,
