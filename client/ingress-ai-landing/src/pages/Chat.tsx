@@ -1395,34 +1395,57 @@ ${
                                     </p>
                                   </div>
                                 </div>
-
-                                {/* Checkboxes only for specific modes */}
+                                {/* Slidebar only for specific modes */}
                                 {mode.id === "deep" && (
-                                  <input
-                                    type="checkbox"
-                                    checked={isDetailedResponseNeeded}
-                                    onChange={(e) => {
-                                      e.stopPropagation();
-                                      setIsDetailedResponseNeeded(
-                                        e.target.checked,
-                                      );
-                                    }}
-                                    className="accent-blue-500"
-                                  />
+                                  <label
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="relative inline-flex items-center cursor-pointer ml-3"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isDetailedResponseNeeded}
+                                      onChange={(e) =>
+                                        setIsDetailedResponseNeeded(
+                                          e.target.checked,
+                                        )
+                                      }
+                                      className="sr-only peer"
+                                    />
+
+                                    <div
+                                      className="w-10 h-5 bg-gray-300 rounded-full peer
+      peer-checked:bg-blue-600
+      after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+      after:bg-white after:border after:rounded-full after:h-4 after:w-4
+      after:transition-all peer-checked:after:translate-x-5"
+                                    ></div>
+                                  </label>
                                 )}
 
                                 {mode.id === "visualizer" && (
-                                  <input
-                                    type="checkbox"
-                                    checked={isVisualizationNeeded}
-                                    onChange={(e) => {
-                                      e.stopPropagation();
-                                      setIsVisualizationNeeded(
-                                        e.target.checked,
-                                      );
-                                    }}
-                                    className="accent-blue-500"
-                                  />
+                                  <label
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="relative inline-flex items-center cursor-pointer"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isVisualizationNeeded}
+                                      onChange={(e) =>
+                                        setIsVisualizationNeeded(
+                                          e.target.checked,
+                                        )
+                                      }
+                                      className="sr-only peer"
+                                    />
+
+                                    <div
+                                      className="w-10 h-5 bg-gray-300 rounded-full peer 
+        peer-checked:bg-blue-600
+        after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+        after:bg-white after:border after:rounded-full after:h-4 after:w-4
+        after:transition-all peer-checked:after:translate-x-5"
+                                    ></div>
+                                  </label>
                                 )}
                               </button>
                             ))}
