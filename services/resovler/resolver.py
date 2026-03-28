@@ -7,6 +7,7 @@ Dependencies (all in the same package):
     entity_index.py     — builds lookup tables from db.json
     fuzzy_match.py      — exact token-subsequence + rapidfuzz matching
     intent_extractor.py — keyword / TF-IDF / neural intent detection
+    response.py         — deduplication, intent attachment, response builders
 
 Public API:
     resolver = EntityResolver("db.json")
@@ -23,12 +24,26 @@ except Exception:
 
 from entity_index import EntityIndex
 from fuzzy_match import FuzzyMatcher
-from intent_extractor import extract_intent
+from response import ResponseBuilder
 
 # ── constants ─────────────────────────────────────────────────────────────────
 
 MAX_SUGGESTION_ENTITIES = 4
 MAX_QUERY_TOKENS        = 20
+
+# Stripped from clause fragments before fuzzy matching (noise around place names).
+LOCATION_NOISE_TOKENS = {
+    "compare", "between", "and", "or", "of", "the", "a", "an",
+    "in", "for", "at", "to", "from", "with",
+    "level", "levels", "gournd", "ground", "water", "levle",
+    "extraction", "extract", "extracted", "data", "show", "give", "me",
+    "tell", "what", "how", "is", "are", "please", "this", "that",
+    "ok",           # common ASR/typo for "of"
+    "groundwater",
+    "table",
+}
+
+_CLAUSE_SPLIT = re.compile(r"\b(?:and|or)\b", re.I)
 
 
 # ── main class ────────────────────────────────────────────────────────────────
@@ -47,57 +62,22 @@ class EntityResolver:
         ambiguous → options:  List[Dict],  message: str
         suggest   → options:  List[Dict],  message: str
         not_found → message:  str
+
+    All response construction is delegated to ResponseBuilder (response.py).
+    This class contains only location-finding logic.
     """
 
     def __init__(self, json_path: str):
-        self.idx     = EntityIndex(json_path)
-        self.matcher = FuzzyMatcher(self.idx)
+        self.idx      = EntityIndex(json_path)
+        self.matcher  = FuzzyMatcher(self.idx)
+        self.response = ResponseBuilder()
 
     # ── public delegation (keeps existing callers working) ────────────────────
 
     def normalize(self, text: str) -> str:
         return self.idx.normalize(text)
 
-    # ── internal: deduplication ───────────────────────────────────────────────
-
-    def _entity_dedupe_key(self, entity: Dict) -> str:
-        return "|".join([
-            entity.get("type",     ""),
-            entity.get("state",    ""),
-            entity.get("district", ""),
-            entity.get("block",    ""),
-        ]).strip("|")
-
-    def _dedupe_entities(self, entities: List[Dict]) -> List[Dict]:
-        seen: set = set()
-        out:  List[Dict] = []
-        for e in entities:
-            k = self._entity_dedupe_key(e)
-            if k not in seen:
-                seen.add(k)
-                out.append(e)
-        return out
-
-    # ── internal: intent attachment ───────────────────────────────────────────
-
-    def _attach_intent(self, response: Dict, query: str) -> Dict:
-        """
-        Calls intent_extractor.extract_intent() and merges its output into
-        the resolver response dict.
-
-        Keys added to every response:
-            intents        — e.g. ["comparison", "extraction"]
-            intent_status  — "resolved" | "ambiguous" | "not_found"
-
-        The old single-string "intent" key ("resolve_location") is gone.
-        Resolution status under "status" is never touched.
-        """
-        result = extract_intent(query)
-        response["intents"]       = result["intents"]
-        response["intent_status"] = result["intent_status"]
-        return response
-
-    # ── internal: lazy type-keyed cache for fuzzy stage ───────────────────────
+    # ── internal: lazy type-keyed cache for stage 3 fuzzy ────────────────────
 
     def _get_keys_by_type(self) -> Dict[str, List[str]]:
         if not hasattr(self, "_keys_by_type_cache"):
@@ -109,24 +89,294 @@ class EntityResolver:
             self._keys_by_type_cache = cache
         return self._keys_by_type_cache
 
+    # ── internal: clause splitting + noise stripping ──────────────────────────
+
+    def _location_clauses(self, query_norm: str) -> List[str]:
+        parts = _CLAUSE_SPLIT.split(query_norm)
+        return [p.strip() for p in parts if p.strip()]
+
+    def _strip_location_noise(self, clause: str) -> str:
+        toks = self.idx.normalize(clause).split()
+        while toks and toks[0] in LOCATION_NOISE_TOKENS:
+            toks.pop(0)
+        while toks and toks[-1] in LOCATION_NOISE_TOKENS:
+            toks.pop()
+        return " ".join(toks)
+
+    # ── internal: pick the best representative entity for a matched key ───────
+
+    def _representative_entity_for_key(self, key: str) -> Optional[Dict]:
+        ents = self.idx.entity_index_flat.get(key, [])
+        if not ents:
+            return None
+        pref = {"district": 0, "state": 1, "block": 2}
+        return sorted(ents, key=lambda e: pref.get(e.get("type"), 9))[0]
+
+    # ── internal: resolve a list of already-extracted exact keys ─────────────
+
+    def _resolve_extracted_keys(
+        self,
+        extracted_keys: List[str],
+        query_norm:     str,
+    ) -> Tuple[List[Dict], List[Dict]]:
+        """
+        Given keys confirmed to exist in the index, classify each as
+        resolved (single unambiguous entity) or ambiguous (multiple candidates).
+
+        Returns (resolved_list, ambiguous_list).
+        Does NOT call ResponseBuilder — classification only.
+        """
+        resolved:  List[Dict] = []
+        ambiguous: List[Dict] = []
+
+        if not extracted_keys:
+            return resolved, ambiguous
+
+        padded_q = f" {query_norm} "
+
+        for key in extracted_keys:
+            candidates = self.idx.entity_index_flat.get(key, [])
+            if not candidates:
+                continue
+
+            # single candidate — unambiguous
+            if len(candidates) == 1:
+                resolved.append(candidates[0])
+                continue
+
+            # multiple types share the same normalised name:
+            # try to narrow using adjacent type keywords
+            narrowed = candidates
+
+            if (
+                re.search(rf"{re.escape(key)}\s+districts?\b", query_norm)
+                or re.search(rf"districts?\s+{re.escape(key)}\b", query_norm)
+            ):
+                narrowed = [e for e in narrowed if e.get("type") == "district"]
+
+            elif (
+                re.search(rf"{re.escape(key)}\s+blocks?\b", query_norm)
+                or re.search(rf"blocks?\s+{re.escape(key)}\b", query_norm)
+            ):
+                narrowed = [e for e in narrowed if e.get("type") == "block"]
+
+            elif (
+                re.search(rf"{re.escape(key)}\s+states?\b", query_norm)
+                or re.search(rf"states?\s+{re.escape(key)}\b", query_norm)
+            ):
+                narrowed = [e for e in narrowed if e.get("type") == "state"]
+
+            # "in / for / at <key>" pattern — prefer state interpretation
+            if len(narrowed) > 1 and (
+                f" in {key} "  in padded_q
+                or f" for {key} " in padded_q
+                or f" at {key} "  in padded_q
+            ):
+                state_only = [e for e in narrowed if e.get("type") == "state"]
+                if len(state_only) == 1:
+                    narrowed = state_only
+
+            if len(narrowed) == 1:
+                resolved.append(narrowed[0])
+            else:
+                ambiguous.extend(narrowed)
+
+        return resolved, ambiguous
+
+    # ── internal: try state-context disambiguation ────────────────────────────
+
+    @staticmethod
+    def _disambiguate_by_state(
+        resolved:  List[Dict],
+        ambiguous: List[Dict],
+    ) -> Tuple[List[Dict], List[Dict]]:
+        """
+        If exactly one state is implied by the resolved set, filter the
+        ambiguous list to entries that belong to that state.
+
+        Returns updated (resolved, ambiguous).
+        Pure logic — does NOT call ResponseBuilder.
+        """
+        if not (ambiguous and resolved):
+            return resolved, ambiguous
+
+        inferred_states = {e.get("state") for e in resolved if e.get("state")}
+        if len(inferred_states) != 1:
+            return resolved, ambiguous
+
+        state = next(iter(inferred_states))
+        dis   = [e for e in ambiguous if e.get("state") == state]
+        if dis:
+            return resolved + dis, []
+        return resolved, ambiguous
+
+    # ── internal: collect fuzzy suggestion entities from noisy clauses ────────
+
+    def _fuzzy_option_entities_from_clauses(
+        self,
+        clauses_needing_fuzzy: List[str],
+        exclude:               List[Dict],
+    ) -> List[Dict]:
+        """
+        Strip noise tokens from each clause, then run fuzzy_match() to find
+        close db.json entries. Returns up to MAX_SUGGESTION_ENTITIES entities,
+        excluding any already in `exclude`.
+        """
+        exclude_k = {
+            ResponseBuilder._entity_dedupe_key(e) for e in exclude
+        }
+        out:       List[Dict] = []
+        seen_keys: set        = set()
+
+        for clause in clauses_needing_fuzzy:
+            trimmed = self._strip_location_noise(clause)
+            if len(trimmed) < 2:
+                continue
+
+            pairs = self.matcher.fuzzy_match(trimmed)
+            if not pairs:
+                continue
+
+            # keep only matches within 1 point of the best score
+            best_score = pairs[0][1]
+            for key, score in pairs:
+                if score < best_score - 1:
+                    break
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                ent = self._representative_entity_for_key(key)
+                if ent and ResponseBuilder._entity_dedupe_key(ent) not in exclude_k:
+                    out.append(ent)
+                if len(out) >= MAX_SUGGESTION_ENTITIES:
+                    return out
+
+        return out
+
+    # ── internal: last-resort single-clause fuzzy fallback ───────────────────
+
+    def _try_fuzzy_fallback_whole_query(
+        self,
+        query_norm: str,
+        query_raw:  str,
+    ) -> Optional[Dict]:
+        """
+        Called when the main pipeline fully exhausted and found nothing.
+        Strips template words from the whole query, then tries exact + fuzzy.
+
+        Returns a response dict or None if still no match.
+        """
+        trimmed = self._strip_location_noise(query_norm).strip()
+        if len(trimmed) < 2:
+            return None
+
+        rb     = self.response
+        dedupe = rb.dedupe
+
+        # try exact match on the stripped string first
+        extracted = self.matcher.extract_entities(trimmed)
+        if extracted:
+            resolved, ambig = self._resolve_extracted_keys(extracted, query_norm)
+            resolved, ambig = dedupe(resolved), dedupe(ambig)
+            resolved, ambig = self._disambiguate_by_state(resolved, ambig)
+
+            if ambig:
+                return rb.ambiguous(ambig, query_raw)
+            if resolved:
+                return rb.resolved(resolved, query_raw)
+
+        # fall through to fuzzy
+        options = self._fuzzy_option_entities_from_clauses([trimmed], [])
+        if options:
+            return rb.suggest(dedupe(options)[:MAX_SUGGESTION_ENTITIES], query_raw)
+
+        return None
+
+    # ── internal: multi-clause resolution (queries with "and" / "or") ─────────
+
+    def _try_resolve_multi_clause(
+        self,
+        query_norm: str,
+        query_raw:  str,
+    ) -> Optional[Dict]:
+        """
+        When the query lists multiple places joined by and/or, split into
+        clauses and resolve each independently. Exact hits are merged;
+        clauses with no exact match get fuzzy suggestions.
+
+        Returns a response dict, or None when there is only one clause
+        (caller falls through to the main single-clause pipeline).
+        """
+        clauses = self._location_clauses(query_norm)
+        if len(clauses) < 2:
+            return None
+
+        rb     = self.response
+        dedupe = rb.dedupe
+
+        resolved_all:  List[Dict] = []
+        ambiguous_all: List[Dict] = []
+        fuzzy_clauses: List[str]  = []
+
+        for clause in clauses:
+            keys = self.matcher.extract_entities(clause)
+            if not keys:
+                fuzzy_clauses.append(clause)
+                continue
+            r, a = self._resolve_extracted_keys(keys, query_norm)
+            resolved_all.extend(r)
+            ambiguous_all.extend(a)
+
+        resolved_all  = dedupe(resolved_all)
+        ambiguous_all = dedupe(ambiguous_all)
+
+        # try to collapse ambiguity using resolved state context
+        resolved_all, ambiguous_all = self._disambiguate_by_state(
+            resolved_all, ambiguous_all
+        )
+
+        if ambiguous_all:
+            return rb.ambiguous(ambiguous_all, query_raw)
+
+        options = self._fuzzy_option_entities_from_clauses(fuzzy_clauses, resolved_all)
+
+        if options and resolved_all:
+            return rb.suggest_with_resolved(resolved_all, options, query_raw)
+
+        if options and not resolved_all:
+            return rb.suggest(dedupe(options)[:MAX_SUGGESTION_ENTITIES], query_raw)
+
+        if resolved_all and fuzzy_clauses:
+            return rb.partial(resolved_all, query_raw)
+
+        if resolved_all:
+            return rb.resolved(resolved_all, query_raw)
+
+        return None
+
     # ── main resolve pipeline ─────────────────────────────────────────────────
 
     def resolve(self, query: str) -> Dict:
         """
         Resolve a natural-language query into location entities + intents.
 
-        Pipeline stages (returns as soon as a stage produces a result):
+        Pipeline (returns at first stage that produces a result):
 
-            Stage 0 — exact token-subsequence match over the full index
-            Stage 1 — pattern-based mention extraction ("<name> district" etc.)
-            Stage 2 — state-context disambiguation for ambiguous hits
-            Stage 3 — fuzzy suggestions for misspellings / unknown mentions
-            Stage 4 — clean exact hit (fallthrough from stages 1-2)
+            Pre-check  — multi-clause split  (and/or queries)
+            Stage 0    — exact token-subsequence match over the full index
+            Stage 1    — pattern-based mention extraction ("<n> district" etc.)
+            Stage 2    — state-context disambiguation
+            Stage 3    — fuzzy suggestions for misspelled / unknown mentions
+            Stage 4    — clean exact hit (stage 1-2 fallthrough)
+            Fallback   — whole-query noise-stripped fuzzy attempt
         """
 
         # ── guard + normalise ─────────────────────────────────────────────────
         query      = " ".join(query.split()[:MAX_QUERY_TOKENS])
         query_norm = self.idx.normalize(query)
+
+        rb     = self.response
+        dedupe = rb.dedupe
 
         # ── infer which admin types the user is asking about ──────────────────
         def infer_types() -> List[str]:
@@ -137,101 +387,35 @@ class EntityResolver:
             return types or ["state", "district", "block"]
 
         mentioned_types = infer_types()
-        dedupe          = self._dedupe_entities
+
+        # ── pre-check: multi-clause (and / or) queries ────────────────────────
+        multi = self._try_resolve_multi_clause(query_norm, query)
+        if multi is not None:
+            return multi
 
         # ══════════════════════════════════════════════════════════════════════
         # STAGE 0 — exact token-subsequence match
         #
         # Uses FuzzyMatcher.extract_entities() which does greedy longest-match
         # over the prebuilt keys_by_first_token index.
-        # Handles: "in Punjab", "Nagpur district", multi-location queries.
+        # Handles: "in Punjab", "Nagpur district", plain location names.
         # ══════════════════════════════════════════════════════════════════════
-
-        resolved_exact:  List[Dict] = []
-        ambiguous_exact: List[Dict] = []
 
         extracted_keys = self.matcher.extract_entities(query_norm)
 
         if extracted_keys:
-            padded_q = f" {query_norm} "
-
-            for key in extracted_keys:
-                candidates = self.idx.entity_index_flat.get(key, [])
-                if not candidates:
-                    continue
-
-                # single match — unambiguous
-                if len(candidates) == 1:
-                    resolved_exact.append(candidates[0])
-                    continue
-
-                # multiple types share the same name — narrow by nearby keywords
-                narrowed = candidates
-
-                if (
-                    re.search(rf"{re.escape(key)}\s+districts?\b", query_norm)
-                    or re.search(rf"districts?\s+{re.escape(key)}\b", query_norm)
-                ):
-                    narrowed = [e for e in narrowed if e.get("type") == "district"]
-
-                elif (
-                    re.search(rf"{re.escape(key)}\s+blocks?\b", query_norm)
-                    or re.search(rf"blocks?\s+{re.escape(key)}\b", query_norm)
-                ):
-                    narrowed = [e for e in narrowed if e.get("type") == "block"]
-
-                elif (
-                    re.search(rf"{re.escape(key)}\s+states?\b", query_norm)
-                    or re.search(rf"states?\s+{re.escape(key)}\b", query_norm)
-                ):
-                    narrowed = [e for e in narrowed if e.get("type") == "state"]
-
-                # "... in <key>" pattern — prefer state interpretation
-                if len(narrowed) > 1 and (
-                    f" in {key} "  in padded_q
-                    or f" for {key} " in padded_q
-                    or f" at {key} "  in padded_q
-                ):
-                    state_only = [e for e in narrowed if e.get("type") == "state"]
-                    if len(state_only) == 1:
-                        narrowed = state_only
-
-                if len(narrowed) == 1:
-                    resolved_exact.append(narrowed[0])
-                else:
-                    ambiguous_exact.extend(narrowed)
-
-        # stage 0 produced something — handle immediately
-        if resolved_exact or ambiguous_exact:
-
-            # try to collapse ambiguity using an already-resolved state
-            if ambiguous_exact and resolved_exact:
-                inferred_states = {
-                    e.get("state") for e in resolved_exact if e.get("state")
-                }
-                if len(inferred_states) == 1:
-                    dis = [
-                        e for e in ambiguous_exact
-                        if e.get("state") == next(iter(inferred_states))
-                    ]
-                    if dis:
-                        resolved_exact.extend(dis)
-                        ambiguous_exact = []
+            resolved_exact, ambiguous_exact = self._resolve_extracted_keys(
+                extracted_keys, query_norm
+            )
+            resolved_exact, ambiguous_exact = self._disambiguate_by_state(
+                resolved_exact, ambiguous_exact
+            )
 
             if ambiguous_exact:
-                return self._attach_intent({
-                    "status":      "ambiguous",
-                    "message":     "Multiple matches found. Please clarify which location you mean.",
-                    "options":     dedupe(ambiguous_exact),
-                    "description": "Your query matches more than one possible location. "
-                                   "Select the correct option(s) to continue.",
-                }, query)
+                return rb.ambiguous(ambiguous_exact, query)
 
-            return self._attach_intent({
-                "status":      "resolved",
-                "entities":    dedupe(resolved_exact),
-                "description": f"Resolved {len(resolved_exact)} location(s) from your query.",
-            }, query)
+            if resolved_exact:
+                return rb.resolved(resolved_exact, query)
 
         # ══════════════════════════════════════════════════════════════════════
         # STAGE 1 — pattern-based mention extraction
@@ -258,7 +442,6 @@ class EntityResolver:
                     name     = " ".join((filtered or tokens)[-max_name_tokens:]).strip()
                     mentions.append((t, name))
 
-            # dedupe while preserving order
             seen: set = set()
             out:  List[Tuple[str, str]] = []
             for item in mentions:
@@ -267,13 +450,12 @@ class EntityResolver:
                     out.append(item)
             return out
 
-        mentions            = extract_mentions()
-        resolved_entities:  List[Dict] = []
-        ambiguous_entities: List[Dict] = []
+        mentions:           List[Tuple[str, str]] = extract_mentions()
+        resolved_entities:  List[Dict]            = []
+        ambiguous_entities: List[Dict]            = []
         unknown_mentions:   List[Tuple[str, str]] = []
 
         if mentions:
-            # exact lookup for each explicit mention
             for ent_type, name in mentions:
                 key     = self.idx.normalize(name)
                 matches = [
@@ -288,7 +470,7 @@ class EntityResolver:
                     unknown_mentions.append((ent_type, key))
 
         else:
-            # no explicit type keywords — try n-gram exact match across all types
+            # no explicit type keywords — n-gram exact match across all types
             tokens = query_norm.split()
             stopwords = {
                 "compare", "between", "and", "or", "of", "the", "a", "an",
@@ -317,33 +499,14 @@ class EntityResolver:
 
         # ══════════════════════════════════════════════════════════════════════
         # STAGE 2 — state-context disambiguation
-        #
-        # If we have at least one cleanly resolved entity whose state is known,
-        # use that state to filter out wrong-state ambiguous candidates.
-        # Only applied when exactly one state is implied (safe assumption).
         # ══════════════════════════════════════════════════════════════════════
 
-        if ambiguous_entities and resolved_entities:
-            inferred_states = {
-                e.get("state") for e in resolved_entities if e.get("state")
-            }
-            if len(inferred_states) == 1:
-                dis = [
-                    e for e in ambiguous_entities
-                    if e.get("state") == next(iter(inferred_states))
-                ]
-                if dis:
-                    resolved_entities.extend(dis)
-                    ambiguous_entities = []
+        resolved_entities, ambiguous_entities = self._disambiguate_by_state(
+            resolved_entities, ambiguous_entities
+        )
 
         if ambiguous_entities:
-            return self._attach_intent({
-                "status":      "ambiguous",
-                "message":     "Multiple matches found. Please clarify.",
-                "options":     dedupe(ambiguous_entities),
-                "description": "Your query matches more than one possible location. "
-                               "Select the option that matches your intended state/district/block.",
-            }, query)
+            return rb.ambiguous(ambiguous_entities, query)
 
         # ══════════════════════════════════════════════════════════════════════
         # STAGE 3 — fuzzy suggestions for unknown / misspelled mentions
@@ -360,7 +523,7 @@ class EntityResolver:
             fuzzy_ambiguous:     List[Dict] = []
 
             for ent_type, mention_key in unknown_mentions:
-                keys   = keys_by_type.get(ent_type, [])
+                keys = keys_by_type.get(ent_type, [])
                 if not keys:
                     continue
 
@@ -386,62 +549,33 @@ class EntityResolver:
                         suggestion_entities.append(cands[0])
 
             # one last disambiguation attempt using resolved context
-            if fuzzy_ambiguous and resolved_entities:
-                inferred_states = {
-                    e.get("state") for e in resolved_entities if e.get("state")
-                }
-                if len(inferred_states) == 1:
-                    dis = [
-                        e for e in fuzzy_ambiguous
-                        if e.get("state") == next(iter(inferred_states))
-                    ]
-                    if dis:
-                        resolved_entities.extend(dis)
-                        fuzzy_ambiguous = []
+            _, fuzzy_ambiguous = self._disambiguate_by_state(
+                resolved_entities, fuzzy_ambiguous
+            )
 
             if fuzzy_ambiguous:
-                return self._attach_intent({
-                    "status":      "ambiguous",
-                    "message":     "Multiple matches found. Please clarify.",
-                    "options":     dedupe(fuzzy_ambiguous),
-                    "description": "Some locations are ambiguous due to similar spellings/names. "
-                                   "Choose the intended one(s).",
-                }, query)
+                return rb.ambiguous(fuzzy_ambiguous, query)
 
             if suggestion_entities:
-                return self._attach_intent({
-                    "status":      "suggest",
-                    "message":     "Did you mean one of these?",
-                    "options":     dedupe(suggestion_entities)[:MAX_SUGGESTION_ENTITIES],
-                    "description": "No exact match found, but these look close to what you typed.",
-                }, query)
+                return rb.suggest(
+                    dedupe(suggestion_entities)[:MAX_SUGGESTION_ENTITIES], query
+                )
 
-            # mentions existed but nothing matched at all
             if resolved_entities:
-                return self._attach_intent({
-                    "status":      "not_found",
-                    "message":     "Could not match some location names in your query.",
-                    "description": "Partial resolution — some location names were unrecognised.",
-                }, query)
+                return rb.partial_with_known(resolved_entities, query)
 
-            return self._attach_intent({
-                "status":  "not_found",
-                "message": "Could not find any matching location. Please clarify.",
-            }, query)
+            return rb.not_found(query, with_context=True)
 
         # ══════════════════════════════════════════════════════════════════════
-        # STAGE 4 — clean exact hit
+        # STAGE 4 — clean exact hit (fallthrough from stages 1-2)
         # ══════════════════════════════════════════════════════════════════════
 
         if resolved_entities:
-            return self._attach_intent({
-                "status":   "resolved",
-                "entities": dedupe(resolved_entities),
-            }, query)
+            return rb.resolved(resolved_entities, query)
 
-        return self._attach_intent({
-            "status":      "not_found",
-            "message":     "Could not find any matching location. Please clarify.",
-            "description": "No known state/district/block names matched your query. "
-                           "Try spelling the location exactly or include more context.",
-        }, query)
+        # ── whole-query fuzzy fallback ────────────────────────────────────────
+        fb = self._try_fuzzy_fallback_whole_query(query_norm, query)
+        if fb is not None:
+            return fb
+
+        return rb.not_found(query)

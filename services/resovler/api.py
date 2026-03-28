@@ -52,21 +52,28 @@ def resolve_entity(req: QueryRequest):
         }
 
     if status == "suggest":
-        return {
+        body = {
             "status": "suggest",
             "message": result.get("message", "Did you mean one of these?"),
             "options": result.get("options", []),
             **intent_payload,
             "description": result.get("description", "Showing close matches based on your query."),
         }
+        if result.get("entities"):
+            body["entities"] = result["entities"]
+            body["action"] = "ok"
+        return body
 
     if status == "not_found":
-        return {
+        body = {
             "status": "not_found",
             "message": result.get("message", "Could not find any matching location."),
             **intent_payload,
             "description": result.get("description", "No matching location was found."),
         }
+        if result.get("entities"):
+            body["entities"] = result["entities"]
+        return body
 
     return {"status": "error", "message": "Unknown resolver status", "raw": result}
 
