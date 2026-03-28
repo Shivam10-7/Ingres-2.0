@@ -74,7 +74,7 @@ You will see `(myvenv)` appear at the start of your prompt when activation succe
 ### 3a. Minimal install (resolver + API only, no neural model)
 
 ```powershell
-pip install fastapi uvicorn rapidfuzz pydantic scikit-learn
+pip install  -r requirement.txt
 ```
 
 ### 3b. Full install (includes neural intent backend)
