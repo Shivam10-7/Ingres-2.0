@@ -9,6 +9,7 @@ except Exception:
 
 from entity_index import EntityIndex
 
+#  tweak these values for optimal results
 MAX_QUERY_TOKENS = 20
 FUZZY_SCORE_CUTOFF = 90
 MAX_NGRAM_SIZE = 3

@@ -180,3 +180,6 @@ Use these with `POST /resolve-entity`:
 
 - `session_id` is currently kept for compatibility; the resolver endpoint does not use it directly.
 - The agent layer elsewhere in the repo uses a different entity-resolver function, so this API is mainly for frontend/backend integration or standalone testing of place resolution.
+
+db.json ──► entity_index.py ──► fuzzy_match.py ──► resolver.py ──► api.py
+intent_db.json ──► intent_extractor.py ──────────────────┘
