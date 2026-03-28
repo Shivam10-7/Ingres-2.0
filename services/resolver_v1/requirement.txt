@@ -1,5 +1,0 @@
-fastapi
-uvicorn
-sentence-transformers
-rapidfuzz
-torch
