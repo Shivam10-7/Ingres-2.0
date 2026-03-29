@@ -78,6 +78,11 @@ class ResponseBuilder:
         result = extract_intent(query)
         response["intents"]       = result["intents"]
         response["intent_status"] = result["intent_status"]
+        # Always provide a stable array of already-resolved entities when present.
+        # API layer can also project this field, but keeping it here makes the
+        # resolver output self-contained.
+        if "resolved_entities" not in response:
+            response["resolved_entities"] = response.get("entities", [])
         return response
 
     # ── named response builders ───────────────────────────────────────────────

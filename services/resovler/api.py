@@ -33,29 +33,36 @@ def resolve_entity(req: QueryRequest):
         "intents": intents,
         "intent_status": result.get("intent_status"),
     }
+    resolved_entities = result.get("entities", []) or result.get("resolved_entities", []) or []
     if status == "resolved":
         return {
             "status": "resolved",
             "entities": result.get("entities", []),
+            "resolved_entities": resolved_entities,
             "action": "ok",
             **intent_payload,
             "description": result.get("description", "Resolved location(s) successfully."),
         }
 
     if status == "ambiguous":
-        return {
+        body = {
             "status": "ambiguous",
             "message": result.get("message", "Multiple matches found. Please clarify."),
             "options": result.get("options", []),
+            "resolved_entities": resolved_entities,
             **intent_payload,
             "description": result.get("description", "Your query matches more than one possible location."),
         }
+        if result.get("suggestions"):
+            body["suggestions"] = result["suggestions"]
+        return body
 
     if status == "suggest":
         body = {
             "status": "suggest",
             "message": result.get("message", "Did you mean one of these?"),
             "options": result.get("options", []),
+            "resolved_entities": resolved_entities,
             **intent_payload,
             "description": result.get("description", "Showing close matches based on your query."),
         }
@@ -68,6 +75,7 @@ def resolve_entity(req: QueryRequest):
         body = {
             "status": "not_found",
             "message": result.get("message", "Could not find any matching location."),
+            "resolved_entities": resolved_entities,
             **intent_payload,
             "description": result.get("description", "No matching location was found."),
         }

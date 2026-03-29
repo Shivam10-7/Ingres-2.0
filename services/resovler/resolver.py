@@ -43,7 +43,9 @@ LOCATION_NOISE_TOKENS = {
     "table",
 }
 
-_CLAUSE_SPLIT = re.compile(r"\b(?:and|or)\b", re.I)
+# Split multi-location queries written with commas and/or conjunctions.
+# Examples: "pune, nagpur and delhi", "pune or nagpur".
+_CLAUSE_SPLIT = re.compile(r"\s*(?:,|\band\b|\bor\b)\s*", re.I)
 
 
 # ── main class ────────────────────────────────────────────────────────────────
@@ -336,7 +338,18 @@ class EntityResolver:
         )
 
         if ambiguous_all:
-            return rb.ambiguous(ambiguous_all, query_raw)
+            # Keep any already-resolved locations (e.g. Delhi) even when another
+            # location is ambiguous (e.g. Nagpur), and still provide fuzzy
+            # suggestions for other unmatched clauses (e.g. punee).
+            resp = rb.ambiguous(ambiguous_all, query_raw)
+            if resolved_all:
+                resp["entities"] = resolved_all
+            suggestions = self._fuzzy_option_entities_from_clauses(
+                fuzzy_clauses, resolved_all
+            )
+            if suggestions:
+                resp["suggestions"] = dedupe(suggestions)[:MAX_SUGGESTION_ENTITIES]
+            return resp
 
         options = self._fuzzy_option_entities_from_clauses(fuzzy_clauses, resolved_all)
 
