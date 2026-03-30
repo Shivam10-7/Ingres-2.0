@@ -11,10 +11,11 @@ const mongoose = require('mongoose');
 const Database = require('./src/routes/db/dataRetrive');
 const cookieParser = require('cookie-parser');
 const http = require('http');
+const { Pool } = require('pg');
 const chartDeterminer = require('./src/routes/Modules/ChartDeterminer'); // Ensure this is correctly imported for use in dataRetrive.js
 // Create an HTTP server using the Express app
 // const server = http.createServer(app);
-const mysql = require("mysql2"); // Keep the import for the connection block
+// const mysql = require("mysql2"); // Keep the import for the connection block
 const classifier = require('./src/routes/classifier');
 // const { stat } = require('fs');
 
@@ -26,21 +27,37 @@ mongoose.connect(process.env.MONGO_URI)
     console.log("MongoDB connection error:", err);
 });
 
-// connection with the MYSQL
-const con = mysql.createConnection({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
+// // connection with the MYSQL
+// const con = mysql.createConnection({
+//     host: process.env.DB_HOST,
+//     user: process.env.DB_USER,
+//     database: process.env.DB_NAME,
+//     password: process.env.DB_PASSWORD,
+// });
+// // Trying connection with the MYSQL
+// con.connect(function (err) {
+//     if (err) {
+//         console.warn("MySQL connection failed (continuing without DB):", err.message);
+//     } else {
+//         console.log("✅ MySQL Connected!");
+//     }
+// });
+
+// Stage-1 migration note:
+// Keeping old MySQL connectivity block above for reference.
+// Neon/Postgres connectivity check is now active below.
+const neonPool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
-// Trying connection with the MYSQL
-con.connect(function (err) {
-    if (err) {
-        console.warn("MySQL connection failed (continuing without DB):", err.message);
-    } else {
-        console.log("✅ MySQL Connected!");
-    }
-});
+
+neonPool.query('SELECT 1 AS neon_up')
+    .then((result) => {
+        console.log("✅ Neon/Postgres connected:", result.rows[0]);
+    })
+    .catch((err) => {
+        console.warn("Neon/Postgres connection failed (continuing without DB):", err.message);
+    });
 
 // Attach WebSocket server to SAME HTTP server
 // const wss = new WebSocket.Server({ server });
@@ -153,7 +170,9 @@ app.post('/tester', async (req, res) => {
     // // this is for pie chart
     // const sql ="SELECT categorization, COUNT(*) AS Total_Assessment_Units FROM ingresdata2025 GROUP BY categorization;"
     // this is for line chart
-    const sql ="SELECT district, ROUND(AVG(`stage of ground water extraction (%)`), 2) AS Avg_Extraction_Stage FROM ingresdata2025 GROUP BY district LIMIT 100;"
+    // Old MySQL-style query kept for reference:
+    // const sql ="SELECT district, ROUND(AVG(`stage of ground water extraction (%)`), 2) AS Avg_Extraction_Stage FROM ingresdata2025 GROUP BY district LIMIT 100;"
+    const sql ='SELECT "district", ROUND(AVG("stage_of_ground_water_extraction_(%)"), 2) AS "Avg_Extraction_Stage" FROM ingresdata2025 GROUP BY "district" LIMIT 100;';
     const [rows, fields, ChartType] = await Database(sql);
     let result ='';
     const chartType = (ChartType && ChartType.chartType) || (ChartType && ChartType.type) || 'table';
@@ -208,6 +227,26 @@ if (result && typeof result === 'object') {
 } else {
     return res.status(500).json({ error: "Result is not a valid object", received: result });
 }
+});
+
+// Stage-1 verification endpoint for Neon/Postgres.
+// This helps test DB connectivity without running full LLM pipeline.
+app.get('/health/neon', async (req, res) => {
+    try {
+        const testSql = 'SELECT COUNT(*)::int AS total_rows FROM ingresdata2025;';
+        const result = await neonPool.query(testSql);
+        return res.status(200).json({
+            success: true,
+            message: "Neon DB reachable",
+            probe: result.rows[0]
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Neon DB probe failed",
+            error: error.message
+        });
+    }
 });
 
 
