@@ -364,6 +364,7 @@ app.post('/dataQuery/test', async (req, res) => {
 //     clients.forEach((c) => c.send(text));
 // }, 1000);
 
-app.listen(8081, () => {
-    console.log("http://localhost:8081");
+const PORT = process.env.PORT || 8081;
+app.listen(PORT, () => {
+    console.log(`http://localhost:${PORT}`);
 })
