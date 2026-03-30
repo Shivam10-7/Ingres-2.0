@@ -436,7 +436,6 @@ app.post('/dataQuery/test', async (req, res) => {
 // }, 1000);
 
 const PORT = process.env.PORT || 8081;
-
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-});
+app.listen(PORT, () => {
+    console.log(`http://localhost:${PORT}`);
+})
