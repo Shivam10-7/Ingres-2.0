@@ -83,6 +83,17 @@ class ResponseBuilder:
         # resolver output self-contained.
         if "resolved_entities" not in response:
             response["resolved_entities"] = response.get("entities", [])
+
+        # If we resolved location(s) but couldn't detect intent, guide the client/user.
+        has_locations = bool(response.get("resolved_entities"))
+        if has_locations and response.get("intent_status") == "not_found":
+            response.setdefault(
+                "intent_message",
+                "Location(s) were resolved, but the intent is unclear. Please clarify what you want to know (e.g. water level, recharge, extraction, status, comparison).",
+            )
+            desc = response.get("description")
+            if isinstance(desc, str) and "intent" not in desc.lower():
+                response["description"] = f"{desc} Intent was not detected — please clarify your intent."
         return response
 
     # ── named response builders ───────────────────────────────────────────────

@@ -141,12 +141,9 @@ def extract_intent(query: str) -> Dict:
     # 3. group-aware multi-intent selection
     detected = _detect_intents_by_group(intent_scores)
 
-    if len(detected) == 0:
-        status = "not_found"
-    elif len(detected) == 1:
-        status = "resolved"
-    else:
-        status = "ambiguous"
+    # Multiple intents are expected because we select at most one per group
+    # (metric/operation/status/general). This should not be treated as ambiguity.
+    status = "resolved" if detected else "not_found"
 
     return {
         "intents":       detected,

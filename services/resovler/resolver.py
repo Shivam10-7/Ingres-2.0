@@ -41,6 +41,12 @@ LOCATION_NOISE_TOKENS = {
     "ok",           # common ASR/typo for "of"
     "groundwater",
     "table",
+    # Common query scaffolding / intent words (strip when isolating location tokens)
+    "list", "show", "all",
+    "district", "districts", "block", "blocks", "state", "states",
+    "over", "overexploited", "overexploited", "exploited",
+    "lowest", "highest", "minimum", "maximum",
+    "recharge", "availability", "balance", "quality", "trend", "forecast",
 }
 
 # Split multi-location queries written with commas and/or conjunctions.
@@ -443,6 +449,11 @@ class EntityResolver:
             stopwords_in_name = {
                 "and", "or", "of", "the", "a", "an",
                 "between", "level", "extraction", "compare", "for",
+                # query scaffolding that often appears right before "district(s)"
+                "list", "show", "all",
+                "over", "overexploited", "exploited",
+                "lowest", "highest", "minimum", "maximum",
+                "recharge", "availability", "balance", "quality", "trend", "forecast",
             }
             for t in mentioned_types:
                 pattern = rf"([a-z0-9]+(?:\s+[a-z0-9]+){{0,{max_name_tokens - 1}}})\s+{t}s?\b"
@@ -577,6 +588,13 @@ class EntityResolver:
             if resolved_entities:
                 return rb.partial_with_known(resolved_entities, query)
 
+            # We had a typed mention (e.g. "... districts in punee ...") but could
+            # not fuzzy-resolve it in this stage (often because the "mention"
+            # accidentally captured a non-location phrase). Fall through to the
+            # whole-query fuzzy fallback before declaring not_found.
+            fb = self._try_fuzzy_fallback_whole_query(query_norm, query)
+            if fb is not None:
+                return fb
             return rb.not_found(query, with_context=True)
 
         # ══════════════════════════════════════════════════════════════════════
