@@ -1,3 +1,15 @@
+#It's live 🎉🎊✨🖥️😁
+```postman
+https://ingres-2-0.onrender.com/resolve-entity
+```
+```testpayload
+{
+  "query": "list over exploited districts in pune with lowest recharge",
+  "session_id": "1222221"
+}
+```
+
+
 # Entity Resolver API — Setup Guide
 
 > **Stack:** Python 3.x · FastAPI · Uvicorn · rapidfuzz · sentence-transformers (optional)
