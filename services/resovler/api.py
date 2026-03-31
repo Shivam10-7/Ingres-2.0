@@ -89,3 +89,7 @@ def resolve_entity(req: QueryRequest):
 @app.get("/")
 def root():
     return {"message": "Entity Resolver API Running "}
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "message": "Happiness is when your code runs without errors!😘"}
