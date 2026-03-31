@@ -1,2 +1,11 @@
 .vscode/
 .idea/
+__pycache__
+.env
+/env
+venv
+*.pyc
+*.pyo
+/myvenv
+myvenv
+myvenv/

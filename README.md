@@ -156,4 +156,9 @@ For queries or support, please open an [issue](https://github.com/rutviktayde/IN
 _Empower groundwater management with AI-driven insights. Join us in making India's water future sustainable!_
 
 ---
+
+Server 
+1. Client Server 
+2. Node Sever 
+3. AI Uvicorn Server
 <img width="456" height="140" alt="Image" src="https://github.com/user-attachments/assets/e40dfd39-6201-49cb-9958-59917a492efe" />

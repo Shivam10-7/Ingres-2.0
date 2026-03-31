@@ -36,7 +36,7 @@ import {
   ChatSession,
 } from '@/lib/api';
 import { ChatSidebarContent } from '@/components/ChatSidebarContent';
-import { EChartsRenderer } from '@/components/EChartsRenderer';
+import { EChartsRenderer, type EChartsOption } from '@/components/EChartsRenderer';
 import IndiaMapComponent, { GW as GW_DATA } from '@/components/IndiaMapComponent';
 const logoLight = '/logo_LIGHT.png';
 const logoDark = '/logo_DARK.png';
@@ -87,8 +87,12 @@ type ChatMessageItem = {
   text: string;
   sender: 'user' | 'bot';
   timestamp: Date;
-  chartData?: any;
+  chartData?: EChartsOption;
   options?: SuggestionOption[];
+  // Used by the typewriter animation: when true, render incremental text.
+  isNew?: boolean;
+  // Elapsed time (ms) for the backend response that generated this bot message.
+  responseTimeMs?: number;
 };
 
 const buildLocationSuggestions = (place: string): SuggestionOption[] => [
@@ -198,7 +202,7 @@ function ChatPage() {
   const [isVisualizationNeeded, setIsVisualizationNeeded] = useState(false);
   const [isDetailedResponseNeeded, setIsDetailedResponseNeeded] = useState(false);
   const [isMapNeeded, setIsMapNeeded] = useState(false);
-  const [lastChartData, setLastChartData] = useState<any>(null);
+  const [lastChartData, setLastChartData] = useState<EChartsOption | null>(null);
 
   const [location, setLocation] = useState<{ city?: string; state?: string; lat: number; lng: number } | null>(null);
   const [locationStatus, setLocationStatus] = useState<'pending' | 'granted' | 'denied'>('pending');
@@ -244,30 +248,46 @@ function ChatPage() {
     setShowResults(false);
     const history = await getChatSessionHistory(chatId);
     if (history && history.messages) {
-      const formattedMessages: ChatMessageItem[] = history.messages.map((m: any, i: number) => {
+      const formattedMessages: ChatMessageItem[] = history.messages.map((m, i) => {
         const content = m.content;
 
         let text = '';
-        let chartData: any;
+        let chartData: EChartsOption | undefined;
+        let responseTimeMs: number | undefined;
 
         if (typeof content === 'string') {
           text = content;
         } else if (Array.isArray(content)) {
           const first = content[0] ?? {};
           text = typeof first.response === 'string' ? first.response : JSON.stringify(first);
-          chartData = first.chartData ?? first.chartdata;
+          chartData =
+            (first.chartData ?? first.chartdata) as EChartsOption | undefined;
+          responseTimeMs =
+            typeof first.responseTimeMs === 'number'
+              ? first.responseTimeMs
+              : typeof first.response_time_ms === 'number'
+                ? first.response_time_ms
+                : undefined;
         } else if (content && typeof content === 'object') {
           text = typeof content.response === 'string' ? content.response : JSON.stringify(content);
-          chartData = content.chartData ?? content.chartdata;
+          chartData =
+            (content.chartData ?? content.chartdata) as EChartsOption | undefined;
+          responseTimeMs =
+            typeof content.responseTimeMs === 'number'
+              ? content.responseTimeMs
+              : typeof content.response_time_ms === 'number'
+                ? content.response_time_ms
+                : undefined;
         }
 
         return {
-          id: m._id || i,
+          id: i,
           text,
           chartData,
           sender: m.role === 'user' ? 'user' : 'bot',
           timestamp: new Date(m.timestamp || Date.now()),
           isNew: false,
+          responseTimeMs,
         };
       });
 
@@ -472,7 +492,7 @@ function ChatPage() {
     navigator.geolocation.getCurrentPosition(onSuccess, onError, { timeout: 12000 });
   }, []);
 
-  const handleMapStateSelect = async (stateName: string, _data?: any) => {
+  const handleMapStateSelect = async (stateName: string, _data?: unknown) => {
     if (!stateName) return;
 
     const userMsg: ChatMessageItem = {
@@ -498,7 +518,7 @@ function ChatPage() {
     setMessages(prev => [...prev, botMsg]);
   };
 
-  const handleMapDistrictSelect = async (districtName: string, stateName: string, _data?: any) => {
+  const handleMapDistrictSelect = async (districtName: string, stateName: string, _data?: unknown) => {
     if (!districtName || !stateName) return;
 
     const place = `${districtName}, ${stateName}`;
@@ -540,12 +560,14 @@ function ChatPage() {
   const handleLogout = async () => {
     try {
       await fetch('/auth/logout', { method: 'POST', credentials: 'include' });
-    } catch { }
+    } catch {
+      // Logout failures shouldn't block navigation.
+    }
     navigate('/landing');
   };
 
   // Mark message as complete (transition from typewriter to HTML)
-  const markMessageComplete = (id: string) => {
+  const markMessageComplete = (id: string | number) => {
     setMessages(prev =>
       prev.map(msg =>
         msg.id === id ? { ...msg, isNew: false } : msg
@@ -603,7 +625,15 @@ function ChatPage() {
     }
 
     try {
+      // Measure request time for this bot response.
+      const startedAt =
+        typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
+
       const data = await sendChatRequest(textToSend, isDetailedResponseNeeded, isVisualizationNeeded);
+      const responseTimeMs =
+        Math.round(
+          (typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now()) - startedAt
+        );
 
       if (!data.success) {
         throw new Error(data.error || 'Failed to fetch response');
@@ -615,20 +645,21 @@ function ChatPage() {
           ? responsePayload
           : responsePayload?.response ?? "I'm sorry, I received an empty response.";
 
-      const chartData =
+      const chartData: EChartsOption | undefined =
         responsePayload && typeof responsePayload === 'object'
-          ? responsePayload.chartdata ?? responsePayload.chartData
+          ? (responsePayload.chartdata ?? responsePayload.chartData) as EChartsOption | undefined
           : undefined;
 
       setLastChartData(chartData ?? null);
 
-      const botResponse = {
+      const botResponse: ChatMessageItem = {
         id: crypto.randomUUID(), // More robust unique ID
         text: answerText,
         chartData,
         sender: 'bot',
         timestamp: new Date(),
         isNew: true,
+        responseTimeMs,
       };
 
       setMessages(prev => [...prev, botResponse]);
@@ -638,6 +669,7 @@ function ChatPage() {
           {
             response: answerText,
             chartData,
+            responseTimeMs,
           },
         ]);
 
@@ -980,6 +1012,11 @@ function ChatPage() {
                               <span className={`text-xs mt-2 block ${message.sender === 'user' ? 'text-white/70' : isLightMode ? 'text-slate-500' : 'text-white/40'}`}>
                                 {formatTime(message.timestamp)}
                               </span>
+                              {message.sender === 'bot' && typeof message.responseTimeMs === 'number' && (
+                                <span className={`text-[10px] mt-1 block ${isLightMode ? 'text-slate-400' : 'text-white/40'}`}>
+                                  Response time: {(message.responseTimeMs / 1000).toFixed(2)} s
+                                </span>
+                              )}
 
                               {message.options && message.options.length > 0 && (
                                 <div className="mt-3 max-h-64 overflow-y-auto space-y-2">

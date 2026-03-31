@@ -2,3 +2,5 @@ fastapi
 uvicorn
 rapidfuzz
 pydantic
+sentence-transformers
+torch
