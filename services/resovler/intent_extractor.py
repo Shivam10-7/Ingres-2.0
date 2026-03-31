@@ -5,6 +5,9 @@ from typing import Dict, List
 from rapidfuzz import process
 from sentence_transformers import SentenceTransformer, util
 
+import os
+os.environ["TRANSFORMERS_CACHE"] = "/app/.cache"
+os.environ["HF_HOME"] = "/app/.cache"
 # ── load once at import time ──────────────────────────────────────────────────
 
 with open("intent_db.json") as f:
