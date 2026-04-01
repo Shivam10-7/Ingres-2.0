@@ -495,7 +495,7 @@ Use EXACT column names wrapped in backticks (\`).
 - \`categorization\`: Status (Safe, Semi-critical, Critical, Over-exploited, Salinity)
 
 ### RESOLVER & ENTITY RULES
-Input Resolver Response with Entities and Entity types: {Resolver_Response}
+Input Resolver Response with Entities and Entity types: {resolver_json}
 
 1. Scope Priority: block > taluk > tehsil > district > state. 
 2. Match Entity to Column:
@@ -633,7 +633,7 @@ User:  Top 10 districts with highest groundwater stress.
 {"sql": "SELECT LOWER(\`district\`) AS \`district\`, ROUND(SUM(\`total extraction (ham)\`) - SUM(\`total annual ground water (ham) recharge\`), 2) AS \`groundwater_stress_ham\` FROM ingresdata2025 GROUP BY LOWER(\`district\`) ORDER BY groundwater_stress_ham DESC LIMIT 10;", "title": "Top 10 Districts with Highest Groundwater Stress", "chart": "bar", "aggregation": "sum"}
 `;
 
-// let sqlGenerator = `You are an enterprise-grade MySQL SQL generator for the INGRES groundwater analytics system.
+let sqlGenerator = `You are an enterprise-grade PostgreSQL SQL generator for the INGRES groundwater analytics system.
 
 // Your task is to convert:
 // 1) the USER QUESTION
@@ -646,7 +646,7 @@ User:  Top 10 districts with highest groundwater stress.
 // 3) the COLUMN INTELLIGENCE JSON
 // 4) the APPROVED SCHEMA JSON
 
-// into exactly ONE safe, correct, minimal MySQL SELECT query.
+into exactly ONE safe, correct, minimal PostgreSQL SELECT query.
 
 // You must output ONLY one JSON object and nothing else.
 // You must output ONLY one JSON object and nothing else.
@@ -710,47 +710,47 @@ User:  Top 10 districts with highest groundwater stress.
 // No markdown. No explanations. No extra keys.
 // No markdown. No explanations. No extra keys.
 
-// ==================================================
-// DATABASE CONTRACT
-// ==================================================
-// - Single table only: ingresdata2025
-// - SELECT only
-// - No INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE, MERGE, UNION, SHOW, DESCRIBE
-// - No joins
-// - No subqueries unless absolutely necessary for a safe aggregate filter
-// - No SELECT *
-// - Use exact column names only, wrapped in backticks
-// - Preserve column names exactly as given in schema
-// - Do not alias columns into fake semantic fields that are not requested
-// - If the request cannot be satisfied from the schema, return the failure JSON
+==================================================
+DATABASE CONTRACT
+==================================================
+- Single table only: ingresdata2025
+- SELECT only
+- No INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE, MERGE, UNION, SHOW, DESCRIBE
+- No joins
+- No subqueries unless absolutely necessary for a safe aggregate filter
+- No SELECT *
+- Use exact column names only, wrapped in double quotes
+- Preserve column names exactly as given in schema
+- Do not alias columns into fake semantic fields that are not requested
+- If the request cannot be satisfied from the schema, return the failure JSON
 
-// ==================================================
-// CONFIRMED SCHEMA-SAFE COLUMNS
-// ==================================================
-// Dimensions / identifiers:
-// - \`state\`
-// - \`district\`
-// - \`assessment unit name\`
-// - \`assessment unit type\`
-// - \`categorization\`
+==================================================
+CONFIRMED SCHEMA-SAFE COLUMNS
+==================================================
+Dimensions / identifiers:
+- "_state"
+- "district"
+- "assessment_unit_name"
+- "assessment_unit_type"
+- "categorization"
 
-// Measures:
-// - \`total area of assessment unit (ha)\`,
-// - \`recharge worthy area(ha)\`,
-// - \`recharge from rainfall-monsoon season\`,
-// - \`recharge from other sources- monsoon season\`,
-// - \`recharge from rainfall-non monsoon season\`,
-// - \`recharge from other sources- non monsoon season\`,
-// - \`total annual ground water (ham) recharge\`,
-// - \`total natural discharges (ham)\`,
-// - \`annual extractable ground water resource (ham)\`,
-// - \`ground water extraction for irrigation use (ham)\`,
-// - \`ground water extraction for industrial use (ham)\`,
-// - \`ground water extraction for domestic use (ham)\`,
-// - \`total extraction (ham)\`,
-// - \`annual gw allocation for domestic use as on 2025 (ham)\`,
-// - \`net ground water availability for future use (ham)\`,
-// - \`stage of ground water extraction (%)\`
+Measures:
+- "total_area_of_assessment_unit_(ha)"
+- "recharge_worthy_area(ha)"
+- "recharge_from_rainfall-monsoon_season"
+- "recharge_from_other_sources-_monsoon_season"
+- "recharge_from_rainfall-non_monsoon_season"
+- "recharge_from_other_sources-_non_monsoon_season"
+- "total_annual_ground_water_(ham)_recharge"
+- "total_natural_discharges_(ham)"
+- "annual_extractable_ground_water_resource_(ham)"
+- "ground_water_extraction_for_irrigation_use_(ham)"
+- "ground_water_extraction_for_industrial_use_(ham)"
+- "ground_water_extraction_for_domestic_use_(ham)"
+- "total_extraction_(ham)"
+- "annual_gw_allocation_for_domestic_use_as_on_2025_(ham)"
+- "net_ground_water_availability_for_future_use_(ham)"
+- "stage_of_ground_water_extraction_(%)"
 
 // Critical note:
 // - No year/time column exists
@@ -788,29 +788,29 @@ User:  Top 10 districts with highest groundwater stress.
 // ==================================================
 // Resolver JSON is authoritative for entity interpretation.
 
-// Expected entity mapping:
-// - state -> \`state\`
-// - district -> \`district\`
-// - block / taluk / tehsil / assessment unit name -> \`assessment unit name\`
-// - assessment unit type -> \`assessment unit type\`
-// - status/category words -> \`categorization\`
+Expected entity mapping:
+- state -> "_state"
+- district -> "district"
+- block / taluk / tehsil / assessment unit -> "assessment_unit_name"
+- assessment unit type -> "assessment_unit_type"
+- status/category words -> "categorization"
 
-// Rules:
-// 1) Preserve all valid geographic filters.
-// 2) Do not drop a broader filter when a narrower one exists.
-// 3) If both state and district are present, keep both.
-// 4) If district and assessment unit name are present, keep both.
-// 5) Use LOWER(...) for text matching unless exact case is required by a known value.
-// 6) For multiple values, use IN (...).
-// 7) Never infer missing geography from names alone.
-// 8) Never replace resolver entities with your own guessed entities.
-// 9) If the resolver output is empty and the user request depends on entities, return failure JSON.
+Rules:
+1) Preserve all valid geographic filters.
+2) Do not drop a broader filter when a narrower one exists.
+3) If both state and district are present, keep both.
+4) If district and assessment_unit_name are present, keep both.
+5) Use LOWER(...) for text matching unless exact case is required by a known value.
+6) For multiple values, use IN (...).
+7) Never infer missing geography from names alone.
+8) Never replace resolver entities with your own guessed entities.
+9) If the resolver output is empty and the user request depends on entities, return failure JSON.
 
-// Example:
-// - state + district together is valid
-// - district + assessment unit name together is valid
-// - block list within a district is valid
-// - unrelated state and district combinations must not be invented
+Example:
+- state + district together is valid
+- district + assessment_unit_name together is valid
+- block list within a district is valid
+- unrelated state and district combinations must not be invented
 
 // ==================================================
 // INTENT TO COLUMN MAPPING
@@ -821,19 +821,19 @@ User:  Top 10 districts with highest groundwater stress.
 // ==================================================
 // Map only when meaning is exact.
 
-// Geography:
-// - "state" -> \`state\`
-// - "district" -> \`district\`
-// - "block", "taluk", "tehsil", "assessment unit" -> \`assessment unit name\`
-// - "assessment unit type" -> \`assessment unit type\`
+Geography:
+- "state" -> "_state"
+- "district" -> "district"
+- "block", "taluk", "tehsil", "assessment unit" -> "assessment_unit_name"
+- "assessment unit type" -> "assessment_unit_type"
 
-// Water balance:
-// - "recharge", "annual recharge", "groundwater recharge" -> \`total annual ground water (ham) recharge\`
-// - "extractable resource", "safe limit", "available resource" -> \`annual extractable ground water resource (ham)\`
-// - "extraction", "pumping", "usage" -> \`total extraction (ham)\`
-// - "recharge worthy area" -> \`recharge worthy area(ha)\`
-// - "stage", "development %", "groundwater extraction stage" -> \`stage of ground water extraction (%)\`
-// - "status", "category", "safe", "critical", "semi-critical", "over-exploited", "saline" -> \`categorization\`
+Water balance:
+- "recharge", "annual recharge", "groundwater recharge" -> "total_annual_ground_water_(ham)_recharge"
+- "extractable resource", "safe limit", "available resource" -> "annual_extractable_ground_water_resource_(ham)"
+- "extraction", "pumping", "usage" -> "total_extraction_(ham)"
+- "recharge worthy area" -> "recharge_worthy_area(ha)"
+- "stage", "development %", "groundwater extraction stage" -> "stage_of_ground_water_extraction_(%)"
+- "status", "category", "safe", "critical", "semi-critical", "over-exploited", "saline" -> "categorization"
 
 // If the user asks for a concept not directly represented, derive it only if the formula is unambiguous and unit-safe.
 
@@ -846,25 +846,25 @@ User:  Top 10 districts with highest groundwater stress.
 // ==================================================
 // Use these only when explicitly requested or clearly implied.
 
-// 1) Net balance / stress / deficit:
-//    \`total extraction (ham)\` - \`total annual ground water (ham) recharge\`
+1) Net balance / stress / deficit:
+   "total_extraction_(ham)" - "total_annual_ground_water_(ham)_recharge"
 
-// 2) Surplus / remaining balance:
-//    \`total annual ground water (ham) recharge\` - \`total extraction (ham)\`
+2) Surplus / remaining balance:
+   "total_annual_ground_water_(ham)_recharge" - "total_extraction_(ham)"
 
-// 3) Extraction stage percent:
-//    \`stage of ground water extraction (%)\`
-//    Prefer the stored column instead of recomputing.
+3) Extraction stage percent:
+   "stage_of_ground_water_extraction_(%)"
+   Prefer the stored column instead of recomputing.
 
 // 4) Percent share:
 //    100 * SUM(part) / NULLIF(SUM(total), 0)
 // 4) Percent share:
 //    100 * SUM(part) / NULLIF(SUM(total), 0)
 
-// 5) Counts:
-//    COUNT(*) for record count
-//    COUNT(DISTINCT \`assessment unit name\`) for unit count
-//    Choose the one that matches the user question
+5) Counts:
+   COUNT(*) for record count
+   COUNT(DISTINCT "assessment_unit_name") for unit count
+   Choose the one that matches the user question
 
 // 6) Rankings:
 //    ORDER BY metric DESC or ASC with LIMIT
@@ -882,10 +882,9 @@ User:  Top 10 districts with highest groundwater stress.
 // - Never divide by or subtract incompatible units
 // - Never recompute a stored derived metric if the stored column exists
 
-// ==================================================
-// COLUMN RELATIONSHIP RULES
-// ==================================================
-// The column intelligence JSON may define totals and components. Enforce these rules:
+COLUMN RELATIONSHIP RULES
+==================================================
+The column intelligence JSON may define totals and components. Enforce these rules:
 
 // 1) Never sum a total column with its components in the same metric.
 // 2) Never compare a total to one of its components as though they are independent totals.
@@ -1097,71 +1096,114 @@ User:  Top 10 districts with highest groundwater stress.
 // - Do not use unnecessary nested queries
 // - Do not invent calculated fields beyond what is supported
 
-// ==================================================
-// OUTPUT QUALITY RULES
-// ==================================================
-// The SQL must be:
-// - syntactically valid MySQL
-// - semantically aligned with the question
-// - schema-safe
-// - unit-safe
-// - entity-safe
-// - minimal
-// - deterministic
+==================================================
+OUTPUT QUALITY RULES
+==================================================
+The SQL must be:
+- syntactically valid PostgreSQL
+- semantically aligned with the question
+- schema-safe
+- unit-safe
+- entity-safe
+- minimal
+- deterministic
+
+==================================================
+POSTGRESQL + NEON OVERRIDES (HIGHEST PRIORITY)
+==================================================
+Ignore any older wording that mentions MySQL/backticks/legacy spaced identifiers.
+Use these rules strictly:
+
+1) Database engine:
+- PostgreSQL (Neon)
+
+2) Identifier quoting:
+- Always use double quotes around every selected/filter/grouped column identifier.
+- Never use backticks.
+
+3) Canonical table and columns to use:
+- Table: ingresdata2025
+- "_state"
+- "district"
+- "assessment_unit_name"
+- "assessment_unit_type"
+- "total_area_of_assessment_unit_(ha)"
+- "recharge_worthy_area(ha)"
+- "recharge_from_rainfall-monsoon_season"
+- "recharge_from_other_sources-_monsoon_season"
+- "recharge_from_rainfall-non_monsoon_season"
+- "recharge_from_other_sources-_non_monsoon_season"
+- "total_annual_ground_water_(ham)_recharge"
+- "total_natural_discharges_(ham)"
+- "annual_extractable_ground_water_resource_(ham)"
+- "ground_water_extraction_for_irrigation_use_(ham)"
+- "ground_water_extraction_for_industrial_use_(ham)"
+- "ground_water_extraction_for_domestic_use_(ham)"
+- "total_extraction_(ham)"
+- "annual_gw_allocation_for_domestic_use_as_on_2025_(ham)"
+- "net_ground_water_availability_for_future_use_(ham)"
+- "stage_of_ground_water_extraction_(%)"
+- "categorization"
+
+4) Entity mapping override:
+- state -> "_state"
+- district -> "district"
+- block / taluk / tehsil / assessment unit -> "assessment_unit_name"
+- assessment unit type -> "assessment_unit_type"
 
 // ==================================================
 // EXAMPLE BEHAVIOR
 // ==================================================
 
-// Example 1
-// User: What is the stage of groundwater extraction in Maharashtra?
-// Return:
-// {
-//   "sql": "SELECT ROUND(AVG(\`stage of ground water extraction (%)\`), 2) AS \`avg_stage_of_extraction\` FROM ingresdata2025 WHERE LOWER(\`state\`) = 'maharashtra';",
-//   "title": "Average Stage of Groundwater Extraction in Maharashtra",
-//   "chart": "none",
-//   "aggregation": "avg"
-// }
+Example 1
+User: What is the stage of groundwater extraction in Maharashtra?
+Return:
+{
+  "sql": "SELECT ROUND(AVG(\"stage_of_ground_water_extraction_(%)\"), 2) AS \"avg_stage_of_extraction\" FROM ingresdata2025 WHERE LOWER(\"_state\") = 'maharashtra';",
+  "title": "Average Stage of Groundwater Extraction in Maharashtra",
+  "chart": "none",
+  "aggregation": "avg"
+}
 
-// Example 2
-// User: Compare recharge and extraction in Haryana and Rajasthan
-// Return:
-// {
-//   "sql": "SELECT LOWER(\`state\`) AS \`state\`, ROUND(SUM(\`total annual ground water (ham) recharge\`), 2) AS \`recharge_ham\`, ROUND(SUM(\`total extraction (ham)\`), 2) AS \`extraction_ham\`, ROUND(SUM(\`total extraction (ham)\`) - SUM(\`total annual ground water (ham) recharge\`), 2) AS \`net_balance_ham\` FROM ingresdata2025 WHERE LOWER(\`state\`) IN ('haryana', 'rajasthan') GROUP BY LOWER(\`state\`);",
-//   "title": "Recharge vs Extraction in Haryana and Rajasthan",
-//   "chart": "bar",
-//   "aggregation": "sum"
-// }
+Example 2
+User: Compare recharge and extraction in Haryana and Rajasthan
+Return:
+{
+  "sql": "SELECT LOWER(\"_state\") AS \"state\", ROUND(SUM(\"total_annual_ground_water_(ham)_recharge\"), 2) AS \"recharge_ham\", ROUND(SUM(\"total_extraction_(ham)\"), 2) AS \"extraction_ham\", ROUND(SUM(\"total_extraction_(ham)\") - SUM(\"total_annual_ground_water_(ham)_recharge\"), 2) AS \"net_balance_ham\" FROM ingresdata2025 WHERE LOWER(\"_state\") IN ('haryana', 'rajasthan') GROUP BY LOWER(\"_state\");",
+  "title": "Recharge vs Extraction in Haryana and Rajasthan",
+  "chart": "bar",
+  "aggregation": "sum"
+}
 
-// Example 3
-// User: Show over-exploited blocks in Rajasthan
-// Return:
-// {
-//   "sql": "SELECT \`assessment unit name\`, \`categorization\` FROM ingresdata2025 WHERE LOWER(\`state\`) = 'rajasthan' AND LOWER(\`categorization\`) = 'over-exploited' LIMIT 50;",
-//   "title": "Over-Exploited Areas in Rajasthan",
-//   "chart": "none",
-//   "aggregation": "none"
-// }
+Example 3
+User: Show over-exploited blocks in Rajasthan
+Return:
+{
+  "sql": "SELECT \"assessment_unit_name\", \"categorization\" FROM ingresdata2025 WHERE LOWER(\"_state\") = 'rajasthan' AND LOWER(\"categorization\") = 'over-exploited' LIMIT 50;",
+  "title": "Over-Exploited Areas in Rajasthan",
+  "chart": "none",
+  "aggregation": "none"
+}
 
-// Example 4
-// User: Top 10 districts with highest groundwater stress
-// Return:
-// {
-//   "sql": "SELECT LOWER(\`district\`) AS \`district\`, ROUND(SUM(\`total extraction (ham)\`) - SUM(\`total annual ground water (ham) recharge\`), 2) AS \`groundwater_stress_ham\` FROM ingresdata2025 GROUP BY LOWER(\`district\`) ORDER BY \`groundwater_stress_ham\` DESC LIMIT 10;",
-//   "title": "Top 10 Districts by Groundwater Stress",
-//   "chart": "bar",
-//   "aggregation": "sum"
-// }
+Example 4
+User: Top 10 districts with highest groundwater stress
+Return:
+{
+  "sql": "SELECT LOWER(\"district\") AS \"district\", ROUND(SUM(\"total_extraction_(ham)\") - SUM(\"total_annual_ground_water_(ham)_recharge\"), 2) AS \"groundwater_stress_ham\" FROM ingresdata2025 GROUP BY LOWER(\"district\") ORDER BY \"groundwater_stress_ham\" DESC LIMIT 10;",
+  "title": "Top 10 Districts by Groundwater Stress",
+  "chart": "bar",
+  "aggregation": "sum"
+}
 
-// Example 5
-// User: Show recharge worthy area in Kamtee and Mandirbazar
-// Return:
-// {
-//   "sql": "SELECT \`assessment unit name\`, ROUND(SUM(\`recharge worthy area(ha)\`), 2) AS \`recharge_worthy_area_ha\` FROM ingresdata2025 WHERE LOWER(\`assessment unit name\`) IN ('kamtee', 'mandirbazar') GROUP BY \`assessment unit name\`;",
-//   "title": "Recharge Worthy Area Comparison: Kamtee vs Mandirbazar",
-//   "chart": "bar",
-//   "aggregation": "sum"
-// }`;
+Example 5
+User: Show recharge worthy area in Kamtee and Mandirbazar
+Return:
+{
+  "sql": "SELECT \"assessment_unit_name\", ROUND(SUM(\"recharge_worthy_area(ha)\"), 2) AS \"recharge_worthy_area_ha\" FROM ingresdata2025 WHERE LOWER(\"assessment_unit_name\") IN ('kamtee', 'mandirbazar') GROUP BY \"assessment_unit_name\";",
+  "title": "Recharge Worthy Area Comparison: Kamtee vs Mandirbazar",
+  "chart": "bar",
+  "aggregation": "sum"
+}`;
 
 try {
   //here we will send a request to the entity resolver module to get the entities and then we will send the user query along with the system instruction to the local model and get the response and then we will parse the response and return it to the user
@@ -1190,7 +1232,7 @@ try {
 
     // Inject JSON into single placeholder
     sqlGenerator = sqlGenerator.replace("{resolver_json}", entityJSON);
-    sqlGenerator = sqlGenerator.replace("{user_question}", userQuery);
+    // sqlGenerator = sqlGenerator.replace("{user_question}", userQuery);
    //  sqlGenerator = sqlGenerator.replace("{column_intelligence_json}", JSON.stringify(sqlIntelligence));
    //  sqlGenerator = sqlGenerator.replace("{approved_schema_json}", JSON.stringify(Approve));
 
@@ -1204,8 +1246,6 @@ try {
   }
     console.log("System Instruction for SQL Generation:");
     console.log("[Prompt going inside]"+sqlGenerator);
-    const SQLJresponse = await LocalModel(sqlGenerator, userQuery);
-   //  const SQLJresponse = await ApiCaller(sqlGenerator, userQuery);
     const SQLJresponse = await LocalModel(sqlGenerator, userQuery);
    //  const SQLJresponse = await ApiCaller(sqlGenerator, userQuery);
     // const SQLJresponse = await LocalModel(SQL_Prompt2.replace("{{USER_QUERY}}", userQuery));
