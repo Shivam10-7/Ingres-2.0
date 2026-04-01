@@ -620,29 +620,29 @@ DATABASE CONTRACT
 CONFIRMED SCHEMA-SAFE COLUMNS
 ==================================================
 Dimensions / identifiers:
-- \`state\`
-- \`district\`
-- \`assessment unit name\`
-- \`assessment unit type\`
-- \`categorization\`
+- "_state"
+- "district"
+- "assessment_unit_name"
+- "assessment_unit_type"
+- "categorization"
 
 Measures:
-- \`total area of assessment unit (ha)\`,
-- \`recharge worthy area(ha)\`,
-- \`recharge from rainfall-monsoon season\`,
-- \`recharge from other sources- monsoon season\`,
-- \`recharge from rainfall-non monsoon season\`,
-- \`recharge from other sources- non monsoon season\`,
-- \`total annual ground water (ham) recharge\`,
-- \`total natural discharges (ham)\`,
-- \`annual extractable ground water resource (ham)\`,
-- \`ground water extraction for irrigation use (ham)\`,
-- \`ground water extraction for industrial use (ham)\`,
-- \`ground water extraction for domestic use (ham)\`,
-- \`total extraction (ham)\`,
-- \`annual gw allocation for domestic use as on 2025 (ham)\`,
-- \`net ground water availability for future use (ham)\`,
-- \`stage of ground water extraction (%)\`
+- "total_area_of_assessment_unit_(ha)"
+- "recharge_worthy_area(ha)"
+- "recharge_from_rainfall-monsoon_season"
+- "recharge_from_other_sources-_monsoon_season"
+- "recharge_from_rainfall-non_monsoon_season"
+- "recharge_from_other_sources-_non_monsoon_season"
+- "total_annual_ground_water_(ham)_recharge"
+- "total_natural_discharges_(ham)"
+- "annual_extractable_ground_water_resource_(ham)"
+- "ground_water_extraction_for_irrigation_use_(ham)"
+- "ground_water_extraction_for_industrial_use_(ham)"
+- "ground_water_extraction_for_domestic_use_(ham)"
+- "total_extraction_(ham)"
+- "annual_gw_allocation_for_domestic_use_as_on_2025_(ham)"
+- "net_ground_water_availability_for_future_use_(ham)"
+- "stage_of_ground_water_extraction_(%)"
 
 Critical note:
 - No year/time column exists
@@ -666,17 +666,17 @@ ENTITY RESOLUTION RULES
 Resolver JSON is authoritative for entity interpretation.
 
 Expected entity mapping:
-- state -> \`state\`
-- district -> \`district\`
-- block / taluk / tehsil / assessment unit name -> \`assessment unit name\`
-- assessment unit type -> \`assessment unit type\`
-- status/category words -> \`categorization\`
+- state -> "_state"
+- district -> "district"
+- block / taluk / tehsil / assessment unit -> "assessment_unit_name"
+- assessment unit type -> "assessment_unit_type"
+- status/category words -> "categorization"
 
 Rules:
 1) Preserve all valid geographic filters.
 2) Do not drop a broader filter when a narrower one exists.
 3) If both state and district are present, keep both.
-4) If district and assessment unit name are present, keep both.
+4) If district and assessment_unit_name are present, keep both.
 5) Use LOWER(...) for text matching unless exact case is required by a known value.
 6) For multiple values, use IN (...).
 7) Never infer missing geography from names alone.
@@ -685,7 +685,7 @@ Rules:
 
 Example:
 - state + district together is valid
-- district + assessment unit name together is valid
+- district + assessment_unit_name together is valid
 - block list within a district is valid
 - unrelated state and district combinations must not be invented
 
@@ -695,18 +695,18 @@ INTENT TO COLUMN MAPPING
 Map only when meaning is exact.
 
 Geography:
-- "state" -> \`state\`
-- "district" -> \`district\`
-- "block", "taluk", "tehsil", "assessment unit" -> \`assessment unit name\`
-- "assessment unit type" -> \`assessment unit type\`
+- "state" -> "_state"
+- "district" -> "district"
+- "block", "taluk", "tehsil", "assessment unit" -> "assessment_unit_name"
+- "assessment unit type" -> "assessment_unit_type"
 
 Water balance:
-- "recharge", "annual recharge", "groundwater recharge" -> \`total annual ground water (ham) recharge\`
-- "extractable resource", "safe limit", "available resource" -> \`annual extractable ground water resource (ham)\`
-- "extraction", "pumping", "usage" -> \`total extraction (ham)\`
-- "recharge worthy area" -> \`recharge worthy area(ha)\`
-- "stage", "development %", "groundwater extraction stage" -> \`stage of ground water extraction (%)\`
-- "status", "category", "safe", "critical", "semi-critical", "over-exploited", "saline" -> \`categorization\`
+- "recharge", "annual recharge", "groundwater recharge" -> "total_annual_ground_water_(ham)_recharge"
+- "extractable resource", "safe limit", "available resource" -> "annual_extractable_ground_water_resource_(ham)"
+- "extraction", "pumping", "usage" -> "total_extraction_(ham)"
+- "recharge worthy area" -> "recharge_worthy_area(ha)"
+- "stage", "development %", "groundwater extraction stage" -> "stage_of_ground_water_extraction_(%)"
+- "status", "category", "safe", "critical", "semi-critical", "over-exploited", "saline" -> "categorization"
 
 If the user asks for a concept not directly represented, derive it only if the formula is unambiguous and unit-safe.
 
@@ -716,13 +716,13 @@ DERIVED METRIC RULES
 Use these only when explicitly requested or clearly implied.
 
 1) Net balance / stress / deficit:
-   \`total extraction (ham)\` - \`total annual ground water (ham) recharge\`
+   "total_extraction_(ham)" - "total_annual_ground_water_(ham)_recharge"
 
 2) Surplus / remaining balance:
-   \`total annual ground water (ham) recharge\` - \`total extraction (ham)\`
+   "total_annual_ground_water_(ham)_recharge" - "total_extraction_(ham)"
 
 3) Extraction stage percent:
-   \`stage of ground water extraction (%)\`
+   "stage_of_ground_water_extraction_(%)"
    Prefer the stored column instead of recomputing.
 
 4) Percent share:
@@ -730,7 +730,7 @@ Use these only when explicitly requested or clearly implied.
 
 5) Counts:
    COUNT(*) for record count
-   COUNT(DISTINCT \`assessment unit name\`) for unit count
+   COUNT(DISTINCT "assessment_unit_name") for unit count
    Choose the one that matches the user question
 
 6) Rankings:
@@ -742,7 +742,6 @@ Rules:
 - Never divide by or subtract incompatible units
 - Never recompute a stored derived metric if the stored column exists
 
-==================================================
 COLUMN RELATIONSHIP RULES
 ==================================================
 The column intelligence JSON may define totals and components. Enforce these rules:
