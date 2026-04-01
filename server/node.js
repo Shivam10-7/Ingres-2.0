@@ -249,6 +249,14 @@ app.get('/health/neon', async (req, res) => {
     }
 });
 
+// Simple root route to confirm deployed version is live.
+app.get('/', (req, res) => {
+    res.status(200).json({
+        status: "ok",
+        service: "ingres-server"
+    });
+});
+
 
 app.post('/dataQuery/test', async (req, res) => { 
        // 1. Input Validation: Ensure 'query' actually exists before processing
