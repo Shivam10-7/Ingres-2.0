@@ -108,8 +108,8 @@ Generate the final HTML response now using the dataString and userQuery:`;
   
 try {
     console.log("Response Generator Prompt:", RefinedPrompt);
-    // const response = await LocalModel(RefinedPrompt);
-     const response = await ApiCaller(RefinedPrompt,dataString);
+    const response = await LocalModel(RefinedPrompt);
+    //  const response = await ApiCaller(RefinedPrompt,dataString);
 
     return response.trim();
   } catch (error) {
