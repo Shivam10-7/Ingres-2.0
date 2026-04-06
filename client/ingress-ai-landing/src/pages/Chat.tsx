@@ -33,6 +33,7 @@ import {
   getGwraMapData,
   getGwraLocations,
   API_BASE_URL,
+  getAuthHeaders,
   getUserChatSessions,
   createNewChatSession,
   getChatSessionHistory,
@@ -415,6 +416,9 @@ function ChatPage() {
       try {
         const res = await fetch(`${API_BASE_URL}/auth/verify`, {
           credentials: "include",
+          headers: {
+            ...getAuthHeaders(),
+          },
         });
         if (res.ok) {
           const data = await res.json();
@@ -852,7 +856,13 @@ function ChatPage() {
       await fetch(`${API_BASE_URL}/auth/logout`, {
         method: "POST",
         credentials: "include",
+        headers: {
+          ...getAuthHeaders(),
+        },
       });
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem("authToken");
+      }
     } catch {}
     navigate("/landing");
   };
@@ -1237,6 +1247,9 @@ function ChatPage() {
     try {
       await fetch(`${API_BASE_URL}/api/chats/${chatId}`, {
         method: "DELETE",
+        headers: {
+          ...getAuthHeaders(),
+        },
       });
 
       setChats((prev) => prev.filter((chat) => chat.chatId !== chatId));

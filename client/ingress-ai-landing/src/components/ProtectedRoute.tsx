@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, getAuthHeaders } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -12,6 +12,9 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
       try {
         const res = await fetch(`${API_BASE_URL}/auth/verify`, {
           credentials: "include",
+          headers: {
+            ...getAuthHeaders(),
+          },
         });
         if (res.ok) {
           setIsAuthenticated(true);

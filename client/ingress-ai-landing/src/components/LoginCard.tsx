@@ -67,6 +67,10 @@ const LoginCard = () => {
               const err = await res.json();
               throw new Error(err.error || "Authentication failed");
             }
+            const data = await res.json();
+            if (data?.token && typeof window !== "undefined") {
+              window.localStorage.setItem("authToken", data.token);
+            }
             // on success the JWT cookie will be set automatically and user data stored in MongoDB
             navigate('/chat');
           } catch (err) {

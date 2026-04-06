@@ -112,6 +112,9 @@ router.post("/signup-email", async (req, res) => {
 
         return res.status(201).json({
             message: "User created and logged in successfully",
+            token,
+            userId: user._id,
+            email: user.email,
         });
 
     } catch (err) {

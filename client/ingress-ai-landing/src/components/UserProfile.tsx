@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, getAuthHeaders } from "@/lib/api";
 import { LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -23,6 +23,9 @@ const UserProfile = ({ isLightMode = true }: UserProfileProps) => {
       try {
         const res = await fetch(`${API_BASE_URL}/auth/verify`, {
           credentials: "include",
+          headers: {
+            ...getAuthHeaders(),
+          },
         });
         if (res.ok) {
           const data = await res.json();
@@ -43,7 +46,13 @@ const UserProfile = ({ isLightMode = true }: UserProfileProps) => {
       const res = await fetch(`${API_BASE_URL}/auth/logout`, {
         method: "POST",
         credentials: "include",
+        headers: {
+          ...getAuthHeaders(),
+        },
       });
+      if (res.ok && typeof window !== "undefined") {
+        window.localStorage.removeItem("authToken");
+      }
 
       if (res.ok) {
         navigate("/");

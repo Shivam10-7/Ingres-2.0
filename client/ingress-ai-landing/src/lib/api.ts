@@ -8,6 +8,16 @@ const RAG_API_BASE_URL =
   (import.meta.env as any).VITE_RAG_API_BASE_URL ||
   'http://127.0.0.1:8000';
 
+export const getAuthToken = () => {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem('authToken');
+};
+
+export const getAuthHeaders = () => {
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 export interface ChatResponse {
   success: boolean;
   // New API shape: response may be a plain string or an object containing both text and optional chart data.
@@ -73,6 +83,7 @@ export async function sendChatRequest(
       credentials: 'include', // Include cookies for session management
       headers: {
         'Content-Type': 'application/json',
+        ...getAuthHeaders(),
       },
       body: JSON.stringify({
         query,
@@ -115,6 +126,7 @@ export async function sendGeminiRagRequest(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...getAuthHeaders(),
       },
       body: JSON.stringify({
         user_query: userQuery,
@@ -155,6 +167,7 @@ export async function sendQuickChatRequest(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...getAuthHeaders(),
       },
       body: JSON.stringify({
         query,
@@ -255,7 +268,7 @@ export async function createNewChatSession(userId: string, chatName: string = "N
   try {
     const res = await fetch(`${API_BASE_URL}/api/chats`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ userId, chatName }),
     });
     if (!res.ok) throw new Error('Failed to create new chat');
@@ -268,7 +281,9 @@ export async function createNewChatSession(userId: string, chatName: string = "N
 
 export async function getUserChatSessions(userId: string): Promise<ChatSession[]> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/chats/${userId}`);
+    const res = await fetch(`${API_BASE_URL}/api/chats/${userId}`, {
+      headers: { ...getAuthHeaders() },
+    });
     if (!res.ok) throw new Error('Failed to fetch user chats');
     return await res.json();
   } catch (error) {
@@ -279,7 +294,9 @@ export async function getUserChatSessions(userId: string): Promise<ChatSession[]
 
 export async function getChatSessionHistory(chatId: string): Promise<ChatHistoryResponse | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/chats/messages/${chatId}`);
+    const res = await fetch(`${API_BASE_URL}/api/chats/messages/${chatId}`, {
+      headers: { ...getAuthHeaders() },
+    });
     if (!res.ok) throw new Error('Failed to fetch chat history');
     return await res.json();
   } catch (error) {
@@ -292,7 +309,7 @@ export async function saveChatMessage(chatId: string, role: string, content: any
   try {
     const res = await fetch(`${API_BASE_URL}/api/chats/message`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ chatId, role, content }),
     });
     if (!res.ok) throw new Error('Failed to save message');
@@ -307,7 +324,8 @@ export const renameChatSession = async (chatId: string, chatName: string) => {
   const res = await fetch(`${API_BASE_URL}/api/chats/rename/${chatId}`, {
     method: "PUT",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      ...getAuthHeaders(),
     },
     body: JSON.stringify({ chatName })
   });
