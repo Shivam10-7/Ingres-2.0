@@ -30,17 +30,20 @@ import {
 import {
   sendGeminiRagRequest,
   sendChatRequest,
+  getGwraMapData,
+  getGwraLocations,
+  API_BASE_URL,
   getUserChatSessions,
   createNewChatSession,
   getChatSessionHistory,
   saveChatMessage,
   ChatSession,
+  GwraMapSummary,
 } from "@/lib/api";
 import { ChatSidebarContent } from "@/components/ChatSidebarContent";
 import { EChartsRenderer } from "@/components/EChartsRenderer";
-import IndiaMapComponent, {
-  GW as GW_DATA,
-} from "@/components/IndiaMapComponent";
+import IndiaMapComponent from "@/components/IndiaMapComponent";
+import gwraMapDataJson from "../../../../Data/GWRA_MapData.json";
 const logoLight = "/logo_LIGHT.png";
 const logoDark = "/logo_DARK.png";
 import "@/chat/index.css";
@@ -84,10 +87,6 @@ const SUGGESTION_ICONS = [
   <Shield className="w-6 h-6 text-blue-500" />,
 ];
 
-const STATES = ["Gujarat", "Rajasthan", "Maharashtra", "Madhya Pradesh"];
-const DISTRICTS = ["Ahmedabad", "Vadodara", "Surat", "Rajkot"];
-const BLOCKS = ["All Blocks", "Central", "North", "South"];
-
 const SAMPLE_DATA = [
   {
     year: "2024",
@@ -117,6 +116,19 @@ type ChatMessageItem = {
   timestamp: Date;
   chartData?: any;
   options?: SuggestionOption[];
+  isNew?: boolean;
+};
+
+type MapSelection = {
+  state?: string;
+  district?: string;
+};
+
+const LOCAL_GWRA_MAP_DATA = gwraMapDataJson as {
+  source?: string;
+  generatedAt?: string;
+  states?: Record<string, GwraMapSummary>;
+  districts?: Record<string, GwraMapSummary>;
 };
 
 const buildLocationSuggestions = (place: string): SuggestionOption[] => [
@@ -137,6 +149,129 @@ const buildLocationSuggestions = (place: string): SuggestionOption[] => [
     prompt: `Give me groundwater categorization of ${place}`,
   },
 ];
+
+const normalizeMapName = (value = "") =>
+  String(value)
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const formatMapNumber = (value?: number | null, unit = "") => {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return "N/A";
+  }
+
+  const formatted = value.toLocaleString("en-IN", {
+    maximumFractionDigits: value >= 1000 ? 0 : 2,
+  });
+
+  return unit ? `${formatted} ${unit}` : formatted;
+};
+
+const formatStatusLabel = (value = "") =>
+  String(value)
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const roundMapMetric = (value: number) => Math.round(value * 100) / 100;
+
+const categoryFromRank = (rank: number) => {
+  if (rank >= 4) return "Over Exploited";
+  if (rank >= 3) return "Critical";
+  if (rank >= 2) return "Semi Critical";
+  return "Safe";
+};
+
+const statusFromRank = (rank: number) => {
+  if (rank >= 3) return "critical";
+  if (rank >= 2) return "caution";
+  return "safe";
+};
+
+const buildDerivedStateSummaries = (
+  districtData: Record<string, GwraMapSummary>,
+) => {
+  const groupedStates = new Map<
+    string,
+    {
+      name: string;
+      recharge: number;
+      extractable: number;
+      extraction: number;
+      stage: number;
+      categoryRank: number;
+      districtCount: number;
+    }
+  >();
+
+  Object.values(districtData).forEach((entry) => {
+    const stateName = entry.state?.trim();
+    if (!stateName) return;
+
+    const existing = groupedStates.get(stateName) ?? {
+      name: stateName,
+      recharge: 0,
+      extractable: 0,
+      extraction: 0,
+      stage: 0,
+      categoryRank: 0,
+      districtCount: 0,
+    };
+
+    existing.recharge += Number(entry.recharge) || 0;
+    existing.extractable += Number(entry.extractable) || 0;
+    existing.extraction += Number(entry.extraction) || 0;
+    existing.stage += Number(entry.stage) || 0;
+    existing.categoryRank += Number(entry.categoryRank) || 0;
+    existing.districtCount += 1;
+
+    groupedStates.set(stateName, existing);
+  });
+
+  const derivedStates: Record<string, GwraMapSummary> = {};
+
+  groupedStates.forEach((entry, stateName) => {
+    if (!entry.districtCount) return;
+
+    const averageRank = entry.categoryRank / entry.districtCount;
+    const roundedRank = Math.min(4, Math.max(1, Math.round(averageRank)));
+
+    derivedStates[stateName] = {
+      name: entry.name,
+      state: "",
+      recharge: roundMapMetric(entry.recharge / entry.districtCount),
+      extractable: roundMapMetric(entry.extractable / entry.districtCount),
+      extraction: roundMapMetric(entry.extraction / entry.districtCount),
+      stage: roundMapMetric(entry.stage / entry.districtCount),
+      unitCount: entry.districtCount,
+      categoryRank: roundedRank,
+      worstCategory: categoryFromRank(roundedRank),
+      status: statusFromRank(roundedRank),
+    };
+  });
+
+  return derivedStates;
+};
+
+const isSupportedMapQueryText = (value = "") => {
+  const normalized = value.toLowerCase().trim();
+  return (
+    normalized.includes("groundwater level") ||
+    normalized.includes("groundwater_level") ||
+    normalized.includes("total recharge") ||
+    normalized.includes("total_recharge") ||
+    normalized.includes("extractable") ||
+    normalized.includes("extraction") ||
+    normalized.includes("stage of groundwater extraction") ||
+    normalized.includes("categorization") ||
+    normalized.includes("category") ||
+    normalized.includes("stage")
+  );
+};
 
 const formatMessageText = (text: string) => {
   if (!text) return null;
@@ -244,6 +379,16 @@ function ChatPage() {
     useState(false);
   const [isMapNeeded, setIsMapNeeded] = useState(false);
   const [lastChartData, setLastChartData] = useState<any>(null);
+  const [mapSelection, setMapSelection] = useState<MapSelection | null>(null);
+  const [mapStatesData, setMapStatesData] = useState<
+    Record<string, GwraMapSummary>
+  >({});
+  const [mapDistrictsData, setMapDistrictsData] = useState<
+    Record<string, GwraMapSummary>
+  >({});
+  const mapStatesDataRef = useRef<Record<string, GwraMapSummary>>({});
+  const mapDistrictsDataRef = useRef<Record<string, GwraMapSummary>>({});
+  const derivedStateNamesRef = useRef<Set<string>>(new Set());
 
   const [location, setLocation] = useState<{
     city?: string;
@@ -268,7 +413,7 @@ function ChatPage() {
   useEffect(() => {
     const fetchUserAndChats = async () => {
       try {
-        const res = await fetch("http://localhost:8081/auth/verify", {
+        const res = await fetch(`${API_BASE_URL}/auth/verify`, {
           credentials: "include",
         });
         if (res.ok) {
@@ -345,9 +490,12 @@ function ChatPage() {
   };
   const [showDataPanel, setShowDataPanel] = useState(false);
   const [showResults, setShowResults] = useState(false);
-  const [selectedState, setSelectedState] = useState(STATES[0]);
-  const [selectedDistrict, setSelectedDistrict] = useState(DISTRICTS[0]);
-  const [selectedBlock, setSelectedBlock] = useState(BLOCKS[0]);
+  const [stateOptions, setStateOptions] = useState<string[]>([]);
+  const [cityOptions, setCityOptions] = useState<string[]>([]);
+  const [blockOptions, setBlockOptions] = useState<string[]>([]);
+  const [selectedState, setSelectedState] = useState("");
+  const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [selectedBlock, setSelectedBlock] = useState("");
   const [year2023, setYear2023] = useState(true);
   const [year2024, setYear2024] = useState(true);
   const messagesEndRef = useRef(null);
@@ -482,6 +630,89 @@ function ChatPage() {
   }, []);
 
   useEffect(() => {
+    const loadMapData = async () => {
+      const response =
+        LOCAL_GWRA_MAP_DATA &&
+        Object.keys(LOCAL_GWRA_MAP_DATA.states ?? {}).length > 0
+          ? LOCAL_GWRA_MAP_DATA
+          : await getGwraMapData();
+      const nextDistricts = response.districts ?? {};
+      const derivedStates = buildDerivedStateSummaries(nextDistricts);
+      const nextStates =
+        Object.keys(derivedStates).length > 0
+          ? derivedStates
+          : response.states ?? {};
+
+      mapStatesDataRef.current = nextStates;
+      mapDistrictsDataRef.current = nextDistricts;
+      derivedStateNamesRef.current = new Set(Object.keys(derivedStates));
+      setMapStatesData(nextStates);
+      setMapDistrictsData(nextDistricts);
+    };
+
+    loadMapData();
+  }, []);
+
+  useEffect(() => {
+    const loadStates = async () => {
+      const response = await getGwraLocations();
+      const nextStates = response.states ?? [];
+
+      setStateOptions(nextStates);
+
+      if (nextStates.length > 0) {
+        setSelectedState((current) =>
+          current && nextStates.includes(current) ? current : nextStates[0],
+        );
+      }
+    };
+
+    loadStates();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedState) {
+      setCityOptions([]);
+      setSelectedDistrict("");
+      setBlockOptions([]);
+      setSelectedBlock("");
+      return;
+    }
+
+    const loadCities = async () => {
+      const response = await getGwraLocations(selectedState);
+      const nextCities = response.cities ?? [];
+
+      setCityOptions(nextCities);
+      setSelectedDistrict((current) =>
+        current && nextCities.includes(current) ? current : nextCities[0] ?? "",
+      );
+    };
+
+    loadCities();
+  }, [selectedState]);
+
+  useEffect(() => {
+    if (!selectedState || !selectedDistrict) {
+      setBlockOptions([]);
+      setSelectedBlock("");
+      return;
+    }
+
+    const loadAssessmentUnits = async () => {
+      const response = await getGwraLocations(selectedState, selectedDistrict);
+      const nextBlocks = response.assessmentUnits ?? [];
+
+      setBlockOptions(nextBlocks);
+      setSelectedBlock((current) =>
+        current && nextBlocks.includes(current) ? current : nextBlocks[0] ?? "",
+      );
+    };
+
+    loadAssessmentUnits();
+  }, [selectedState, selectedDistrict]);
+
+  useEffect(() => {
     const buildSuggestions = (city?: string, state?: string) => {
       const place = city || state || "India";
       setSuggestionContextLabel(place);
@@ -545,6 +776,7 @@ function ChatPage() {
 
   const handleMapStateSelect = async (stateName: string, _data?: any) => {
     if (!stateName) return;
+    setMapSelection({ state: stateName });
 
     const userMsg: ChatMessageItem = {
       id: crypto.randomUUID(),
@@ -575,6 +807,7 @@ function ChatPage() {
     _data?: any,
   ) => {
     if (!districtName || !stateName) return;
+    setMapSelection({ district: districtName, state: stateName });
 
     const place = `${districtName}, ${stateName}`;
 
@@ -611,10 +844,15 @@ function ChatPage() {
     setMessages((prev) => [...prev, botMsg]);
   };
 
+  const isMapModeActive = isMapNeeded;
+
   // Handle logout
   const handleLogout = async () => {
     try {
-      await fetch("/auth/logout", { method: "POST", credentials: "include" });
+      await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
     } catch {}
     navigate("/landing");
   };
@@ -637,7 +875,191 @@ function ChatPage() {
     };
   };
 
+  const findStateSummary = (stateName?: string) => {
+    if (!stateName) return null;
+
+    const stateData = mapStatesDataRef.current;
+    const direct = stateData[stateName];
+    if (direct) return direct;
+
+    const normalized = normalizeMapName(stateName);
+    return (
+      Object.values(stateData).find(
+        (entry) => normalizeMapName(entry.name) === normalized,
+      ) ?? null
+    );
+  };
+
+  const findDistrictSummary = (districtName?: string, stateName?: string) => {
+    if (!districtName || !stateName) return null;
+
+    const districtData = mapDistrictsDataRef.current;
+    const direct = districtData[`${districtName}|${stateName}`];
+    if (direct) return direct;
+
+    const normalizedDistrict = normalizeMapName(districtName);
+    const normalizedState = normalizeMapName(stateName);
+
+    return (
+      Object.values(districtData).find(
+        (entry) =>
+          normalizeMapName(entry.name) === normalizedDistrict &&
+          normalizeMapName(entry.state || "") === normalizedState,
+      ) ?? null
+    );
+  };
+
+  const resolveMapQueryPlace = (query: string) => {
+    const normalizedQuery = normalizeMapName(query);
+    const stateEntries = Object.values(mapStatesDataRef.current);
+    const districtEntries = Object.values(mapDistrictsDataRef.current);
+    const normalizedLocationCity = normalizeMapName(location?.city || "");
+
+    const matchedState =
+      stateEntries.find((entry) =>
+        normalizedQuery.includes(normalizeMapName(entry.name)),
+      ) ||
+      (normalizedLocationCity &&
+      normalizedQuery.includes(normalizedLocationCity) &&
+      location?.state
+        ? findStateSummary(location.state)
+        : null) ||
+      (mapSelection?.state ? findStateSummary(mapSelection.state) : null);
+
+    if (matchedState) {
+      const matchedDistrict =
+        districtEntries.find(
+          (entry) =>
+            normalizeMapName(entry.state || "") ===
+              normalizeMapName(matchedState.name) &&
+            normalizedQuery.includes(normalizeMapName(entry.name)),
+        ) ||
+        (mapSelection?.district
+          ? findDistrictSummary(mapSelection.district, matchedState.name)
+          : null);
+
+      if (matchedDistrict) {
+        return {
+          requestedPlace: `${matchedDistrict.name}, ${matchedDistrict.state}`,
+          districtSummary: matchedDistrict,
+          stateSummary: matchedState,
+        };
+      }
+
+      return {
+        requestedPlace: matchedState.name,
+        districtSummary: null,
+        stateSummary: matchedState,
+      };
+    }
+
+    const selectedPlace =
+      mapSelection?.district && mapSelection?.state
+        ? `${mapSelection.district}, ${mapSelection.state}`
+        : mapSelection?.state ??
+          (location?.city && location?.state
+            ? `${location.city}, ${location.state}`
+            : location?.state ?? suggestionContextLabel);
+
+    const fallbackPlace =
+      query.match(/([A-Za-z .&()-]+,\s*[A-Za-z .&()-]+)\s*$/)?.[1]?.trim() ||
+      query.match(/\b(?:of|in)\s+(.+)$/i)?.[1]?.trim() ||
+      selectedPlace;
+
+    const districtStateMatch = fallbackPlace.match(/^(.*?),\s*(.+)$/);
+    const districtName =
+      districtStateMatch?.[1]?.trim() ||
+      mapSelection?.district ||
+      (normalizedLocationCity && normalizedQuery.includes(normalizedLocationCity)
+        ? location?.city
+        : undefined);
+    const stateName =
+      districtStateMatch?.[2]?.trim() ||
+      mapSelection?.state ||
+      (normalizedLocationCity && normalizedQuery.includes(normalizedLocationCity)
+        ? location?.state
+        : undefined) ||
+      location?.state ||
+      fallbackPlace;
+
+    return {
+      requestedPlace: fallbackPlace,
+      districtSummary:
+        districtName && stateName
+          ? findDistrictSummary(districtName, stateName)
+          : null,
+      stateSummary: findStateSummary(stateName),
+    };
+  };
+
+  const buildMapModeAnswer = (query: string) => {
+    const normalizedQuery = query.toLowerCase().trim();
+    const isSupportedMapQuery = isSupportedMapQueryText(query);
+
+    if (!isSupportedMapQuery) {
+      return null;
+    }
+
+    const { requestedPlace, districtSummary, stateSummary } =
+      resolveMapQueryPlace(query);
+    const summary = districtSummary || stateSummary;
+    const placeLabel = districtSummary
+      ? `${districtSummary.name}, ${districtSummary.state}`
+      : stateSummary?.name || requestedPlace;
+    const isDerivedStateSummary =
+      !districtSummary &&
+      !!stateSummary &&
+      derivedStateNamesRef.current.has(stateSummary.name);
+    const stateAverageNote = isDerivedStateSummary
+      ? " This state-level value is computed as the average of all district entries for that state in **GWRA_MapData.json**."
+      : "";
+
+    if (!summary) {
+      return `I could not find a matching entry in **GWRA_MapData.json** for **${requestedPlace}**.`;
+    }
+
+    if (
+      normalizedQuery.includes("groundwater level") ||
+      normalizedQuery.includes("groundwater_level")
+    ) {
+      return `For **${placeLabel}**, **GWRA_MapData.json** does not contain a separate groundwater-level field. The closest available metric is **stage of groundwater extraction = ${formatMapNumber(summary.stage)}%**.${stateAverageNote}`;
+    }
+
+    if (
+      normalizedQuery.includes("total recharge") ||
+      normalizedQuery.includes("total_recharge")
+    ) {
+      return `For **${placeLabel}**, **total annual groundwater recharge = ${formatMapNumber(summary.recharge, "Ham")}**.${stateAverageNote}`;
+    }
+
+    if (normalizedQuery.includes("extractable")) {
+      return `For **${placeLabel}**, **annual extractable groundwater resource = ${formatMapNumber(summary.extractable, "Ham")}**.${stateAverageNote}`;
+    }
+
+    if (normalizedQuery.includes("extraction")) {
+      return `For **${placeLabel}**, **total groundwater extraction = ${formatMapNumber(summary.extraction, "Ham")}**.${stateAverageNote}`;
+    }
+
+    if (
+      normalizedQuery.includes("stage of groundwater extraction") ||
+      normalizedQuery.includes("stage")
+    ) {
+      return `For **${placeLabel}**, **stage of groundwater extraction = ${formatMapNumber(summary.stage)}%**. This is based on **extraction = ${formatMapNumber(summary.extraction, "Ham")}** and **extractable = ${formatMapNumber(summary.extractable, "Ham")}**.${stateAverageNote}`;
+    }
+
+    if (
+      normalizedQuery.includes("categorization") ||
+      normalizedQuery.includes("category")
+    ) {
+      return `For **${placeLabel}**, **categorization = ${summary.worstCategory || formatStatusLabel(summary.status)}**.${stateAverageNote}`;
+    }
+
+    return null;
+  };
+
   const handleSend = async (overrideText?: string) => {
+    if (isMapModeActive && !overrideText) return;
+
     const textToSend = overrideText?.trim() || inputValue.trim();
     if (!textToSend) return;
 
@@ -676,6 +1098,64 @@ function ChatPage() {
     }
 
     try {
+      const shouldUseMapData =
+        isSupportedMapQueryText(textToSend) &&
+        (isMapNeeded ||
+          isMapPanelOpen ||
+          !!mapSelection ||
+          selectedMode.id === "auto");
+
+      if (shouldUseMapData && Object.keys(mapStatesDataRef.current).length === 0) {
+        const response =
+          LOCAL_GWRA_MAP_DATA &&
+          Object.keys(LOCAL_GWRA_MAP_DATA.states ?? {}).length > 0
+            ? LOCAL_GWRA_MAP_DATA
+            : await getGwraMapData();
+        const nextDistricts = response.districts ?? {};
+        const derivedStates = buildDerivedStateSummaries(nextDistricts);
+        const nextStates =
+          Object.keys(derivedStates).length > 0
+            ? derivedStates
+            : response.states ?? {};
+        mapStatesDataRef.current = nextStates;
+        mapDistrictsDataRef.current = nextDistricts;
+        derivedStateNamesRef.current = new Set(Object.keys(derivedStates));
+        setMapStatesData(nextStates);
+        setMapDistrictsData(nextDistricts);
+      }
+
+      const mapModeAnswer =
+        shouldUseMapData && buildMapModeAnswer(textToSend);
+
+      if (mapModeAnswer) {
+        const botResponse: ChatMessageItem = {
+          id: crypto.randomUUID(),
+          text: mapModeAnswer,
+          sender: "bot",
+          timestamp: new Date(),
+          isNew: true,
+        };
+
+        setLastChartData(null);
+        setMessages((prev) => [...prev, botResponse]);
+
+        if (activeChatId) {
+          await saveChatMessage(activeChatId, "assistant", [
+            {
+              response: mapModeAnswer,
+              chartData: null,
+            },
+          ]);
+
+          if (userId) {
+            const updatedChats = await getUserChatSessions(userId);
+            setChats(updatedChats);
+          }
+        }
+
+        return;
+      }
+
       const data = await sendChatRequest(
         textToSend,
         isDetailedResponseNeeded,
@@ -726,6 +1206,14 @@ function ChatPage() {
       }
     } catch (err) {
       console.error("Send failed", err);
+      const fallbackMessage: ChatMessageItem = {
+        id: crypto.randomUUID(),
+        text: "I could not complete that request from the server, but the map-selection flow is now configured to answer directly from **GWRA_MapData.json** when the query matches the supported groundwater attributes.",
+        sender: "bot",
+        timestamp: new Date(),
+        isNew: true,
+      };
+      setMessages((prev) => [...prev, fallbackMessage]);
     } finally {
       setIsTyping(false);
     }
@@ -747,7 +1235,7 @@ function ChatPage() {
   //For Deleting Chat
   const handleDeleteChat = async (chatId: string) => {
     try {
-      await fetch(`http://localhost:8081/api/chats/${chatId}`, {
+      await fetch(`${API_BASE_URL}/api/chats/${chatId}`, {
         method: "DELETE",
       });
 
@@ -1525,20 +2013,25 @@ ${
                             50,
                           );
                         }}
-                        placeholder="Type your message..."
+                        placeholder={
+                          isMapModeActive
+                            ? "Custom prompts are temporarily disabled in map mode"
+                            : "Type your message..."
+                        }
+                        disabled={isMapModeActive}
                         className={`flex-1 bg-transparent text-sm py-3 px-2 focus:outline-none ${
                           isLightMode
-                            ? "text-slate-800 placeholder:text-slate-400"
-                            : "text-white placeholder:text-white/40"
+                            ? "text-slate-800 placeholder:text-slate-400 disabled:text-slate-400 disabled:placeholder:text-slate-400"
+                            : "text-white placeholder:text-white/40 disabled:text-white/40 disabled:placeholder:text-white/30"
                         }`}
                       />
 
                       {/* Send Button */}
                       <button
                         onClick={() => handleSend()}
-                        disabled={!inputValue.trim()}
+                        disabled={isMapModeActive || !inputValue.trim()}
                         className={`px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
-                          inputValue.trim()
+                          !isMapModeActive && inputValue.trim()
                             ? "bg-blue-600 hover:bg-blue-500 text-white"
                             : "bg-white/5 text-white/30 cursor-not-allowed"
                         }`}
@@ -1610,7 +2103,7 @@ ${
                               : "glass-input-quick-dark text-white"
                           }`}
                         >
-                          {STATES.map((state) => (
+                          {stateOptions.map((state) => (
                             <option
                               key={state}
                               value={state}
@@ -1651,7 +2144,7 @@ ${
                               : "glass-input-quick-dark text-white"
                           }`}
                         >
-                          {DISTRICTS.map((district) => (
+                          {cityOptions.map((district) => (
                             <option
                               key={district}
                               value={district}
@@ -1692,7 +2185,7 @@ ${
                               : "glass-input-quick-dark text-white"
                           }`}
                         >
-                          {BLOCKS.map((block) => (
+                          {blockOptions.map((block) => (
                             <option
                               key={block}
                               value={block}
@@ -1787,9 +2280,9 @@ ${
                         <div className="flex items-center gap-1 text-xs text-blue-500 mb-4 flex-wrap">
                           <span>{selectedState}</span>
                           <ChevronRight className="w-3 h-3" />
-                          <span>{selectedDistrict}</span>
+                          <span>{selectedDistrict || "Not selected"}</span>
                           <ChevronRight className="w-3 h-3" />
-                          <span>{selectedBlock}</span>
+                          <span>{selectedBlock || "Not selected"}</span>
                         </div>
 
                         {/* Data Table */}
@@ -1912,7 +2405,7 @@ ${
                                 : "glass-input-quick-dark text-white"
                             }`}
                           >
-                            {STATES.map((state) => (
+                            {stateOptions.map((state) => (
                               <option
                                 key={state}
                                 value={state}
@@ -1950,7 +2443,7 @@ ${
                                 : "glass-input-quick-dark text-white"
                             }`}
                           >
-                            {DISTRICTS.map((district) => (
+                            {cityOptions.map((district) => (
                               <option
                                 key={district}
                                 value={district}
@@ -1986,7 +2479,7 @@ ${
                                 : "glass-input-quick-dark text-white"
                             }`}
                           >
-                            {BLOCKS.map((block) => (
+                            {blockOptions.map((block) => (
                               <option
                                 key={block}
                                 value={block}
@@ -2069,9 +2562,9 @@ ${
                           <div className="flex items-center gap-1 text-xs text-blue-400 mb-4 flex-wrap">
                             <span>{selectedState}</span>
                             <ChevronRight className="w-3 h-3" />
-                            <span>{selectedDistrict}</span>
+                            <span>{selectedDistrict || "Not selected"}</span>
                             <ChevronRight className="w-3 h-3" />
-                            <span>{selectedBlock}</span>
+                            <span>{selectedBlock || "Not selected"}</span>
                           </div>
 
                           <div

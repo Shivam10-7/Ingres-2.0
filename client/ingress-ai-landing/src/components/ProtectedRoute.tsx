@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { API_BASE_URL } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -9,7 +10,9 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     // Check if user is authenticated by verifying JWT token
     const checkAuth = async () => {
       try {
-        const res = await fetch("http://localhost:8081/auth/verify", { credentials: "include" });
+        const res = await fetch(`${API_BASE_URL}/auth/verify`, {
+          credentials: "include",
+        });
         if (res.ok) {
           setIsAuthenticated(true);
         } else {

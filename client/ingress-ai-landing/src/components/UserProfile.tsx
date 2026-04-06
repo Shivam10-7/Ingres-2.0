@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_BASE_URL } from "@/lib/api";
 import { LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -20,7 +21,7 @@ const UserProfile = ({ isLightMode = true }: UserProfileProps) => {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const res = await fetch("http://localhost:8081/auth/verify", {
+        const res = await fetch(`${API_BASE_URL}/auth/verify`, {
           credentials: "include",
         });
         if (res.ok) {
@@ -39,7 +40,7 @@ const UserProfile = ({ isLightMode = true }: UserProfileProps) => {
 
   const handleLogout = async () => {
     try {
-      const res = await fetch("http://localhost:8081/auth/logout", {
+      const res = await fetch(`${API_BASE_URL}/auth/logout`, {
         method: "POST",
         credentials: "include",
       });

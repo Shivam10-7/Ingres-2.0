@@ -17,7 +17,12 @@ const chartDeterminer = require('./src/routes/Modules/ChartDeterminer'); // Ensu
 // const server = http.createServer(app);
 // const mysql = require("mysql2"); // Keep the import for the connection block
 const classifier = require('./src/routes/classifier');
-// const { stat } = require('fs');
+const {
+    getStates,
+    getCitiesByState,
+    getAssessmentUnits,
+} = require('./src/routes/Modules/gwraLocations');
+const { getGwraMapData } = require('./src/routes/Modules/gwraMapData');
 
 mongoose.connect(process.env.MONGO_URI)
 .then(() => {
@@ -62,17 +67,25 @@ neonPool.query('SELECT 1 AS neon_up')
 // Attach WebSocket server to SAME HTTP server
 // const wss = new WebSocket.Server({ server });
 
+// Trust proxy for secure cookies when deployed behind Render/NGINX
+app.set('trust proxy', 1);
+
 app.use(express.json());
 app.use(cookieParser());
 
 // allow cross-origin requests from client (with credentials for cookies)
-const allowedOrigins = [
+const defaultOrigins = [
   'http://localhost:5173',
   'http://localhost:8080',
   'http://localhost:8082',
   'http://10.212.167.242:8080',
   'http://10.212.167.242:8082'
 ];
+const envOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -100,6 +113,47 @@ app.use('/auth', require('./src/routes/middleware/auth'));
 
 // routes for chat history
 app.use('/api/chats', require('./src/routes/chatRoutes'));
+
+app.get('/api/gwra/locations', (req, res) => {
+    try {
+        const { state, city } = req.query;
+
+        if (state && city) {
+            return res.status(200).json({
+                state,
+                city,
+                assessmentUnits: getAssessmentUnits(state, city),
+            });
+        }
+
+        if (state) {
+            return res.status(200).json({
+                state,
+                cities: getCitiesByState(state),
+            });
+        }
+
+        return res.status(200).json({
+            states: getStates(),
+        });
+    } catch (error) {
+        console.error('[GWRA Locations] Failed to load location data:', error);
+        return res.status(500).json({
+            error: 'Failed to load GWRA location data',
+        });
+    }
+});
+
+app.get('/api/gwra/map-data', (_req, res) => {
+    try {
+        return res.status(200).json(getGwraMapData());
+    } catch (error) {
+        console.error('[GWRA Map Data] Failed to load map data:', error);
+        return res.status(500).json({
+            error: 'Failed to load GWRA map data',
+        });
+    }
+});
 
 // these are the routes that we get form the chat
 app.post('/chat',AuthJwt, async (req, res) => { 

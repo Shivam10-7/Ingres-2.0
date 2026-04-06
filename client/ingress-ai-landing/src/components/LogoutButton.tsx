@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LogOut } from "lucide-react";
+import { API_BASE_URL } from "@/lib/api";
 
 const LogoutButton = () => {
   const navigate = useNavigate();
@@ -9,7 +10,7 @@ const LogoutButton = () => {
   const handleLogout = async () => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8081/auth/logout", {
+      const res = await fetch(`${API_BASE_URL}/auth/logout`, {
         method: "POST",
         credentials: "include",
       });
