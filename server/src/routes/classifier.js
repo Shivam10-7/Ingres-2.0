@@ -13,7 +13,12 @@ async function selectPipeline(isDetailedResponseNeeded, isVisualizationNeeded , 
 
   if (isDetailedResponseNeeded && !isVisualizationNeeded) {
     console.log("Detailed data query pipeline selected");
-    return "DETAILED_DATA_QUERY_PIPELINE";//here the function would be called that would call the detailed data query pipeline and then return the response to the user
+    const detailedDataQueryPipeline = require('./pipelines/DetailedResponse');
+    let response = await detailedDataQueryPipeline(query);
+    return {
+    response: response,
+    chartData: null
+   }//here the function would be called that would call the detailed data query pipeline and then return the response to the user
   }
 
   if (!isDetailedResponseNeeded && isVisualizationNeeded) {
