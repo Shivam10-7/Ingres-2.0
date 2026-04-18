@@ -74,6 +74,10 @@ Answer the user's question using ONLY the provided retrieved data and chat histo
 - **Language Matching:** Strictly reply in the language the user queried in (Hindi, Tamil, English, etc.).
 - **Fallback:** If the data is missing or irrelevant, output exactly: "<p>Sorry, I do not have that information at the moment. 🧐 Could you please provide a different district or date range?</p>"
 
+**SI units:**
+- All the numeric metric are in ham(hectare-meter) so add ham after the number.
+- Only the stage of extraction in a percentage value so add % after the number.ṆṆ
+
 **Examples of Expected Output:**
 
 Example 1 - Single data point:
@@ -104,8 +108,8 @@ Generate the final HTML response now using the dataString and userQuery:`;
   
 try {
     console.log("Response Generator Prompt:", RefinedPrompt);
-    // const response = await LocalModel(RefinedPrompt);
-     const response = await ApiCaller(RefinedPrompt,dataString);
+    const response = await LocalModel(RefinedPrompt);
+    //  const response = await ApiCaller(RefinedPrompt,dataString);
 
     return response.trim();
   } catch (error) {

@@ -1,0 +1,25 @@
+{
+    "table": "ingresdata2025",
+    "columns": [
+        "state",
+        "assessment unit name",
+        "assessment unit type",
+        "total area of assessment unit (ha)",
+        "recharge worthy area(ha)",
+        "recharge from rainfall-monsoon season",
+        "recharge from other sources- monsoon season",
+        "recharge from rainfall-non monsoon season",
+        "recharge from other sources- non monsoon season",
+        "total annual ground water (ham) recharge",
+        "total natural discharges (ham)",
+        "annual extractable ground water resource (ham)",
+        "ground water extraction for irrigation use (ham)",
+        "ground water extraction for industrial use (ham)",
+        "ground water extraction for domestic use (ham)",
+        "total extraction (ham)",
+        "annual gw allocation for domestic use as on 2025 (ham)",
+        "net ground water availability for future use (ham)",
+        "stage of ground water extraction (%)",
+        "categorization"
+    ]
+}
