@@ -3,6 +3,7 @@ import mapboxgl from 'mapbox-gl';
 import * as GeoJSON from 'geojson';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@/components/IndiaMapComponent.css';
+import { getGwraMapData, type GwraMapSummary } from '@/lib/api';
 
 // ─── MAPBOX TOKEN ──────────────────────────────────────────────────────────────
 const mapboxToken =
@@ -11,7 +12,6 @@ const mapboxToken =
 mapboxgl.accessToken = mapboxToken;
 
 // ─── TOPOJSON MINIMAL CONVERTER ───────────────────────────────────────────────
-// Lightweight TopoJSON → GeoJSON converter (no external dep needed)
 function topoArcToCoords(topology: any, arc: number[]): number[][] {
   const isReversed = arc[0] < 0;
   const idx = isReversed ? ~arc[0] : arc[0];
@@ -40,7 +40,6 @@ function topoArcsToRing(topology: any, arcIdxList: number[]): number[][] {
   for (const arcIdx of arcIdxList) {
     const seg = topoArcToCoords(topology, [arcIdx]);
     if (ring.length > 0) {
-      // skip first point (duplicate of previous last)
       ring.push(...seg.slice(1));
     } else {
       ring.push(...seg);
@@ -108,8 +107,7 @@ export const GW: Record<string, any> = {
   Uttarakhand:       { rain: 1558.0, ext: 2100.0,   extr: 1200.0,   stage: 57.1,  status: 'safe' },
 };
 
-// ─── DISTRICT GROUNDWATER (sample data — extend as needed) ────────────────────
-// Keyed by "district|state"
+// ─── DISTRICT GROUNDWATER ────────────────────────────────────────────────────
 const DISTRICT_GW: Record<string, any> = {
   'Nagpur|Maharashtra':       { stage: 61.2, rain: 1050, status: 'caution' },
   'Pune|Maharashtra':         { stage: 72.4, rain: 720,  status: 'caution' },
@@ -128,17 +126,103 @@ const DISTRICT_GW: Record<string, any> = {
   'Lucknow|Uttar Pradesh':    { stage: 85.6, rain: 900,  status: 'caution' },
 };
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
+// ─── PREMIUM COLOR SYSTEM ─────────────────────────────────────────────────────
+const MAP_DEEP = '#050C9C';
+const MAP_PRIMARY = '#3572EF';
+const MAP_BRIGHT = '#3ABEF9';
+const MAP_LIGHT = '#A7E6FF';
+const MAP_NEUTRAL_FILL = MAP_DEEP;
+const MAP_SELECTED_FILL = MAP_PRIMARY;
+const MAP_BORDER = 'rgba(167, 230, 255, 0.5)';
+const MAP_HOVER_ACCENT = MAP_LIGHT;
+
+// Blue palette requested by user.
 function statusColor(status: string) {
-  return status === 'critical' ? '#3d0010'
-       : status === 'caution'  ? '#2d1f00'
-       : '#003320';
+  return status === 'critical' ? MAP_DEEP
+       : status === 'caution'  ? MAP_PRIMARY
+       : MAP_BRIGHT;
 }
 
 function districtStatusColor(status: string) {
-  return status === 'critical' ? '#4a0014'
-       : status === 'caution'  ? '#3a2800'
-       : '#004028';
+  return status === 'critical' ? MAP_PRIMARY
+       : status === 'caution'  ? MAP_BRIGHT
+       : MAP_LIGHT;
+}
+
+function statusGlowColor(status: string) {
+  return status === 'critical' ? MAP_PRIMARY
+       : status === 'caution'  ? MAP_BRIGHT
+       : MAP_LIGHT;
+}
+
+function normalizeLocationName(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function formatHam(value?: number | null) {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return 'N/A';
+  }
+
+  return value.toLocaleString('en-IN', {
+    maximumFractionDigits: value >= 1000 ? 0 : 2,
+  });
+}
+
+function normalizeCategoryValue(value?: string | null) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getEntrySeverity(entry?: Partial<GwraMapSummary> | null): 'safe' | 'caution' | 'critical' | 'unknown' {
+  if (!entry) return 'unknown';
+
+  const normalizedStatus = normalizeCategoryValue(entry.status);
+  if (normalizedStatus === 'safe') return 'safe';
+  if (normalizedStatus === 'caution' || normalizedStatus === 'semi critical') return 'caution';
+  if (normalizedStatus === 'critical' || normalizedStatus === 'over exploited') return 'critical';
+
+  const normalizedCategory = normalizeCategoryValue(entry.worstCategory);
+  if (normalizedCategory === 'safe') return 'safe';
+  if (normalizedCategory === 'semi critical') return 'caution';
+  if (normalizedCategory === 'critical' || normalizedCategory === 'over exploited') return 'critical';
+
+  if (typeof entry.categoryRank === 'number' && !Number.isNaN(entry.categoryRank)) {
+    if (entry.categoryRank >= 3) return 'critical';
+    if (entry.categoryRank >= 2) return 'caution';
+    return 'safe';
+  }
+
+  return 'unknown';
+}
+
+function getEntryStatusLabel(entry?: Partial<GwraMapSummary> | null) {
+  if (!entry) return 'UNKNOWN';
+
+  const normalizedStatus = normalizeCategoryValue(entry.status);
+  if (normalizedStatus === 'safe') return 'Safe';
+  if (normalizedStatus === 'caution' || normalizedStatus === 'semi critical') return 'Semi Critical';
+  if (normalizedStatus === 'critical') return 'Critical';
+  if (normalizedStatus === 'over exploited') return 'Over Exploited';
+
+  const normalizedCategory = normalizeCategoryValue(entry.worstCategory);
+  if (normalizedCategory) {
+    return normalizedCategory.replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  const severity = getEntrySeverity(entry);
+  if (severity === 'caution') return 'Semi Critical';
+  if (severity === 'critical') return 'Critical';
+  if (severity === 'safe') return 'Safe';
+  return 'Unknown';
 }
 
 function geomBounds(geom: any): [number, number, number, number] {
@@ -176,9 +260,6 @@ interface IndiaMapComponentProps {
 const TOPO_OBJECT_NAME = 'india-districts-2019-734';
 const DISTRICTS_URL =
   'https://raw.githubusercontent.com/HindustanTimesLabs/shapefiles/master/india/districts/districts.json';
-// We'll use the uploaded file via a blob/import approach instead
-// (handled in loadDistrictsForState via fetch of the local file path during dev,
-//  or bundled as a JSON import in production)
 
 // ─── COMPONENT ────────────────────────────────────────────────────────────────
 export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
@@ -196,17 +277,16 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
   const ttInnerRef = useRef<HTMLDivElement>(null);
   const activePopup = useRef<mapboxgl.Popup | null>(null);
 
-  // ── Feature-state tracking refs ──────────────────────────────────────────
   const selectedStateIdRef   = useRef<number | null>(null);
   const hoveredStateIdRef    = useRef<number | null>(null);
   const selectedDistrictIdRef = useRef<number | null>(null);
   const hoveredDistrictIdRef  = useRef<number | null>(null);
 
-  // ── TopoJSON cache (loaded once) ─────────────────────────────────────────
   const topoDataRef = useRef<any>(null);
   const allDistrictsGeoJSONRef = useRef<GeoJSON.FeatureCollection | null>(null);
+  const stateDataRef = useRef<Record<string, GwraMapSummary>>({});
+  const districtDataRef = useRef<Record<string, GwraMapSummary>>({});
 
-  // ── React state ──────────────────────────────────────────────────────────
   const [currentState, setCurrentState] = useState<string | null>(null);
   const [currentDistrict, setCurrentDistrict] = useState<string | null>(null);
   const [zoom, setZoom] = useState(4);
@@ -214,7 +294,6 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
   const [showLoader, setShowLoader] = useState(true);
   const [hierarchyLevel, setHierarchyLevel] = useState<'india' | 'state' | 'district'>('india');
 
-  // ── Resize handling ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!map.current || !isVisible) return;
     const delays = [120, 300, 600];
@@ -228,12 +307,37 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  const getStateData = useCallback((stateName: string) => {
+    const directMatch = stateDataRef.current[stateName];
+    if (directMatch) return directMatch;
+
+    const normalizedState = normalizeLocationName(stateName);
+    return Object.values(stateDataRef.current).find(
+      (entry) => normalizeLocationName(entry.name) === normalizedState
+    );
+  }, []);
+
+  const getDistrictData = useCallback((districtName: string, stateName: string) => {
+    const directKey = `${districtName}|${stateName}`;
+    const directMatch = districtDataRef.current[directKey];
+    if (directMatch) return directMatch;
+
+    const normalizedDistrict = normalizeLocationName(districtName);
+    const normalizedState = normalizeLocationName(stateName);
+
+    return Object.values(districtDataRef.current).find(
+      (entry) =>
+        normalizeLocationName(entry.name) === normalizedDistrict &&
+        normalizeLocationName(entry.state || '') === normalizedState
+    );
+  }, []);
+
   // ─── TOOLTIP ───────────────────────────────────────────────────────────────
   const moveTooltip = useCallback((e: MouseEvent) => {
     if (!ttRef.current) return;
     const cx = (e as any).clientX ?? (e as any).pageX;
     const cy = (e as any).clientY ?? (e as any).pageY;
-    const tw = 220, th = 120;
+    const tw = 220, th = 130;
     const w = window.innerWidth, h = window.innerHeight;
     ttRef.current.style.left = (cx + 16 + tw > w ? cx - tw - 10 : cx + 16) + 'px';
     ttRef.current.style.top  = (cy + 16 + th > h ? cy - th - 10 : cy + 16) + 'px';
@@ -244,43 +348,50 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
   }, []);
 
   const showStateTooltip = useCallback((name: string) => {
-    const d = GW[name];
+    const d = getStateData(name);
+    const severity = getEntrySeverity(d);
+    const glowColor = d ? statusGlowColor(severity) : MAP_HOVER_ACCENT;
     const badge = d
-      ? `<span class="badge b-${d.status}">${d.status.toUpperCase()}</span>`
+      ? `<span class="badge b-${severity}">${getEntryStatusLabel(d).toUpperCase()}</span>`
       : '';
     if (ttInnerRef.current) {
       ttInnerRef.current.innerHTML = `
-        <div class="tt-name">${name} ${badge}</div>
+        <div class="tt-name" style="color:${glowColor}">${name} ${badge}</div>
         ${d ? `
         <hr class="tt-divider"/>
-        <div class="tt-row">Rainfall <span>${d.rain} mm</span></div>
-        <div class="tt-row">Stage    <span>${d.stage}%</span></div>
-        <div class="tt-row" style="font-size:9px;margin-top:4px;color:var(--muted)">Click → districts&nbsp;&nbsp;Dbl-click → zoom</div>
+        <div class="tt-row">Recharge <span style="color:${glowColor}">${formatHam(d.recharge)} Ham</span></div>
+        <div class="tt-row">Extraction <span style="color:${glowColor}">${formatHam(d.extraction)} Ham</span></div>
+        <div class="tt-row">GW Stage <span style="color:${glowColor}">${d.stage}%</span></div>
+        <div class="tt-row" style="font-size:9px;margin-top:6px;color:var(--muted)">
+          <span style="opacity:0.6">Click → districts &nbsp;·&nbsp; Dbl-click → zoom</span>
+        </div>
         ` : `<div class="tt-row" style="color:var(--muted)">Click to explore districts</div>`}
       `;
     }
     if (ttRef.current) ttRef.current.style.display = 'block';
-  }, []);
+  }, [getStateData]);
 
   const showDistrictTooltip = useCallback((district: string, state: string) => {
-    const key = `${district}|${state}`;
-    const d = DISTRICT_GW[key];
+    const d = getDistrictData(district, state);
+    const severity = getEntrySeverity(d);
+    const glowColor = d ? statusGlowColor(severity) : MAP_HOVER_ACCENT;
     const badge = d
-      ? `<span class="badge b-${d.status}">${d.status.toUpperCase()}</span>`
+      ? `<span class="badge b-${severity}">${getEntryStatusLabel(d).toUpperCase()}</span>`
       : '';
     if (ttInnerRef.current) {
       ttInnerRef.current.innerHTML = `
-        <div class="tt-name">📍 ${district} ${badge}</div>
-        <div class="tt-row" style="color:var(--muted);margin-bottom:4px">${state}</div>
+        <div class="tt-name" style="color:${glowColor}">◈ ${district} ${badge}</div>
+        <div class="tt-row" style="color:var(--muted);margin-bottom:5px">${state}</div>
         ${d ? `
         <hr class="tt-divider"/>
-        <div class="tt-row">Rainfall <span>${d.rain} mm</span></div>
-        <div class="tt-row">Stage    <span>${d.stage}%</span></div>
+        <div class="tt-row">Recharge <span style="color:${glowColor}">${formatHam(d.recharge)} Ham</span></div>
+        <div class="tt-row">Extraction <span style="color:${glowColor}">${formatHam(d.extraction)} Ham</span></div>
+        <div class="tt-row">GW Stage <span style="color:${glowColor}">${d.stage}%</span></div>
         ` : `<div class="tt-row" style="color:var(--muted)">Click for details</div>`}
       `;
     }
     if (ttRef.current) ttRef.current.style.display = 'block';
-  }, []);
+  }, [getDistrictData]);
 
   // ─── MAP INIT ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -288,12 +399,17 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: mapTheme === 'light' ? 'mapbox://styles/mapbox/light-v10' : 'mapbox://styles/mapbox/dark-v11',
+      // Premium dark base — deepest available dark style
+      style: mapTheme === 'light'
+        ? 'mapbox://styles/mapbox/light-v10'
+        : 'mapbox://styles/mapbox/dark-v11',
       center: [78.9629, 22.5937],
       zoom: 4,
       minZoom: 3,
       maxZoom: 14,
       antialias: true,
+      // Slight pitch for subtle 3D depth feel
+      pitch: 0,
     });
 
     map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-left');
@@ -307,6 +423,46 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
     });
 
     map.current.on('load', async () => {
+      const mapData = await getGwraMapData();
+      stateDataRef.current = mapData.states ?? {};
+      districtDataRef.current = mapData.districts ?? {};
+
+      const themePalette = mapTheme === 'light'
+        ? {
+            background: '#f2fbff',
+            water: '#A7E6FF',
+            land: '#eef6ff',
+            label: '#050C9C',
+            halo: 'rgba(255,255,255,0.92)',
+          }
+        : {
+            background: '#03065a',
+            water: '#050C9C',
+            land: '#07136f',
+            label: '#A7E6FF',
+            halo: 'rgba(2,6,23,0.95)',
+          };
+      // ── Deep ocean / background override ─────────────────────────────────
+      // Make the ocean/background much darker for depth contrast
+      if (map.current!.getLayer('background')) {
+        map.current!.setPaintProperty('background', 'background-color', themePalette.background);
+      }
+      // Ocean / water layers
+      ['water', 'water-shadow', 'waterway'].forEach(layerId => {
+        if (map.current!.getLayer(layerId)) {
+          try {
+            map.current!.setPaintProperty(layerId, 'fill-color', themePalette.water);
+          } catch { /* layer uses line paint */ }
+          try {
+            map.current!.setPaintProperty(layerId, 'line-color', themePalette.water);
+          } catch { /* layer uses fill paint */ }
+        }
+      });
+      // Darken land base
+      if (map.current!.getLayer('land')) {
+        map.current!.setPaintProperty('land', 'background-color', themePalette.land);
+      }
+
       // ── 1. Load state GeoJSON ──────────────────────────────────────────────
       const STATE_URL =
         'https://raw.githubusercontent.com/geohacker/india/master/state/india_telengana.geojson';
@@ -318,6 +474,9 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
           f.id = i;
           const p = f.properties;
           p._name = p.NAME_1 || p.ST_NM || p.name || p.state || 'Unknown';
+          // Pre-attach status for paint expressions
+          const gwData = getStateData(p._name);
+          p._status = getEntrySeverity(gwData);
         });
       } catch (e) {
         console.error('State GeoJSON load failed', e);
@@ -326,12 +485,8 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
       }
 
       // ── 2. Load TopoJSON districts ─────────────────────────────────────────
-      // Try local first (Vite dev server serves public folder), then fallback CDN
       let topoData: any;
       try {
-        // In a Vite project, place the file in /public/india-districts.json
-        // or import it directly: import topoData from './india-districts-2019-734.json'
-        // For maximum compatibility we try both paths:
         let topoRes: Response | null = null;
         const localPaths = [
           '/india-districts-2019-734.json',
@@ -345,35 +500,34 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
           } catch { /* try next */ }
         }
         if (!topoRes) {
-          // CDN fallback
-          topoRes = await fetch(
-            'https://cdn.jsdelivr.net/npm/india-topojson@1.0.0/india.json'
-          );
+          topoRes = await fetch('https://cdn.jsdelivr.net/npm/india-topojson@1.0.0/india.json');
         }
         topoData = await topoRes!.json();
         topoDataRef.current = topoData;
-
-        // Convert full TopoJSON → GeoJSON once
         const objName = Object.keys(topoData.objects)[0];
         const fullGeoJSON = topoToGeoJSON(topoData, objName);
-        // Assign stable numeric IDs
         fullGeoJSON.features.forEach((f, i) => { (f as any).id = i; });
         allDistrictsGeoJSONRef.current = fullGeoJSON;
       } catch (e) {
         console.warn('District TopoJSON load failed — district layer unavailable', e);
       }
 
-      // ── 3. Add state source & layers ──────────────────────────────────────
+      // ── 3. State source & layers (premium paint system) ───────────────────
       map.current!.addSource('india-states', {
         type: 'geojson',
         data: stateGeoJSON,
         generateId: true,
       });
 
-      const colorExpr: any = ['match', ['get', '_name']];
-      Object.entries(GW).forEach(([name, d]) => colorExpr.push(name, statusColor(d.status)));
-      colorExpr.push('#0f2a44');
+      const colorExpr: any = [
+        'match', ['get', '_status'],
+        'critical', statusColor('critical'),
+        'caution', statusColor('caution'),
+        'safe', statusColor('safe'),
+        MAP_NEUTRAL_FILL,
+      ];
 
+      // 3a. State base fill — deep, rich, gradient-aware
       map.current!.addLayer({
         id: 'states-fill',
         type: 'fill',
@@ -381,48 +535,99 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
         paint: {
           'fill-color': [
             'case',
-            ['boolean', ['feature-state', 'selected'], false], '#00d4ff',
+            ['boolean', ['feature-state', 'selected'], false],
+            MAP_SELECTED_FILL,
             colorExpr,
           ],
           'fill-opacity': [
-            'case',
-            ['boolean', ['feature-state', 'selected'], false], 0.18,
-            0.72,
+            'interpolate', ['linear'], ['zoom'],
+            3,  ['case', ['boolean', ['feature-state', 'selected'], false], 0.9, 0.85],
+            6,  ['case', ['boolean', ['feature-state', 'selected'], false], 0.7, 0.75],
           ],
-          'fill-outline-color': 'rgba(0,0,0,0)',
+          'fill-antialias': true,
         },
       });
 
+      // 3b. State hover shimmer fill — color-matched glow overlay
+      map.current!.addLayer({
+        id: 'states-hover-fill',
+        type: 'fill',
+        source: 'india-states',
+        paint: {
+          'fill-color': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false], MAP_HOVER_ACCENT,
+            ['boolean', ['feature-state', 'hovered'], false],  MAP_HOVER_ACCENT,
+            'transparent',
+          ],
+          'fill-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false], 0.1,
+            ['boolean', ['feature-state', 'hovered'], false],  0.04,
+            0,
+          ],
+        },
+      });
+
+      // 3c. Base state border — thin, premium cyan tint
       map.current!.addLayer({
         id: 'states-line',
         type: 'line',
         source: 'india-states',
-        paint: { 'line-color': 'rgba(0,212,255,0.3)', 'line-width': 0.8 },
+        paint: {
+          'line-color': MAP_BORDER,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 3, 0.5, 6, 1.0],
+        },
       });
 
+      // 3d. Selected state glow border — multi-layer glow simulation
+      // Outer soft glow ring
       map.current!.addLayer({
-        id: 'states-hover-line',
+        id: 'states-glow-outer',
         type: 'line',
         source: 'india-states',
         paint: {
-          'line-color': '#00d4ff',
-          'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 2.5, 0],
-          'line-blur':  ['case', ['boolean', ['feature-state', 'selected'], false], 3, 0],
-          'line-opacity': ['case', ['boolean', ['feature-state', 'selected'], false], 0.9, 0],
+          'line-color': MAP_HOVER_ACCENT,
+          'line-width': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false], 4,
+            ['boolean', ['feature-state', 'hovered'], false],  2,
+            0,
+          ],
+          'line-blur': 0,
+          'line-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false], 0.45,
+            ['boolean', ['feature-state', 'hovered'], false],  0.22,
+            0,
+          ],
         },
       });
 
+      // Inner crisp selected border
       map.current!.addLayer({
-        id: 'states-glow',
-        type: 'fill',
+        id: 'states-selected-line',
+        type: 'line',
         source: 'india-states',
         paint: {
-          'fill-color': '#00d4ff',
-          'fill-opacity': ['case', ['boolean', ['feature-state', 'selected'], false], 0.08, 0],
+          'line-color': MAP_HOVER_ACCENT,
+          'line-width': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false], 2,
+            ['boolean', ['feature-state', 'hovered'], false],  1,
+            0,
+          ],
+          'line-blur': 0,
+          'line-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false], 1.0,
+            ['boolean', ['feature-state', 'hovered'], false],  0.6,
+            0,
+          ],
         },
       });
 
-      // ── 4. Add district source & layers (empty until state selected) ───────
+      // ── 4. District source & layers ────────────────────────────────────────
       const EMPTY_FC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 
       map.current!.addSource('city-boundaries', {
@@ -431,7 +636,16 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
         generateId: true,
       });
 
-      // 4a. District fill — color-coded by groundwater status
+      // District status color expression
+      const districtColorExpr: any = [
+        'match', ['get', 'gw_status'],
+        'critical', districtStatusColor('critical'),
+        'caution',  districtStatusColor('caution'),
+        'safe',     districtStatusColor('safe'),
+        MAP_NEUTRAL_FILL,
+      ];
+
+      // 4a. District base fill — depth hierarchy (brighter than states)
       map.current!.addLayer({
         id: 'city-fill',
         type: 'fill',
@@ -440,87 +654,137 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
           'fill-color': [
             'case',
             ['boolean', ['feature-state', 'selected'], false],
-            '#00d4ff',
-            ['match', ['get', 'gw_status'],
-              'critical', '#4a0014',
-              'caution',  '#3a2800',
-              'safe',     '#004028',
-              '#1e293b',
-            ],
+            MAP_SELECTED_FILL,
+            districtColorExpr,
+          ],
+          'fill-opacity': [
+            'interpolate', ['linear'], ['zoom'],
+            6, 0.75,
+            10, 0.80,
+          ],
+          'fill-antialias': true,
+        },
+      });
+
+      // 4b. District status glow overlay (color-matched)
+      map.current!.addLayer({
+        id: 'city-status-glow',
+        type: 'fill',
+        source: 'city-boundaries',
+        paint: {
+          'fill-color': [
+            'match', ['get', 'gw_status'],
+            'critical', statusGlowColor('critical'),
+            'caution',  statusGlowColor('caution'),
+            'safe',     statusGlowColor('safe'),
+            MAP_HOVER_ACCENT,
           ],
           'fill-opacity': [
             'case',
-            ['boolean', ['feature-state', 'selected'], false], 0.45,
-            0.6,
+            ['boolean', ['feature-state', 'selected'], false], 0.08,
+            ['boolean', ['feature-state', 'hovered'], false],  0.03,
+            0.01,
           ],
         },
       });
 
-      // 4b. District border
+      // 4c. District base border
       map.current!.addLayer({
         id: 'city-border',
         type: 'line',
         source: 'city-boundaries',
         paint: {
-          'line-color': 'rgba(0,212,255,0.4)',
-          'line-width': 0.8,
+          'line-color': MAP_BORDER,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 6, 0.4, 10, 0.8],
         },
       });
 
-      // 4c. District glow (selected highlight)
+      // 4d. District outer glow line (blur)
       map.current!.addLayer({
-        id: 'city-glow',
-        type: 'fill',
+        id: 'city-glow-outer',
+        type: 'line',
         source: 'city-boundaries',
         paint: {
-          'fill-color': '#00d4ff',
-          'fill-opacity': [
+          'line-color': [
+            'match', ['get', 'gw_status'],
+            'critical', statusGlowColor('critical'),
+            'caution',  statusGlowColor('caution'),
+            'safe',     statusGlowColor('safe'),
+            MAP_HOVER_ACCENT,
+          ],
+          'line-width': [
             'case',
-            ['boolean', ['feature-state', 'selected'], false], 0.22,
-            ['boolean', ['feature-state', 'hovered'], false],  0.08,
+            ['boolean', ['feature-state', 'selected'], false], 2.5,
+            ['boolean', ['feature-state', 'hovered'], false],  1.5,
+            0,
+          ],
+          'line-blur': 0,
+          'line-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false], 0.55,
+            ['boolean', ['feature-state', 'hovered'], false],  0.28,
             0,
           ],
         },
       });
 
-      // 4d. District selected outline (bright glow ring)
+      // 4e. District selected crisp border
       map.current!.addLayer({
         id: 'city-selected-line',
         type: 'line',
         source: 'city-boundaries',
         paint: {
-          'line-color': '#00d4ff',
+          'line-color': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            ['match', ['get', 'gw_status'],
+              'critical', statusGlowColor('critical'),
+              'caution',  statusGlowColor('caution'),
+              'safe',     statusGlowColor('safe'),
+              MAP_HOVER_ACCENT,
+            ],
+            MAP_HOVER_ACCENT,
+          ],
           'line-width': [
             'case',
-            ['boolean', ['feature-state', 'selected'], false], 2.5,
+            ['boolean', ['feature-state', 'selected'], false], 2,
+            ['boolean', ['feature-state', 'hovered'], false],  1,
             0,
           ],
-          'line-blur': ['case', ['boolean', ['feature-state', 'selected'], false], 2, 0],
-          'line-opacity': ['case', ['boolean', ['feature-state', 'selected'], false], 1, 0],
+          'line-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false], 1,
+            ['boolean', ['feature-state', 'hovered'], false],  0.7,
+            0,
+          ],
         },
       });
 
-      // 4e. District labels
+      // 4f. District labels — premium typography with glow
       map.current!.addLayer({
         id: 'city-labels',
         type: 'symbol',
         source: 'city-boundaries',
-        minzoom: 6,
+        minzoom: 6.5,
         layout: {
           'text-field': ['get', 'district'],
           'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
-          'text-size': ['interpolate', ['linear'], ['zoom'], 6, 9, 10, 12],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 6, 9, 8, 11, 11, 13],
           'text-anchor': 'center',
           'text-allow-overlap': false,
+          'text-letter-spacing': 0.05,
         },
         paint: {
           'text-color': [
             'case',
-            ['boolean', ['feature-state', 'selected'], false], '#00d4ff',
-            '#c4d8f0',
+            ['boolean', ['feature-state', 'selected'], false], MAP_HOVER_ACCENT,
+            ['boolean', ['feature-state', 'hovered'], false],  MAP_HOVER_ACCENT,
+            themePalette.label,
           ],
-          'text-halo-color': 'rgba(3,8,15,0.9)',
-          'text-halo-width': 1.5,
+          'text-halo-color': themePalette.halo,
+          'text-halo-width': 2,
+          'text-halo-blur': 1,
+          'text-opacity': ['interpolate', ['linear'], ['zoom'], 6.5, 0, 7, 1],
         },
       });
 
@@ -528,20 +792,24 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
         return features.map((f) => {
           const district = (f.properties?.district || '').toString();
           const state = (f.properties?.st_nm || f.properties?.state || '').toString();
-          const key = `${district}|${state}`;
-          const gw = DISTRICT_GW[key];
+          const gw = getDistrictData(district, state);
           return {
             ...f,
             properties: {
               ...f.properties,
-              gw_status: gw?.status || 'unknown',
+              gw_status: getEntrySeverity(gw),
+              gw_stage: gw?.stage ?? null,
+              gw_recharge: gw?.recharge ?? null,
+              gw_extractable: gw?.extractable ?? null,
+              gw_extraction: gw?.extraction ?? null,
+              gw_category: gw?.worstCategory ?? null,
             },
           };
         });
       };
 
       const setCityLayerVisibility = (visible: boolean) => {
-        ['city-fill', 'city-border', 'city-glow', 'city-selected-line', 'city-labels'].forEach((layerId) => {
+        ['city-fill', 'city-status-glow', 'city-border', 'city-glow-outer', 'city-selected-line', 'city-labels'].forEach((layerId) => {
           if (map.current?.getLayer(layerId)) {
             map.current.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
           }
@@ -562,10 +830,8 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
           (map.current.getSource('city-boundaries') as mapboxgl.GeoJSONSource).setData(enriched);
           setCityLayerVisibility(true);
         } else {
-          // In far zoom-out mode, show only states.
           (map.current.getSource('city-boundaries') as mapboxgl.GeoJSONSource).setData({
-            type: 'FeatureCollection',
-            features: [],
+            type: 'FeatureCollection', features: [],
           });
           setCityLayerVisibility(false);
           if (selectedDistrictIdRef.current !== null) {
@@ -575,11 +841,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
         }
       };
 
-      map.current!.on('zoomend', () => {
-        applyZoomMode();
-      });
-
-      // initial mode
+      map.current!.on('zoomend', () => applyZoomMode());
       applyZoomMode();
 
       // ── 5. State interactions ─────────────────────────────────────────────
@@ -616,7 +878,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
         hideTooltip();
       });
 
-      // State SINGLE click → load districts
+      // State SINGLE click
       map.current!.on('click', 'states-fill', (e) => {
         if (map.current!.getZoom() >= CITY_MODE_MIN_ZOOM) return;
         const feat = e.features?.[0];
@@ -624,7 +886,6 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
         const id   = feat.id as number;
         const name = feat.properties._name;
 
-        // Toggle deselect
         if (selectedStateIdRef.current === id) {
           map.current!.setFeatureState({ source: 'india-states', id }, { selected: false });
           selectedStateIdRef.current = null;
@@ -635,7 +896,6 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
           return;
         }
 
-        // Deselect previous
         if (selectedStateIdRef.current !== null) {
           map.current!.setFeatureState(
             { source: 'india-states', id: selectedStateIdRef.current }, { selected: false }
@@ -644,18 +904,16 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
 
         selectedStateIdRef.current = id;
         map.current!.setFeatureState({ source: 'india-states', id }, { selected: true });
-
         setCurrentState(name);
         setCurrentDistrict(null);
         setHierarchyLevel('state');
         hierarchyLevelRef.current = 'state';
 
-        // In top zoom-out levels: state click only glows/selects.
-        if (onStateSelect) onStateSelect(name, GW[name]);
+        if (onStateSelect) onStateSelect(name, getStateData(name));
         onMapMessage?.(`Selected state: ${name}`);
       });
 
-      // State DOUBLE click → zoom closer (handled above + prevent double fire)
+      // State DOUBLE click → zoom
       map.current!.on('dblclick', 'states-fill', (e) => {
         if (map.current!.getZoom() >= CITY_MODE_MIN_ZOOM) return;
         e.preventDefault();
@@ -663,7 +921,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
         if (!feat) return;
         const bounds = geomBounds(feat.geometry);
         map.current!.fitBounds(bounds as [number, number, number, number], {
-          padding: 40, duration: 800,
+          padding: 40, duration: 900,
         });
       });
 
@@ -714,19 +972,19 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
         hideTooltip();
       });
 
-      // District SINGLE click → highlight + popup
+      // District SINGLE click
       map.current!.on('click', 'city-fill', (e) => {
         if (map.current!.getZoom() < CITY_MODE_MIN_ZOOM) return;
-        e.preventDefault(); // stop state click firing
+        e.preventDefault();
         const feat = e.features?.[0];
         if (!feat) return;
         const id       = feat.id as number;
         const district = feat.properties.district as string;
         const state    = feat.properties.st_nm    as string;
-        const key      = `${district}|${state}`;
-        const gwData   = DISTRICT_GW[key];
+        const gwData   = getDistrictData(district, state);
+        const severity = getEntrySeverity(gwData);
+        const glowColor = gwData ? statusGlowColor(severity) : MAP_HOVER_ACCENT;
 
-        // Toggle deselect
         if (selectedDistrictIdRef.current === id) {
           map.current!.setFeatureState({ source: 'city-boundaries', id }, { selected: false });
           selectedDistrictIdRef.current = null;
@@ -735,7 +993,6 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
           return;
         }
 
-        // Deselect previous
         if (selectedDistrictIdRef.current !== null) {
           map.current!.setFeatureState(
             { source: 'city-boundaries', id: selectedDistrictIdRef.current }, { selected: false }
@@ -748,24 +1005,34 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
         setHierarchyLevel('district');
         hierarchyLevelRef.current = 'district';
 
-        // Popup
         const centroid = computeCentroid(feat.geometry as GeoJSON.Geometry);
         activePopup.current?.remove();
+
         const statusBadge = gwData
-          ? `<span style="display:inline-block;margin-top:6px;padding:2px 8px;border-radius:12px;font-size:9px;text-transform:uppercase;letter-spacing:1px;
-               background:${gwData.status==='critical'?'rgba(255,77,109,0.15)':gwData.status==='caution'?'rgba(245,166,35,0.15)':'rgba(0,229,160,0.15)'};
-               color:${gwData.status==='critical'?'#ff4d6d':gwData.status==='caution'?'#f5a623':'#00e5a0'};
-               border:1px solid ${gwData.status==='critical'?'rgba(255,77,109,0.4)':gwData.status==='caution'?'rgba(245,166,35,0.4)':'rgba(0,229,160,0.4)'}">${gwData.status.toUpperCase()}</span>`
+          ? `<span class="popup-status-badge" style="
+               display:inline-block;margin-top:8px;padding:3px 10px;border-radius:12px;
+               font-size:9px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;
+               background:${severity==='critical'?'rgba(255,77,109,0.15)':severity==='caution'?'rgba(245,166,35,0.15)':'rgba(0,229,160,0.15)'};
+               color:${glowColor};
+               border:1px solid ${glowColor}40;
+               box-shadow: 0 0 8px ${glowColor}30;
+             ">${getEntryStatusLabel(gwData).toUpperCase()}</span>`
           : '';
 
-        activePopup.current = new mapboxgl.Popup({ closeOnClick: true, maxWidth: '240px' })
+        activePopup.current = new mapboxgl.Popup({
+          closeOnClick: true,
+          maxWidth: '260px',
+          className: 'premium-popup',
+        })
           .setLngLat(centroid)
           .setHTML(`
-            <div class="popup-title">📍 ${district}</div>
-            <div class="popup-row"><span class="pk">State</span><span class="pv">${state}</span></div>
+            <div class="popup-title" style="color:${glowColor}">◈ ${district}</div>
+            <div class="popup-row"><span class="pk">State</span><span class="pv" style="color:${glowColor}">${state}</span></div>
             ${gwData ? `
-            <div class="popup-row"><span class="pk">Rainfall</span><span class="pv">${gwData.rain} mm</span></div>
-            <div class="popup-row"><span class="pk">GW Stage</span><span class="pv">${gwData.stage}%</span></div>
+            <div class="popup-row"><span class="pk">Recharge</span><span class="pv" style="color:${glowColor}">${formatHam(gwData.recharge)} Ham</span></div>
+            <div class="popup-row"><span class="pk">Extractable</span><span class="pv" style="color:${glowColor}">${formatHam(gwData.extractable)} Ham</span></div>
+            <div class="popup-row"><span class="pk">Extraction</span><span class="pv" style="color:${glowColor}">${formatHam(gwData.extraction)} Ham</span></div>
+            <div class="popup-row"><span class="pk">GW Stage</span><span class="pv" style="color:${glowColor}">${gwData.stage}%</span></div>
             ${statusBadge}
             ` : `<div class="popup-row"><span class="pk" style="color:var(--muted)">No data available</span></div>`}
           `)
@@ -774,7 +1041,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
         if (onDistrictSelect) onDistrictSelect(district, state, gwData);
       });
 
-      // District DOUBLE click → zoom to district + show parent state info
+      // District DOUBLE click
       map.current!.on('dblclick', 'city-fill', (e) => {
         if (map.current!.getZoom() < CITY_MODE_MIN_ZOOM) return;
         e.preventDefault();
@@ -787,7 +1054,6 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
           padding: 60, duration: 900, maxZoom: 12,
         });
 
-        // Highlight parent state on city double click.
         const stateFeatures = stateGeoJSON?.features || [];
         const targetState = state.toString().trim().toLowerCase();
         const parent = stateFeatures.find((sf: any) => {
@@ -797,14 +1063,12 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
         if (parent?.id !== undefined) {
           if (selectedStateIdRef.current !== null && selectedStateIdRef.current !== parent.id) {
             map.current!.setFeatureState(
-              { source: 'india-states', id: selectedStateIdRef.current },
-              { selected: false }
+              { source: 'india-states', id: selectedStateIdRef.current }, { selected: false }
             );
           }
           selectedStateIdRef.current = parent.id as number;
           map.current!.setFeatureState(
-            { source: 'india-states', id: parent.id as number },
-            { selected: true }
+            { source: 'india-states', id: parent.id as number }, { selected: true }
           );
           setCurrentState(state);
           setHierarchyLevel('state');
@@ -812,17 +1076,16 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
         }
 
         onMapMessage?.(`Zoomed to district. Parent state: ${state}`);
-        if (onStateSelect) onStateSelect(state, GW[state]);
+        if (onStateSelect) onStateSelect(state, getStateData(state));
       });
 
       setShowLoader(false);
-      console.info('Map loaded. Click any state to reveal district boundaries.');
+      console.info('▶ Premium GIS Map loaded. Click any state to reveal district boundaries.');
     });
 
     return () => { map.current?.remove(); };
   }, [mapTheme]);
 
-  // ── Keep a stable ref to hierarchyLevel for use inside map callbacks ────
   const hierarchyLevelRef = useRef<'india' | 'state' | 'district'>('india');
   useEffect(() => { hierarchyLevelRef.current = hierarchyLevel; }, [hierarchyLevel]);
 
@@ -831,12 +1094,10 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
     if (!map.current?.getSource('city-boundaries')) return;
 
     if (!allDistrictsGeoJSONRef.current) {
-      // District data unavailable (fetch failed)
       console.warn('No district data available');
       return;
     }
 
-    // Clear previous selection
     if (selectedDistrictIdRef.current !== null) {
       try {
         map.current.setFeatureState(
@@ -847,37 +1108,38 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
     }
     activePopup.current?.remove();
 
-    // Filter districts by state name
+    const normalizedStateName = normalizeLocationName(stateName);
     const stateFeatures = allDistrictsGeoJSONRef.current.features.filter((f) => {
-      const sn = f.properties?.st_nm || f.properties?.state || '';
-      return sn === stateName;
+      const sn = String(f.properties?.st_nm || f.properties?.state || '');
+      return normalizeLocationName(sn) === normalizedStateName;
     });
 
     if (stateFeatures.length === 0) {
       console.warn(`No districts found for state: ${stateName}`);
     }
 
-    // Enrich features with groundwater status for paint expressions
     const enriched: GeoJSON.FeatureCollection = {
       type: 'FeatureCollection',
       features: stateFeatures.map((f) => {
         const d = f.properties?.district || '';
-        const key = `${d}|${stateName}`;
-        const gw = DISTRICT_GW[key];
+        const gw = getDistrictData(String(d), stateName);
         return {
           ...f,
           properties: {
             ...f.properties,
-            gw_status: gw?.status || 'unknown',
-            gw_stage:  gw?.stage  || null,
-            gw_rain:   gw?.rain   || null,
+            gw_status: getEntrySeverity(gw),
+            gw_stage: gw?.stage ?? null,
+            gw_recharge: gw?.recharge ?? null,
+            gw_extractable: gw?.extractable ?? null,
+            gw_extraction: gw?.extraction ?? null,
+            gw_category: gw?.worstCategory ?? null,
           },
         };
       }),
     };
 
     (map.current.getSource('city-boundaries') as mapboxgl.GeoJSONSource).setData(enriched);
-  }, []);
+  }, [getDistrictData]);
 
   const clearDistricts = useCallback(() => {
     if (!map.current?.getSource('city-boundaries')) return;
@@ -889,7 +1151,6 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
     });
   }, []);
 
-  // ─── RESET MAP ────────────────────────────────────────────────────────────
   const resetMap = useCallback(() => {
     setCurrentState(null);
     setCurrentDistrict(null);
@@ -900,7 +1161,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
       map.current.removeFeatureState({ source: 'india-states' });
     }
     selectedStateIdRef.current = null;
-    map.current?.flyTo({ center: [78.9629, 22.5937], zoom: 4, duration: 1000 });
+    map.current?.flyTo({ center: [78.9629, 22.5937], zoom: 4, duration: 1200 });
   }, [clearDistricts]);
 
   // ─── RENDER ───────────────────────────────────────────────────────────────
@@ -909,13 +1170,20 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
       className="map-container h-full w-full relative"
       style={{ display: isVisible ? 'block' : 'none' }}
     >
+      {/* Vignette overlay — cinematic edge darkening */}
+      <div className="map-vignette" />
+
       <div id="map" ref={mapContainer} className="h-full w-full" />
 
       {/* Loading overlay */}
       {showLoader && (
         <div className="loader">
-          <div className="loader-ring" />
-          <div className="loader-text">Initializing GIS layers…</div>
+          <div className="loader-ring-wrap">
+            <div className="loader-ring" />
+            <div className="loader-ring-inner" />
+          </div>
+          <div className="loader-text">Initializing Intelligence Layers</div>
+          <div className="loader-sub">Calibrating GIS telemetry…</div>
         </div>
       )}
 
@@ -926,35 +1194,41 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
 
       {/* Hierarchy breadcrumb badge */}
       <div className="mapBadge">
-        <div className="mb-z">
-          {hierarchyLevel === 'india'    && '🌏 India'}
-          {hierarchyLevel === 'state'    && `📍 ${currentState}`}
-          {hierarchyLevel === 'district' && `🏙 ${currentDistrict}`}
+        <div className="mb-hierarchy">
+          {hierarchyLevel === 'india'    && <><span className="mb-icon">◉</span> <span className="mb-z">India</span></>}
+          {hierarchyLevel === 'state'    && <><span className="mb-icon" style={{ color: MAP_HOVER_ACCENT }}>◈</span> <span className="mb-z">{currentState}</span></>}
+          {hierarchyLevel === 'district' && <><span className="mb-icon" style={{ color: statusGlowColor('caution') }}>◆</span> <span className="mb-z">{currentDistrict}</span></>}
         </div>
-        <div style={{ fontSize: 9, color: 'var(--muted)', letterSpacing: '1px' }}>
-          ZOOM {zoom} &nbsp;|&nbsp; {coords.lat}°N {coords.lng}°E
+        <div className="mb-coords">
+          <span style={{color:'rgba(199,236,255,0.55)'}}>Z</span> {zoom}
+          &nbsp;·&nbsp;
+          <span style={{color:'rgba(199,236,255,0.55)'}}>N</span> {coords.lat}°
+          &nbsp;
+          <span style={{color:'rgba(199,236,255,0.55)'}}>E</span> {coords.lng}°
         </div>
         {hierarchyLevel !== 'india' && (
-          <button
-            onClick={resetMap}
-            style={{
-              marginTop: 6,
-              background: 'rgba(0,212,255,0.1)',
-              border: '1px solid rgba(0,212,255,0.3)',
-              color: 'var(--accent)',
-              borderRadius: 5,
-              padding: '3px 10px',
-              fontSize: 9,
-              cursor: 'pointer',
-              letterSpacing: '1px',
-              textTransform: 'uppercase',
-              fontFamily: 'var(--mono)',
-            }}
-          >
-            ← Reset
+          <button onClick={resetMap} className="mb-reset-btn">
+            ← Reset View
           </button>
         )}
       </div>
+
+      {/* Legend overlay */}
+      {/* <div className="map-legend">
+        <div className="legend-title">GW STATUS</div>
+        <div className="legend-item">
+          <div className="legend-dot legend-safe" />
+          <span>Safe</span>
+        </div>
+        <div className="legend-item">
+          <div className="legend-dot legend-caution" />
+          <span>Caution</span>
+        </div>
+        <div className="legend-item">
+          <div className="legend-dot legend-critical" />
+          <span>Critical</span>
+        </div>
+      </div> */}
     </div>
   );
 };

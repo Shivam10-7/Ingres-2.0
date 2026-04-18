@@ -24,6 +24,36 @@ export interface QuickChatResponse {
   error?: string;
 }
 
+export interface GwraLocationsResponse {
+  states?: string[];
+  state?: string;
+  city?: string;
+  cities?: string[];
+  assessmentUnits?: string[];
+  error?: string;
+}
+
+export interface GwraMapSummary {
+  name: string;
+  state?: string;
+  recharge: number;
+  extractable: number;
+  extraction: number;
+  unitCount: number;
+  worstCategory: string;
+  categoryRank: number;
+  stage: number;
+  status: string;
+}
+
+export interface GwraMapDataResponse {
+  source?: string;
+  generatedAt?: string;
+  states?: Record<string, GwraMapSummary>;
+  districts?: Record<string, GwraMapSummary>;
+  error?: string;
+}
+
 /**
  * Sends a chat request with detailed response and visualization options
  * (legacy /chat endpoint, kept for backwards compatibility).
@@ -141,6 +171,52 @@ export async function sendQuickChatRequest(
     console.error('Quick chat request failed:', error);
     return {
       error: error instanceof Error ? error.message : 'Failed to connect to server',
+    };
+  }
+}
+
+export async function getGwraLocations(
+  state?: string,
+  city?: string
+): Promise<GwraLocationsResponse> {
+  try {
+    const params = new URLSearchParams();
+    if (state) params.set('state', state);
+    if (city) params.set('city', city);
+
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${API_BASE_URL}/api/gwra/locations${suffix}`);
+
+    if (!response.ok) {
+      return {
+        error: `HTTP ${response.status}`,
+      };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('GWRA location request failed:', error);
+    return {
+      error: error instanceof Error ? error.message : 'Failed to load GWRA location data',
+    };
+  }
+}
+
+export async function getGwraMapData(): Promise<GwraMapDataResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/gwra/map-data`);
+
+    if (!response.ok) {
+      return {
+        error: `HTTP ${response.status}`,
+      };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('GWRA map data request failed:', error);
+    return {
+      error: error instanceof Error ? error.message : 'Failed to load GWRA map data',
     };
   }
 }
