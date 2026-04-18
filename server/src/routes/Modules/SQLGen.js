@@ -480,7 +480,7 @@ Use EXACT column names wrapped in backticks (\`).
 - \`categorization\`: Status (Safe, Semi-critical, Critical, Over-exploited, Salinity)
 
 ### RESOLVER & ENTITY RULES
-Input Resolver Response with Entities and Entity types: {Resolver_Response}
+Input Resolver Response with Entities and Entity types: {resolver_json}
 
 1. Scope Priority: block > taluk > tehsil > district > state. 
 2. Match Entity to Column:
@@ -959,7 +959,7 @@ try {
 
     // Inject JSON into single placeholder
     sqlGenerator = sqlGenerator.replace("{resolver_json}", entityJSON);
-    sqlGenerator = sqlGenerator.replace("{user_question}", userQuery);
+    // sqlGenerator = sqlGenerator.replace("{user_question}", userQuery);
    //  sqlGenerator = sqlGenerator.replace("{column_intelligence_json}", JSON.stringify(sqlIntelligence));
    //  sqlGenerator = sqlGenerator.replace("{approved_schema_json}", JSON.stringify(Approve));
 
