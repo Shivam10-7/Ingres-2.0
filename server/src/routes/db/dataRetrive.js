@@ -26,7 +26,7 @@ async function data_retrive(sql_query) {
     console.log('Checking for SQL injection vulnerabilities in the query...');
     // Perform SQL injection check before executing the query
     //The sql validator is currently not working as expected, so commenting it out for now. Will fix it in the next iteration.😎😎
-    // await SQLinjectionCheck(sql_query);
+    await SQLinjectionCheck(sql_query);
     const [rows, fields] = await connection.execute(sql_query); 
     // Validate results
     if (!rows || rows.length === 0) {
@@ -38,6 +38,9 @@ async function data_retrive(sql_query) {
     console.log('Determined Chart Type:', ChartType);
     return [rows, fields, ChartType];
   } catch (error) {
+    if(error.status === 426) {  // Check for specific status code from SQL injection check
+      console.error('SQL Injection detected in query:', sql_query);
+    }
     console.error('Error executing query in db:', error);
     throw error; // Propagate error to caller
   } finally {
