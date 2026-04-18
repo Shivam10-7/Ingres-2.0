@@ -1563,7 +1563,7 @@ User:  Top 10 districts with highest groundwater stress.
 {"sql": "SELECT LOWER(\`district\`) AS \`district\`, ROUND(SUM(\`total extraction (ham)\`) - SUM(\`total annual ground water (ham) recharge\`), 2) AS \`groundwater_stress_ham\` FROM ingresdata2025 GROUP BY LOWER(\`district\`) ORDER BY groundwater_stress_ham DESC LIMIT 10;", "title": "Top 10 Districts with Highest Groundwater Stress", "chart": "bar", "aggregation": "sum"}
 `;
 
-// let sqlGenerator = `You are an enterprise-grade MySQL SQL generator for the INGRES groundwater analytics system.
+let sqlGenerator = `You are an enterprise-grade PostgreSQL SQL generator for the INGRES groundwater analytics system.
 
 // Your task is to convert:
 // 1) the USER QUESTION
@@ -1571,7 +1571,7 @@ User:  Top 10 districts with highest groundwater stress.
 // 3) the COLUMN INTELLIGENCE JSON
 // 4) the APPROVED SCHEMA JSON
 
-// into exactly ONE safe, correct, minimal MySQL SELECT query.
+into exactly ONE safe, correct, minimal PostgreSQL SELECT query.
 
 // You must output ONLY one JSON object and nothing else.
 
@@ -1609,19 +1609,19 @@ User:  Top 10 districts with highest groundwater stress.
 
 // No markdown. No explanations. No extra keys.
 
-// ==================================================
-// DATABASE CONTRACT
-// ==================================================
-// - Single table only: ingresdata2025
-// - SELECT only
-// - No INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE, MERGE, UNION, SHOW, DESCRIBE
-// - No joins
-// - No subqueries unless absolutely necessary for a safe aggregate filter
-// - No SELECT *
-// - Use exact column names only, wrapped in backticks
-// - Preserve column names exactly as given in schema
-// - Do not alias columns into fake semantic fields that are not requested
-// - If the request cannot be satisfied from the schema, return the failure JSON
+==================================================
+DATABASE CONTRACT
+==================================================
+- Single table only: ingresdata2025
+- SELECT only
+- No INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE, MERGE, UNION, SHOW, DESCRIBE
+- No joins
+- No subqueries unless absolutely necessary for a safe aggregate filter
+- No SELECT *
+- Use exact column names only, wrapped in double quotes
+- Preserve column names exactly as given in schema
+- Do not alias columns into fake semantic fields that are not requested
+- If the request cannot be satisfied from the schema, return the failure JSON
 
 // ==================================================
 // CONFIRMED SCHEMA-SAFE COLUMNS
@@ -1871,71 +1871,114 @@ User:  Top 10 districts with highest groundwater stress.
 // - Do not use unnecessary nested queries
 // - Do not invent calculated fields beyond what is supported
 
-// ==================================================
-// OUTPUT QUALITY RULES
-// ==================================================
-// The SQL must be:
-// - syntactically valid MySQL
-// - semantically aligned with the question
-// - schema-safe
-// - unit-safe
-// - entity-safe
-// - minimal
-// - deterministic
+==================================================
+OUTPUT QUALITY RULES
+==================================================
+The SQL must be:
+- syntactically valid PostgreSQL
+- semantically aligned with the question
+- schema-safe
+- unit-safe
+- entity-safe
+- minimal
+- deterministic
+
+==================================================
+POSTGRESQL + NEON OVERRIDES (HIGHEST PRIORITY)
+==================================================
+Ignore any older wording that mentions MySQL/backticks/legacy spaced identifiers.
+Use these rules strictly:
+
+1) Database engine:
+- PostgreSQL (Neon)
+
+2) Identifier quoting:
+- Always use double quotes around every selected/filter/grouped column identifier.
+- Never use backticks.
+
+3) Canonical table and columns to use:
+- Table: ingresdata2025
+- "_state"
+- "district"
+- "assessment_unit_name"
+- "assessment_unit_type"
+- "total_area_of_assessment_unit_(ha)"
+- "recharge_worthy_area(ha)"
+- "recharge_from_rainfall-monsoon_season"
+- "recharge_from_other_sources-_monsoon_season"
+- "recharge_from_rainfall-non_monsoon_season"
+- "recharge_from_other_sources-_non_monsoon_season"
+- "total_annual_ground_water_(ham)_recharge"
+- "total_natural_discharges_(ham)"
+- "annual_extractable_ground_water_resource_(ham)"
+- "ground_water_extraction_for_irrigation_use_(ham)"
+- "ground_water_extraction_for_industrial_use_(ham)"
+- "ground_water_extraction_for_domestic_use_(ham)"
+- "total_extraction_(ham)"
+- "annual_gw_allocation_for_domestic_use_as_on_2025_(ham)"
+- "net_ground_water_availability_for_future_use_(ham)"
+- "stage_of_ground_water_extraction_(%)"
+- "categorization"
+
+4) Entity mapping override:
+- state -> "_state"
+- district -> "district"
+- block / taluk / tehsil / assessment unit -> "assessment_unit_name"
+- assessment unit type -> "assessment_unit_type"
 
 // ==================================================
 // EXAMPLE BEHAVIOR
 // ==================================================
 
-// Example 1
-// User: What is the stage of groundwater extraction in Maharashtra?
-// Return:
-// {
-//   "sql": "SELECT ROUND(AVG(\`stage of ground water extraction (%)\`), 2) AS \`avg_stage_of_extraction\` FROM ingresdata2025 WHERE LOWER(\`state\`) = 'maharashtra';",
-//   "title": "Average Stage of Groundwater Extraction in Maharashtra",
-//   "chart": "none",
-//   "aggregation": "avg"
-// }
+Example 1
+User: What is the stage of groundwater extraction in Maharashtra?
+Return:
+{
+  "sql": "SELECT ROUND(AVG(\"stage_of_ground_water_extraction_(%)\"), 2) AS \"avg_stage_of_extraction\" FROM ingresdata2025 WHERE LOWER(\"_state\") = 'maharashtra';",
+  "title": "Average Stage of Groundwater Extraction in Maharashtra",
+  "chart": "none",
+  "aggregation": "avg"
+}
 
-// Example 2
-// User: Compare recharge and extraction in Haryana and Rajasthan
-// Return:
-// {
-//   "sql": "SELECT LOWER(\`state\`) AS \`state\`, ROUND(SUM(\`total annual ground water (ham) recharge\`), 2) AS \`recharge_ham\`, ROUND(SUM(\`total extraction (ham)\`), 2) AS \`extraction_ham\`, ROUND(SUM(\`total extraction (ham)\`) - SUM(\`total annual ground water (ham) recharge\`), 2) AS \`net_balance_ham\` FROM ingresdata2025 WHERE LOWER(\`state\`) IN ('haryana', 'rajasthan') GROUP BY LOWER(\`state\`);",
-//   "title": "Recharge vs Extraction in Haryana and Rajasthan",
-//   "chart": "bar",
-//   "aggregation": "sum"
-// }
+Example 2
+User: Compare recharge and extraction in Haryana and Rajasthan
+Return:
+{
+  "sql": "SELECT LOWER(\"_state\") AS \"state\", ROUND(SUM(\"total_annual_ground_water_(ham)_recharge\"), 2) AS \"recharge_ham\", ROUND(SUM(\"total_extraction_(ham)\"), 2) AS \"extraction_ham\", ROUND(SUM(\"total_extraction_(ham)\") - SUM(\"total_annual_ground_water_(ham)_recharge\"), 2) AS \"net_balance_ham\" FROM ingresdata2025 WHERE LOWER(\"_state\") IN ('haryana', 'rajasthan') GROUP BY LOWER(\"_state\");",
+  "title": "Recharge vs Extraction in Haryana and Rajasthan",
+  "chart": "bar",
+  "aggregation": "sum"
+}
 
-// Example 3
-// User: Show over-exploited blocks in Rajasthan
-// Return:
-// {
-//   "sql": "SELECT \`assessment unit name\`, \`categorization\` FROM ingresdata2025 WHERE LOWER(\`state\`) = 'rajasthan' AND LOWER(\`categorization\`) = 'over-exploited' LIMIT 50;",
-//   "title": "Over-Exploited Areas in Rajasthan",
-//   "chart": "none",
-//   "aggregation": "none"
-// }
+Example 3
+User: Show over-exploited blocks in Rajasthan
+Return:
+{
+  "sql": "SELECT \"assessment_unit_name\", \"categorization\" FROM ingresdata2025 WHERE LOWER(\"_state\") = 'rajasthan' AND LOWER(\"categorization\") = 'over-exploited' LIMIT 50;",
+  "title": "Over-Exploited Areas in Rajasthan",
+  "chart": "none",
+  "aggregation": "none"
+}
 
-// Example 4
-// User: Top 10 districts with highest groundwater stress
-// Return:
-// {
-//   "sql": "SELECT LOWER(\`district\`) AS \`district\`, ROUND(SUM(\`total extraction (ham)\`) - SUM(\`total annual ground water (ham) recharge\`), 2) AS \`groundwater_stress_ham\` FROM ingresdata2025 GROUP BY LOWER(\`district\`) ORDER BY \`groundwater_stress_ham\` DESC LIMIT 10;",
-//   "title": "Top 10 Districts by Groundwater Stress",
-//   "chart": "bar",
-//   "aggregation": "sum"
-// }
+Example 4
+User: Top 10 districts with highest groundwater stress
+Return:
+{
+  "sql": "SELECT LOWER(\"district\") AS \"district\", ROUND(SUM(\"total_extraction_(ham)\") - SUM(\"total_annual_ground_water_(ham)_recharge\"), 2) AS \"groundwater_stress_ham\" FROM ingresdata2025 GROUP BY LOWER(\"district\") ORDER BY \"groundwater_stress_ham\" DESC LIMIT 10;",
+  "title": "Top 10 Districts by Groundwater Stress",
+  "chart": "bar",
+  "aggregation": "sum"
+}
 
-// Example 5
-// User: Show recharge worthy area in Kamtee and Mandirbazar
-// Return:
-// {
-//   "sql": "SELECT \`assessment unit name\`, ROUND(SUM(\`recharge worthy area(ha)\`), 2) AS \`recharge_worthy_area_ha\` FROM ingresdata2025 WHERE LOWER(\`assessment unit name\`) IN ('kamtee', 'mandirbazar') GROUP BY \`assessment unit name\`;",
-//   "title": "Recharge Worthy Area Comparison: Kamtee vs Mandirbazar",
-//   "chart": "bar",
-//   "aggregation": "sum"
-// }`;
+Example 5
+User: Show recharge worthy area in Kamtee and Mandirbazar
+Return:
+{
+  "sql": "SELECT \"assessment_unit_name\", ROUND(SUM(\"recharge_worthy_area(ha)\"), 2) AS \"recharge_worthy_area_ha\" FROM ingresdata2025 WHERE LOWER(\"assessment_unit_name\") IN ('kamtee', 'mandirbazar') GROUP BY \"assessment_unit_name\";",
+  "title": "Recharge Worthy Area Comparison: Kamtee vs Mandirbazar",
+  "chart": "bar",
+  "aggregation": "sum"
+}`;
 
 try {
   //here we will send a request to the entity resolver module to get the entities and then we will send the user query along with the system instruction to the local model and get the response and then we will parse the response and return it to the user
