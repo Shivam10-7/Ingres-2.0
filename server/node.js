@@ -10,8 +10,9 @@ const mongoose = require('mongoose');
 // const WebSocket = require('ws');
 const Database = require('./src/routes/db/dataRetrive');
 const cookieParser = require('cookie-parser');
-const http = require('http');
+// const http = require('http');
 const chartDeterminer = require('./src/routes/Modules/ChartDeterminer'); // Ensure this is correctly imported for use in dataRetrive.js
+const RequestLock = require('./src/routes/middleware/RequestLock')
 // Create an HTTP server using the Express app
 // const server = http.createServer(app);
 const mysql = require("mysql2"); // Keep the import for the connection block
@@ -85,7 +86,7 @@ app.use('/auth', require('./src/routes/middleware/auth'));
 app.use('/api/chats', require('./src/routes/chatRoutes'));
 
 // these are the routes that we get form the chat
-app.post('/chat',AuthJwt, async (req, res) => { 
+app.post('/chat',AuthJwt,RequestLock, async (req, res) => { 
     // 1. Input Validation: Ensure 'query' actually exists before processing
     const { query, isDetailedResponseNeeded, isVisualizationNeeded } = req.body;
 
