@@ -40,7 +40,7 @@ import {
   ChatSession,
   GwraMapSummary,
 } from "@/lib/api";
-import { API_BASE_URL } from "@/lib/config";
+import { API_BASE_URL, QUICKCHAT_URL } from "@/lib/config";
 import { ChatSidebarContent } from "@/components/ChatSidebarContent";
 import { EChartsRenderer } from "@/components/EChartsRenderer";
 import IndiaMapComponent from "@/components/IndiaMapComponent";
@@ -604,12 +604,12 @@ function ChatPage() {
     setShowModeDropdown(false);
 
     if (mode.id === "quick") {
-      setShowQuickModal(true);
-      setShowDataPanel(false);
-    } else {
-      setShowQuickModal(false);
-      setShowDataPanel(false);
+      window.location.href = QUICKCHAT_URL;
+      return;
     }
+
+    setShowQuickModal(false);
+    setShowDataPanel(false);
 
     // ⭐ AUTO should reset everything
     if (mode.id === "auto") {
