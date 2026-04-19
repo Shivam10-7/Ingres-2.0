@@ -6,6 +6,29 @@ const LocalModel = require("../../../LocalModel");
 const EntityResolver = require("../Modules/Entity_Resolve");
 const Approve = require("../db/Approved.json");
 const sqlIntelligence = require("../db/COLUMN_INTELLIGENCE.json");
+
+const SQLGEN_LOG_PREFIX = "[SQLGen]";
+
+function previewText(value, maxLength = 280) {
+  if (value === undefined || value === null) return "";
+  const normalized = String(value).replace(/\s+/g, " ").trim();
+  return normalized.length > maxLength
+    ? `${normalized.slice(0, maxLength)}...`
+    : normalized;
+}
+
+function formatErrorDetails(error) {
+  if (!error) {
+    return { message: "Unknown error" };
+  }
+
+  return {
+    name: error.name,
+    message: error.message,
+    stack: error.stack,
+  };
+}
+
 async function SQLGen(userQuery) {
 // let sqlGenerator = `
 // You are an expert MySQL query generator for a groundwater assessment database.
@@ -557,7 +580,7 @@ async function SQLGen(userQuery) {
 // {"sql": "SELECT LOWER(\`district\`) AS \`district\`, ROUND(SUM(\`total extraction (ham)\`) - SUM(\`total annual ground water (ham) recharge\`), 2) AS \`groundwater_stress_ham\` FROM ingresdata2025 GROUP BY LOWER(\`district\`) ORDER BY groundwater_stress_ham DESC LIMIT 10;", "title": "Top 10 Districts with Highest Groundwater Stress", "chart": "bar", "aggregation": "sum"}
 // `;
 
-let sqlGenerator = `You are an enterprise-grade PostgreSQL SQL generator for the INGRES groundwater analytics system.
+const SQL_PROMPT_TEMPLATE = `You are an enterprise-grade PostgreSQL SQL generator for the INGRES groundwater analytics system.
 
 Your task is to convert:
 1) the USER QUESTION
@@ -974,8 +997,16 @@ Return:
 }`;
 
 try {
+  console.log(`${SQLGEN_LOG_PREFIX} Starting SQL generation`, {
+    queryPreview: previewText(userQuery),
+    queryLength: typeof userQuery === "string" ? userQuery.length : 0,
+  });
+
   //here we will send a request to the entity resolver module to get the entities and then we will send the user query along with the system instruction to the local model and get the response and then we will parse the response and return it to the user
+  let sqlPrompt = SQL_PROMPT_TEMPLATE;
+
   try {
+    console.log(`${SQLGEN_LOG_PREFIX} Invoking entity resolver`);
     const Detectedentities = await EntityResolver(userQuery);
 
     // Normalize → { type, value }
@@ -993,48 +1024,87 @@ try {
     const entityJSON = JSON.stringify(normalizedEntities);
 
     console.log(
-      "[SQLGen] Entity resolution successful.",
-      "Entities JSON:", entityJSON,
-      "| status:", Detectedentities.status
+      `${SQLGEN_LOG_PREFIX} Entity resolution successful`,
+      {
+        status: Detectedentities.status,
+        entityCount: normalizedEntities.length,
+        entitiesPreview: previewText(entityJSON),
+      }
     );
 
     // Inject JSON into single placeholder
-    sqlGenerator = sqlGenerator.replace("{resolver_json}", entityJSON);
-    sqlGenerator = sqlGenerator.replace("{user_question}", userQuery);
-    sqlGenerator = sqlGenerator.replace("{column_intelligence_json}", JSON.stringify(sqlIntelligence));
-    sqlGenerator = sqlGenerator.replace("{approved_schema_json}", JSON.stringify(Approve));
+    sqlPrompt = sqlPrompt.replace("{resolver_json}", entityJSON);
+    sqlPrompt = sqlPrompt.replace("{user_question}", userQuery);
+    sqlPrompt = sqlPrompt.replace("{column_intelligence_json}", JSON.stringify(sqlIntelligence));
+    sqlPrompt = sqlPrompt.replace("{approved_schema_json}", JSON.stringify(Approve));
 
     console.log(
-      "[SQLGen] SQL prompt after entity injection:",
-      sqlGenerator
+      `${SQLGEN_LOG_PREFIX} Prompt assembled`,
+      {
+        promptLength: sqlPrompt.length,
+        promptPreview: previewText(sqlPrompt, 500),
+      }
     );
 
   } catch (error) {
-    console.error("[SQLGen] Entity resolution failed:", error.message);
+    console.error(`${SQLGEN_LOG_PREFIX} Entity resolution failed`, {
+      ...formatErrorDetails(error),
+      queryPreview: previewText(userQuery),
+    });
   }
-    console.log("System Instruction for SQL Generation:");
-    console.log("[Prompt going inside]"+sqlGenerator);
+
+    console.log(`${SQLGEN_LOG_PREFIX} Sending prompt to model`, {
+      promptLength: sqlPrompt.length,
+      queryPreview: previewText(userQuery),
+    });
     // const SQLJresponse = await LocalModel(sqlGenerator, userQuery);
-    const SQLJresponse = await ApiCaller(sqlGenerator, userQuery);
+    const SQLJresponse = await ApiCaller(sqlPrompt, userQuery);
     // const SQLJresponse = await LocalModel(SQL_Prompt2.replace("{{USER_QUERY}}", userQuery));
-    
-    
+
+    console.log(`${SQLGEN_LOG_PREFIX} Model response received`, {
+      responseLength:
+        typeof SQLJresponse === "string" ? SQLJresponse.length : 0,
+      responsePreview: previewText(SQLJresponse, 400),
+    });
+
     let FinalResponse="";
     try {
+      console.log(`${SQLGEN_LOG_PREFIX} Parsing model response`);
       FinalResponse=parseLLMJsonString(SQLJresponse);
       //Changed  parsing and moved to fuunction
       // FinalResponse=  JSON.parse(SQLJresponse);
+      console.log(`${SQLGEN_LOG_PREFIX} Parsed SQL response successfully`, {
+        hasError: Boolean(FinalResponse?.error),
+        sqlPreview: previewText(FinalResponse?.sql, 220),
+        titlePreview: previewText(FinalResponse?.title, 120),
+        chart: FinalResponse?.chart,
+        aggregation: FinalResponse?.aggregation,
+      });
     } catch (error) {
-      console.error("[SQLGen] Failed to parse model response as JSON:", error.message);
+      console.error(`${SQLGEN_LOG_PREFIX} Failed to parse model response as JSON`, {
+        ...formatErrorDetails(error),
+        rawResponsePreview: previewText(SQLJresponse, 500),
+      });
     }
   
     if (!FinalResponse || FinalResponse.error) {
-      console.warn(`[SQLGen] Model could not generate SQL for: "${userQuery}"`);
+      console.warn(`${SQLGEN_LOG_PREFIX} Model could not generate SQL`, {
+        queryPreview: previewText(userQuery),
+        response: FinalResponse,
+      });
     }
+
+    console.log(`${SQLGEN_LOG_PREFIX} SQL generation finished`, {
+      success: Boolean(FinalResponse && !FinalResponse.error),
+      hasSql: Boolean(FinalResponse?.sql),
+    });
     return FinalResponse;
 
 } catch (error) {
-      console.error("[SQLGen Error]:", error.message);
+      console.error(`${SQLGEN_LOG_PREFIX} Unhandled error during SQL generation`, {
+      ...formatErrorDetails(error),
+      queryPreview: previewText(userQuery),
+    });
       return {
       error: "Technical error generating query",
       sql: null
