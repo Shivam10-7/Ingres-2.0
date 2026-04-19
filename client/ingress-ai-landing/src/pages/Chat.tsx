@@ -32,7 +32,6 @@ import {
   sendChatRequest,
   getGwraMapData,
   getGwraLocations,
-  API_BASE_URL,
   getAuthHeaders,
   getUserChatSessions,
   createNewChatSession,
@@ -41,6 +40,7 @@ import {
   ChatSession,
   GwraMapSummary,
 } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/config";
 import { ChatSidebarContent } from "@/components/ChatSidebarContent";
 import { EChartsRenderer } from "@/components/EChartsRenderer";
 import IndiaMapComponent from "@/components/IndiaMapComponent";
@@ -596,7 +596,7 @@ function ChatPage() {
 
   // Map panel state (integrated in main chat screen)
   const [isMapPanelOpen, setIsMapPanelOpen] = useState(false); // start hidden until user clicks map icon
-  const [isMapInitialized, setIsMapInitialized] = useState(true); // start loading map in background immediately
+  const [isMapInitialized, setIsMapInitialized] = useState(false);
 
   // Handle mode selection
   const handleModeSelect = (mode) => {
@@ -629,11 +629,10 @@ function ChatPage() {
   };
 
   useEffect(() => {
-    // Start loading the map immediately (hidden by default) so user-click is fast.
-    setIsMapInitialized(true);
-  }, []);
+    if (!isMapNeeded && !isMapPanelOpen) {
+      return;
+    }
 
-  useEffect(() => {
     const loadMapData = async () => {
       const response =
         LOCAL_GWRA_MAP_DATA &&
@@ -655,7 +654,7 @@ function ChatPage() {
     };
 
     loadMapData();
-  }, []);
+  }, [isMapNeeded, isMapPanelOpen]);
 
   useEffect(() => {
     const loadStates = async () => {
@@ -1109,11 +1108,7 @@ function ChatPage() {
 
     try {
       const shouldUseMapData =
-        isSupportedMapQueryText(textToSend) &&
-        (isMapNeeded ||
-          isMapPanelOpen ||
-          !!mapSelection ||
-          selectedMode.id === "auto");
+        isMapModeActive && isSupportedMapQueryText(textToSend);
 
       if (shouldUseMapData && Object.keys(mapStatesDataRef.current).length === 0) {
         const response =
@@ -1994,12 +1989,16 @@ ${
                         onClick={() => {
                           setIsMapPanelOpen((prev) => {
                             const next = !prev;
+                            setIsMapNeeded(next);
+                            if (next) {
+                              setIsMapInitialized(true);
+                              setSidebarOpen(false);
+                            } else {
+                              setMapSelection(null);
+                              setShowInlineMapOptions(false);
+                            }
                             return next;
                           });
-                          setIsMapNeeded((prev) => !prev);
-                          if (!isMapPanelOpen) {
-                            setSidebarOpen(false);
-                          }
                         }}
                         className={`p-2.5 rounded-xl transition-colors ${isLightMode ? "hover:bg-slate-200/80" : "hover:bg-white/10"}`}
                         title="Toggle Map"

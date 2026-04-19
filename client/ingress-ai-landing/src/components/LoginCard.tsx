@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/config";
 
 const LoginCard = () => {
   const navigate = useNavigate();

@@ -1,12 +1,4 @@
-// legacy backend (Node service) used for auth/chat/etc.
-export const API_BASE_URL =
-  (import.meta.env as any).VITE_API_BASE_URL ||
-  'https://ingres-2-0-0xfe.onrender.com';
-
-// python RAG service running via uvicorn
-const RAG_API_BASE_URL =
-  (import.meta.env as any).VITE_RAG_API_BASE_URL ||
-  'http://127.0.0.1:8000';
+import { API_BASE_URL, RAG_API_BASE_URL } from "@/lib/config";
 
 export const getAuthToken = () => {
   if (typeof window === 'undefined') return null;

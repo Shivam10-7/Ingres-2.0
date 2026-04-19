@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { API_BASE_URL, getAuthHeaders } from "@/lib/api";
+import { getAuthHeaders } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/config";
 import { LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 

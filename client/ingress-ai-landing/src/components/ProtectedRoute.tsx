@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { API_BASE_URL, getAuthHeaders } from "@/lib/api";
+import { getAuthHeaders } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/config";
 import { useNavigate } from "react-router-dom";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
