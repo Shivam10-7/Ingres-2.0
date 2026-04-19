@@ -32,13 +32,6 @@ mongoose.connect(process.env.MONGO_URI)
     console.log("MongoDB connection error:", err);
 });
 
-try {
-  getGwraMapData();
-  console.log('✅ GWRA map data preloaded from server/data/GWRA_MapData.json');
-} catch (error) {
-  console.error('[Startup] Failed to preload GWRA map data:', error);
-}
-
 // // connection with the MYSQL
 // const con = mysql.createConnection({
 //     host: process.env.DB_HOST,
@@ -85,10 +78,8 @@ const defaultOrigins = [
   'http://localhost:5173',
   'http://localhost:8080',
   'http://localhost:8082',
-  'http://localhost:4173',
   'http://10.212.167.242:8080',
-  'http://10.212.167.242:8082',
-  'https://geekvelocity-ingres.netlify.app'
+  'http://10.212.167.242:8082'
 ];
 const envOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
@@ -438,4 +429,8 @@ app.post('/dataQuery/test', async (req, res) => {
 const PORT = process.env.PORT || 8081;
 app.listen(PORT, () => {
     console.log(`http://localhost:${PORT}`);
+const PORT = process.env.PORT || 8081;
+app.listen(PORT, () => {
+    console.log(`http://localhost:${PORT}`);
+})
 })

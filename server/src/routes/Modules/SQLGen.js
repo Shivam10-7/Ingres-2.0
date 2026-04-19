@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 const  ApiCaller  = require("../../../API-Service");
 const parseLLMJsonString = require("../Modules/parseLLMJsonString");
 const ParseModelJson =  require("../Modules/parseLLMJsonString");
@@ -9,6 +10,20 @@ async function SQLGen(userQuery) {
 // let sqlGenerator = `
 // You are an expert MySQL query generator for a groundwater assessment database.
 
+=======
+
+const  ApiCaller  = require("../../../API-Service");
+const parseLLMJsonString = require("../Modules/parseLLMJsonString");
+const ParseModelJson =  require("../Modules/parseLLMJsonString");
+const LocalModel = require("../../../LocalModel");
+const EntityResolver = require("../Modules/Entity_Resolve");
+const Approve = require("../db/Approved.json");
+const sqlIntelligence = require("../db/COLUMN_INTELLIGENCE.json");
+async function SQLGen(userQuery) {
+// let sqlGenerator = `
+// You are an expert MySQL query generator for a groundwater assessment database.
+
+>>>>>>> ca07e750 (fixed minor issues in node.js)
 // Your task is to convert a natural language user query into a SAFE and CORRECT SQL query.
 
 // ==============================
@@ -462,6 +477,7 @@ async function SQLGen(userQuery) {
 // }`;
 
 
+<<<<<<< HEAD
 let sqlGenerator=`You are an expert MySQL query generator for the INGRES groundwater database. 
 Convert the user query + resolver output into ONE safe, correct, minimal SELECT query.
 let sqlGenerator=`You are an expert MySQL query generator for the INGRES groundwater database. 
@@ -709,6 +725,147 @@ into exactly ONE safe, correct, minimal PostgreSQL SELECT query.
 
 // No markdown. No explanations. No extra keys.
 // No markdown. No explanations. No extra keys.
+=======
+// let sqlGenerator=`You are an expert MySQL query generator for the INGRES groundwater database. 
+// Convert the user query + resolver output into ONE safe, correct, minimal SELECT query.
+
+// ### DATABASE SCHEMA (Table: \`ingresdata2025\`)
+// Use EXACT column names wrapped in backticks (\`).
+// - \`state\`: State / Union Territory
+// - \`district\`: District name
+// - \`assessment unit name\`: Block / Taluk / Tehsil / specific unit
+// - \`assessment unit type\`: Unit classification (block, district, tehsil, etc.)
+// - \`recharge worthy area(ha)\`: Area in hectares
+// - \`total annual ground water (ham) recharge\`: Recharge volume
+// - \`annual extractable ground water resource (ham)\`: Safe / available limit
+// - \`total extraction (ham)\`: Actual annual extraction
+// - \`stage of ground water extraction (%)\`: Extraction vs extractable (%)
+// - \`categorization\`: Status (Safe, Semi-critical, Critical, Over-exploited, Salinity)
+
+// ### RESOLVER & ENTITY RULES
+// Input Resolver Response with Entities and Entity types: {Resolver_Response}
+
+// 1. Scope Priority: block > taluk > tehsil > district > state. 
+// 2. Match Entity to Column:
+//    - state -> \`state\`
+//    - district -> \`district\`
+//    - block/taluk/tehsil/assessment unit name -> \`assessment unit name\`
+//    - assessment unit type -> \`assessment unit type\`
+// 3. Multiple Entities: Use \`IN (...)\`. Keep both broad and narrow filters if both exist (e.g., \`state\`='Rajasthan' AND \`district\`='Jaipur'). 
+// 4. DO NOT default to \`state\` unless explicitly requested/resolved. Do not invent entities.
+
+// ### INTENT MAPPING
+// - "recharge" / "annual recharge" -> \`total annual ground water (ham) recharge\`
+// - "extraction" / "pumping" / "usage" -> \`total extraction (ham)\`
+// - "extractable resource" / "safe limit" -> \`annual extractable ground water resource (ham)\`
+// - "stage" / "development %" -> \`stage of ground water extraction (%)\`
+// - "status" / "category" / "safe" / "over-exploited" -> \`categorization\`
+// - "recharge worthy area" -> \`recharge worthy area(ha)\`
+
+// ### CALCULATION & AGGREGATION RULES
+// 1. Math: Net Balance = (\`total extraction (ham)\` - \`total annual ground water (ham) recharge\`). Positive = deficit; Negative = surplus.
+// 2. Unit Safety: NEVER mix units (e.g., subtracting hectares from ham).
+// 3. Aggregations: 
+//    - Totals/Volumes/Areas -> \`SUM()\`
+//    - Averages/Percentages -> \`AVG()\`
+//    - Always \`ROUND(..., 2)\` for numerical outputs.
+// 4. Comparisons: Group by the comparison dimension (e.g., \`GROUP BY state\`).
+// 5. Limits: Use \`LIMIT 50\` for broad lists, \`LIMIT 10\` for top/bottom queries.
+
+// ### STRICT SAFETY CONSTRAINTS
+// - Output ONLY a JSON object. No markdown formatting (no \`\`\`json), no explanations.
+// - ONLY \`SELECT\` queries. No DML/DDL. Unknown columns/tables = strictly forbidden.
+// - NO 'year' column exists. If a year is requested, return the error JSON.
+
+// ### OUTPUT SCHEMA
+
+//   Return ONLY JSON in this structure strictly given below. **No explanations, no markdown, no extra text.**:
+//   {
+//     "sql": "SELECT ...",
+//     "title": "Short human readable title",
+//     "chart": "none | bar | line | pie",
+//     "aggregation": "none | avg | sum | weighted"
+
+//   If the question cannot be answered using the schema, retur  
+//   {
+//     "error": "Cannot answer with available data"
+//   }
+
+// ### EXAMPLES
+// User: What is the stage of groundwater extraction in Maharashtra? 
+// {"sql": "SELECT ROUND(AVG(\`stage of ground water extraction (%)\`), 2) AS \`avg_stage_of_extraction\` FROM ingresdata2025 WHERE LOWER(\`state\`) = 'maharashtra';", "title": "Average Stage of Groundwater Extraction in Maharashtra", "chart": "none", "aggregation": "avg"}
+
+// User: Compare stage of extraction for Maharashtra and Punjab
+// {"sql": "SELECT LOWER(\`state\`) AS \`state\`, ROUND(AVG(\`stage of ground water extraction (%)\`), 2) AS \`avg_stage_of_extraction\` FROM ingresdata2025 WHERE LOWER(\`state\`) IN ('maharashtra', 'punjab') GROUP BY LOWER(\`state\`);", "title": "Comparison of Groundwater Extraction Stage: Maharashtra vs Punjab", "chart": "bar", "aggregation": "avg"}
+
+// User: Compare recharge worthy area present in Kamtee and Mandirbazar
+// {"sql": "SELECT \`assessment unit name\`, ROUND(SUM(\`recharge worthy area(ha)\`), 2) AS \`recharge_worthy_area_ha\` FROM ingresdata2025 WHERE LOWER(\`assessment unit name\`) IN ('kamtee', 'mandirbazar') GROUP BY \`assessment unit name\`;", "title": "Recharge Worthy Area Comparison: Kamtee vs Mandirbazar", "chart": "bar", "aggregation": "sum"}
+
+// User: Compare recharge and extraction in Haryana and Rajasthan
+// {"sql": "SELECT LOWER(\`state\`) AS \`state\`, ROUND(SUM(\`total annual ground water (ham) recharge\`), 2) AS \`recharge_ham\`, ROUND(SUM(\`total extraction (ham)\`), 2) AS \`extraction_ham\`, ROUND(SUM(\`total extraction (ham)\`) - SUM(\`total annual ground water (ham) recharge\`), 2) AS \`net_balance_ham\` FROM ingresdata2025 WHERE LOWER(\`state\`) IN ('haryana', 'rajasthan') GROUP BY LOWER(\`state\`);", "title": "Groundwater Recharge vs Extraction in Haryana and Rajasthan", "chart": "bar", "aggregation": "sum"}
+
+// User: Show over-exploited blocks in Rajasthan
+// {"sql": "SELECT \`assessment unit name\`, \`categorization\` FROM ingresdata2025 WHERE LOWER(\`state\`) = 'rajasthan' AND LOWER(\`categorization\`) = 'over_exploited' LIMIT 50;", "title": "Over-Exploited Areas in Rajasthan", "chart": "none", "aggregation": "none"}
+
+// User: Compare recharge and extraction in haryana and Rajasthan.
+// {"sql": "SELECT LOWER(\`state\`) AS \`state\`, ROUND(SUM(\`total annual ground water (ham) recharge\`), 2) AS \`recharge_ham\`, ROUND(SUM(\`total extraction (ham)\`), 2) AS \`extraction_ham\`, ROUND(SUM(\`total extraction (ham)\`) - SUM(\`total annual ground water (ham) recharge\`), 2) AS \`net_balance_ham\` FROM ingresdata2025 WHERE LOWER(\`state\`) IN ('haryana', 'rajasthan') GROUP BY LOWER(\`state\`);", "title": "Groundwater Recharge vs Extraction in Haryana and Rajasthan", "chart": "bar", "aggregation": "sum"}
+
+// User: Average groundwater stage by state.
+// {"sql": "SELECT LOWER(\`state\`) AS \`state\`, ROUND(AVG(\`stage of ground water extraction (%)\`), 2) AS \`avg_stage_of_extraction\` FROM ingresdata2025 GROUP BY LOWER(\`state\`) ORDER BY avg_stage_of_extraction DESC;", "title": "Average Stage of Groundwater Extraction by State", "chart": "bar", "aggregation": "sum"}
+
+// User:  Compare recharge worthy area in Nagpur and Jaipur.
+// {"sql": "SELECT LOWER(\`district\`) AS \`district\`, ROUND(SUM(\`recharge worthy area(ha)\`), 2) AS \`recharge_worthy_area_ha\` FROM ingresdata2025 WHERE (LOWER(\`district\`) = 'nagpur' AND LOWER(\`state\`) = 'maharashtra') OR (LOWER(\`district\`) = 'jaipur' AND LOWER(\`state\`) = 'rajasthan') GROUP BY LOWER(\`district\`);", "title": "Recharge Worthy Area Comparison: Nagpur vs Jaipur", "chart": "bar", "aggregation": "sum"}
+
+// User:  Top 10 districts with highest groundwater stress.
+// {"sql": "SELECT LOWER(\`district\`) AS \`district\`, ROUND(SUM(\`total extraction (ham)\`) - SUM(\`total annual ground water (ham) recharge\`), 2) AS \`groundwater_stress_ham\` FROM ingresdata2025 GROUP BY LOWER(\`district\`) ORDER BY groundwater_stress_ham DESC LIMIT 10;", "title": "Top 10 Districts with Highest Groundwater Stress", "chart": "bar", "aggregation": "sum"}
+// `;
+
+let sqlGenerator = `You are an enterprise-grade PostgreSQL SQL generator for the INGRES groundwater analytics system.
+
+Your task is to convert:
+1) the USER QUESTION
+2) the RESOLVER JSON
+3) the COLUMN INTELLIGENCE JSON
+4) the APPROVED SCHEMA JSON
+
+into exactly ONE safe, correct, minimal PostgreSQL SELECT query.
+
+You must output ONLY one JSON object and nothing else.
+
+==================================================
+INPUTS
+==================================================
+USER_QUESTION: {user_question}
+
+RESOLVER_JSON: {resolver_json}
+
+COLUMN_INTELLIGENCE_JSON: {column_intelligence_json}
+
+APPROVED_SCHEMA_JSON: {approved_schema_json}
+
+The APPROVED SCHEMA and COLUMN INTELLIGENCE JSON are authoritative.
+Never invent columns, relationships, units, measures, entities, or tables.
+
+==================================================
+OUTPUT FORMAT
+==================================================
+Return exactly one of these:
+
+1) Success:
+{
+  "sql": "SELECT ...",
+  "title": "Short human-readable title",
+  "chart": "none | bar | line | pie",
+  "aggregation": "none | avg | sum | weighted"
+}
+
+2) Failure:
+{
+  "error": "Cannot answer with available data"
+}
+
+No markdown. No explanations. No extra keys.
+>>>>>>> ca07e750 (fixed minor issues in node.js)
 
 ==================================================
 DATABASE CONTRACT
@@ -752,6 +909,7 @@ Measures:
 - "net_ground_water_availability_for_future_use_(ham)"
 - "stage_of_ground_water_extraction_(%)"
 
+<<<<<<< HEAD
 // Critical note:
 // - No year/time column exists
 // - Do not answer time trend / annual trend / monthly trend / year-over-year queries unless the schema explicitly contains a time column in the approved schema JSON
@@ -787,6 +945,28 @@ Measures:
 // ENTITY RESOLUTION RULES
 // ==================================================
 // Resolver JSON is authoritative for entity interpretation.
+=======
+Critical note:
+- No year/time column exists
+- Do not answer time trend / annual trend / monthly trend / year-over-year queries unless the schema explicitly contains a time column in the approved schema JSON
+
+==================================================
+SCHEMA-AWARENESS RULES
+==================================================
+1) Every selected column must exist in APPROVED_SCHEMA_JSON.
+2) Every measure must be used only with compatible units.
+3) Never mix hectares and ham in arithmetic.
+4) Never mix raw component logic unless the schema explicitly defines the relationship.
+5) Prefer stored derived measures over recomputing them.
+6) Use the most specific valid column for the user intent.
+7) If multiple columns are plausible, choose the one explicitly encoded in COLUMN_INTELLIGENCE_JSON.
+8) If ambiguity remains after schema and resolver inspection, return failure JSON.
+
+==================================================
+ENTITY RESOLUTION RULES
+==================================================
+Resolver JSON is authoritative for entity interpretation.
+>>>>>>> ca07e750 (fixed minor issues in node.js)
 
 Expected entity mapping:
 - state -> "_state"
@@ -812,6 +992,7 @@ Example:
 - block list within a district is valid
 - unrelated state and district combinations must not be invented
 
+<<<<<<< HEAD
 // ==================================================
 // INTENT TO COLUMN MAPPING
 // ==================================================
@@ -820,6 +1001,12 @@ Example:
 // INTENT TO COLUMN MAPPING
 // ==================================================
 // Map only when meaning is exact.
+=======
+==================================================
+INTENT TO COLUMN MAPPING
+==================================================
+Map only when meaning is exact.
+>>>>>>> ca07e750 (fixed minor issues in node.js)
 
 Geography:
 - "state" -> "_state"
@@ -835,6 +1022,7 @@ Water balance:
 - "stage", "development %", "groundwater extraction stage" -> "stage_of_ground_water_extraction_(%)"
 - "status", "category", "safe", "critical", "semi-critical", "over-exploited", "saline" -> "categorization"
 
+<<<<<<< HEAD
 // If the user asks for a concept not directly represented, derive it only if the formula is unambiguous and unit-safe.
 
 // ==================================================
@@ -845,6 +1033,14 @@ Water balance:
 // DERIVED METRIC RULES
 // ==================================================
 // Use these only when explicitly requested or clearly implied.
+=======
+If the user asks for a concept not directly represented, derive it only if the formula is unambiguous and unit-safe.
+
+==================================================
+DERIVED METRIC RULES
+==================================================
+Use these only when explicitly requested or clearly implied.
+>>>>>>> ca07e750 (fixed minor issues in node.js)
 
 1) Net balance / stress / deficit:
    "total_extraction_(ham)" - "total_annual_ground_water_(ham)_recharge"
@@ -856,16 +1052,22 @@ Water balance:
    "stage_of_ground_water_extraction_(%)"
    Prefer the stored column instead of recomputing.
 
+<<<<<<< HEAD
 // 4) Percent share:
 //    100 * SUM(part) / NULLIF(SUM(total), 0)
 // 4) Percent share:
 //    100 * SUM(part) / NULLIF(SUM(total), 0)
+=======
+4) Percent share:
+   100 * SUM(part) / NULLIF(SUM(total), 0)
+>>>>>>> ca07e750 (fixed minor issues in node.js)
 
 5) Counts:
    COUNT(*) for record count
    COUNT(DISTINCT "assessment_unit_name") for unit count
    Choose the one that matches the user question
 
+<<<<<<< HEAD
 // 6) Rankings:
 //    ORDER BY metric DESC or ASC with LIMIT
 // 6) Rankings:
@@ -881,11 +1083,22 @@ Water balance:
 // - Use NULLIF(..., 0) for all division
 // - Never divide by or subtract incompatible units
 // - Never recompute a stored derived metric if the stored column exists
+=======
+6) Rankings:
+   ORDER BY metric DESC or ASC with LIMIT
+
+Rules:
+- Use ROUND(..., 2) for numeric outputs
+- Use NULLIF(..., 0) for all division
+- Never divide by or subtract incompatible units
+- Never recompute a stored derived metric if the stored column exists
+>>>>>>> ca07e750 (fixed minor issues in node.js)
 
 COLUMN RELATIONSHIP RULES
 ==================================================
 The column intelligence JSON may define totals and components. Enforce these rules:
 
+<<<<<<< HEAD
 // 1) Never sum a total column with its components in the same metric.
 // 2) Never compare a total to one of its components as though they are independent totals.
 // 3) If the user requests the total, use the total column.
@@ -1095,6 +1308,124 @@ The column intelligence JSON may define totals and components. Enforce these rul
 // - Prefer direct filters and direct aggregations
 // - Do not use unnecessary nested queries
 // - Do not invent calculated fields beyond what is supported
+=======
+1) Never sum a total column with its components in the same metric.
+2) Never compare a total to one of its components as though they are independent totals.
+3) If the user requests the total, use the total column.
+4) If the user requests a component breakdown, use only the component columns.
+5) Do not create formulas across unrelated measures unless explicitly supported.
+6) Do not assume hidden relationships not present in the intelligence JSON.
+
+If a requested relationship is not encoded, return failure JSON.
+
+==================================================
+AGGREGATION RULES
+==================================================
+- Use SUM for totals, volumes, and areas
+- Use AVG for averages or average percentages
+- Use COUNT for counts
+- Use weighted logic only if the user explicitly asks for a weighted result or the schema supports a required weighted formula
+- If aggregating by a dimension, every selected non-aggregated field must be in GROUP BY
+- Use HAVING for aggregate filters
+- Use WHERE for row-level filters
+
+Important:
+Do not mix raw row-level columns with aggregate output unless the raw columns are grouping dimensions.
+
+==================================================
+QUERY CLASS SUPPORT
+==================================================
+You must support these query types when schema allows:
+
+1) Single entity lookup
+   - Example: stage for one district, category for one block
+
+2) Multi-entity comparison
+   - Example: compare recharge in two states
+
+3) Top/bottom ranking
+   - Example: top 10 districts by stress
+
+4) Threshold analysis
+   - Example: units where extraction exceeds recharge
+
+5) Category distribution
+   - Example: count of over-exploited units by state
+
+6) Share/composition analysis
+   - Example: percentage of units in each category
+
+7) Multi-metric dashboard
+   - Example: recharge, extraction, and net balance together
+
+8) Parent-child geography
+   - Example: district-level breakdown within one state
+
+9) Entity-constrained comparison
+   - Example: compare two assessment units within the same district
+
+10) Status-filtered listings
+   - Example: all safe / critical / over-exploited units
+
+11) Area queries
+   - Example: recharge worthy area by district
+
+12) Availability queries
+   - Example: annual extractable ground water resource by state
+
+==================================================
+SORTING AND LIMITING RULES
+==================================================
+- Top/bottom/ranking questions: ORDER BY metric and LIMIT 10 unless user specifies otherwise
+- Broad listings: LIMIT 50
+- If no ranking is requested, do not add ORDER BY unnecessarily
+- If no limit is requested and the result is a grouped summary, omit LIMIT unless the expected output could be large
+
+==================================================
+CHART SELECTION RULES
+==================================================
+- bar: comparisons, rankings, grouped metrics
+- pie: category share or category composition with a small number of categories
+- line: only if a real ordered sequence exists; do not invent time series
+- none: single-row answers, direct lookups, filtered lists, or non-visual outputs
+
+If unsure:
+- use "bar" for grouped comparisons
+- use "none" for single-value answers
+
+==================================================
+VALIDATION RULES
+==================================================
+Before producing SQL, verify internally:
+
+1) Does every referenced column exist in the approved schema?
+2) Are all units compatible?
+3) Are totals and components being mixed incorrectly?
+4) Is the entity mapping valid?
+5) Is the aggregation appropriate for the question?
+6) Does the query require a time column that does not exist?
+7) Does the query require a join or second table?
+8) Is the query asking for data not present in the schema?
+9) Is the output one safe SELECT statement only?
+
+If any answer is NO, return:
+{
+  "error": "Cannot answer with available data"
+}
+
+==================================================
+SQL GENERATION RULES
+==================================================
+- Use exact column names from the approved schema
+- Use LOWER() for text filters on user-supplied values
+- Use aliases only when they improve readability
+- Use concise, human-readable aliases
+- Round all numeric outputs to 2 decimals
+- Keep the query as small as possible while still correct
+- Prefer direct filters and direct aggregations
+- Do not use unnecessary nested queries
+- Do not invent calculated fields beyond what is supported
+>>>>>>> ca07e750 (fixed minor issues in node.js)
 
 ==================================================
 OUTPUT QUALITY RULES
@@ -1151,9 +1482,15 @@ Use these rules strictly:
 - block / taluk / tehsil / assessment unit -> "assessment_unit_name"
 - assessment unit type -> "assessment_unit_type"
 
+<<<<<<< HEAD
 // ==================================================
 // EXAMPLE BEHAVIOR
 // ==================================================
+=======
+==================================================
+EXAMPLE BEHAVIOR
+==================================================
+>>>>>>> ca07e750 (fixed minor issues in node.js)
 
 Example 1
 User: What is the stage of groundwater extraction in Maharashtra?
@@ -1232,9 +1569,15 @@ try {
 
     // Inject JSON into single placeholder
     sqlGenerator = sqlGenerator.replace("{resolver_json}", entityJSON);
+<<<<<<< HEAD
     // sqlGenerator = sqlGenerator.replace("{user_question}", userQuery);
    //  sqlGenerator = sqlGenerator.replace("{column_intelligence_json}", JSON.stringify(sqlIntelligence));
    //  sqlGenerator = sqlGenerator.replace("{approved_schema_json}", JSON.stringify(Approve));
+=======
+    sqlGenerator = sqlGenerator.replace("{user_question}", userQuery);
+    sqlGenerator = sqlGenerator.replace("{column_intelligence_json}", JSON.stringify(sqlIntelligence));
+    sqlGenerator = sqlGenerator.replace("{approved_schema_json}", JSON.stringify(Approve));
+>>>>>>> ca07e750 (fixed minor issues in node.js)
 
     console.log(
       "[SQLGen] SQL prompt after entity injection:",
@@ -1246,8 +1589,13 @@ try {
   }
     console.log("System Instruction for SQL Generation:");
     console.log("[Prompt going inside]"+sqlGenerator);
+<<<<<<< HEAD
     const SQLJresponse = await LocalModel(sqlGenerator, userQuery);
    //  const SQLJresponse = await ApiCaller(sqlGenerator, userQuery);
+=======
+    // const SQLJresponse = await LocalModel(sqlGenerator, userQuery);
+    const SQLJresponse = await ApiCaller(sqlGenerator, userQuery);
+>>>>>>> ca07e750 (fixed minor issues in node.js)
     // const SQLJresponse = await LocalModel(SQL_Prompt2.replace("{{USER_QUERY}}", userQuery));
     
     
@@ -1274,4 +1622,8 @@ try {
 }
 
 }
+<<<<<<< HEAD
+=======
+
+>>>>>>> ca07e750 (fixed minor issues in node.js)
  module.exports = SQLGen;
