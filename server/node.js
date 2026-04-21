@@ -78,6 +78,7 @@ const defaultOrigins = [
   'http://localhost:5173',
   'http://localhost:8080',
   'http://localhost:8082',
+  'http://localhost:4173',
   'http://10.212.167.242:8080',
   'http://10.212.167.242:8082'
 ];

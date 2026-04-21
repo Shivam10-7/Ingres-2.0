@@ -1412,11 +1412,11 @@ function ChatPage() {
           )}
 
           {/* Main Content */}
-          <main className="flex-1 flex flex-col h-full relative min-w-0">
+          <main className="flex-1 flex flex-col h-full relative min-w-0 overflow-hidden">
             {/* Header with user profile and theme toggle */}
             <header
               className={`h-auto glass-panel border-b-0 flex items-center justify-between pr-6 py-4 shrink-0 transition-[background,backdrop-filter,box-shadow,border-color] duration-500 ease-out ${
-                sidebarOpen && !isMobile ? "pl-6" : "pl-16"
+                sidebarOpen && !isMobile ? "pl-6" : "pl-4 md:pl-16"
               }`}
             >
               <div className="flex items-center">
@@ -1473,11 +1473,11 @@ function ChatPage() {
             </header>
 
             {/* Chat Area */}
-            <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
               {/* Main Chat Column */}
               <div
-                className={`flex flex-col ${showDataPanel ? "border-r border-white/5" : ""} transition-all duration-300`}
-                style={{ width: isMapPanelOpen ? "50%" : "100%", minWidth: 0 }}
+                className={`flex flex-col transition-all duration-300 ${showDataPanel ? "md:border-r md:border-white/5 border-t border-white/5" : ""}`}
+                style={{ width: isMapPanelOpen ? (isMobile ? "100%" : "50%") : "100%", minWidth: 0 }}
               >
                 {/* Messages */}
                 <div
@@ -2058,9 +2058,9 @@ ${
               {/* Map Panel — mounted lazily on first open, then kept alive with CSS visibility */}
               {isMapInitialized && (
                 <div
-                  className="border-l border-white/10 relative overflow-hidden transition-all duration-300 shrink-0"
+                  className={`relative overflow-hidden transition-all duration-300 shrink-0 ${isMobile ? "border-t border-white/10" : "border-l border-white/10"}`}
                   style={{
-                    width: isMapPanelOpen ? "50%" : "0px",
+                    width: isMapPanelOpen ? (isMobile ? "100%" : "50%") : "0px",
                     minWidth: isMapPanelOpen ? undefined : "0",
                   }}
                   onTransitionEnd={() =>
@@ -2079,7 +2079,7 @@ ${
               {/* Data Query Panel - for Quick Chat mode */}
               {showDataPanel && (
                 <div
-                  className={`w-96 quick-mode-panel flex flex-col animate-slideIn ${
+                  className={`w-full md:w-96 quick-mode-panel flex flex-col animate-slideIn ${
                     isLightMode
                       ? "quick-mode-panel-light"
                       : "quick-mode-panel-dark"
