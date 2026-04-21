@@ -80,7 +80,8 @@ const defaultOrigins = [
   'http://localhost:8082',
   'http://localhost:4173',
   'http://10.212.167.242:8080',
-  'http://10.212.167.242:8082'
+  'http://10.212.167.242:8082',
+  'https://ingres-fyp.netlify.app'
 ];
 const envOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
