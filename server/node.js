@@ -1,4 +1,4 @@
-require('dotenv').config(); // Injected the .env file
+﻿require('dotenv').config(); // Injected the .env file
 const express = require('express');
 const app = express()
 const cors = require('cors');

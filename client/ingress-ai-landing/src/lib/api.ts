@@ -60,6 +60,16 @@ export interface GwraMapDataResponse {
   error?: string;
 }
 
+const normalizeChatQueryForBackend = (query: string) => {
+  if (typeof query !== 'string') return query;
+
+  return query
+    .replace(/\bground\s+water\s+level\b/gi, 'stage of groundwater extraction')
+    .replace(/\bgroundwater\s+level\b/gi, 'stage of groundwater extraction')
+    .replace(/\bgroundwater_level\b/gi, 'stage of groundwater extraction')
+    .replace(/\bgujrat\b/gi, 'Gujarat');
+};
+
 /**
  * Sends a chat request with detailed response and visualization options
  * (legacy /chat endpoint, kept for backwards compatibility).
@@ -70,6 +80,8 @@ export async function sendChatRequest(
   isVisualizationNeeded: boolean
 ): Promise<ChatResponse> {
   try {
+    const backendQuery = normalizeChatQueryForBackend(query);
+
     const response = await fetch(`${API_BASE_URL}/chat`, {
       method: 'POST',
       credentials: 'include', // Include cookies for session management
@@ -78,7 +90,7 @@ export async function sendChatRequest(
         ...getAuthHeaders(),
       },
       body: JSON.stringify({
-        query,
+        query: backendQuery,
         isDetailedResponseNeeded,
         isVisualizationNeeded,
       }),

@@ -730,6 +730,7 @@ Water balance:
 - "extraction", "pumping", "usage" -> "total_extraction_(ham)"
 - "recharge worthy area" -> "recharge_worthy_area(ha)"
 - "stage", "development %", "groundwater extraction stage" -> "stage_of_ground_water_extraction_(%)"
+- "ground water level", "groundwater level", "groundwater_level" -> "stage_of_ground_water_extraction_(%)"
 - "status", "category", "safe", "critical", "semi-critical", "over-exploited", "saline" -> "categorization"
 
 If the user asks for a concept not directly represented, derive it only if the formula is unambiguous and unit-safe.
