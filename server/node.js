@@ -32,6 +32,13 @@ mongoose.connect(process.env.MONGO_URI)
     console.log("MongoDB connection error:", err);
 });
 
+try {
+  getGwraMapData();
+  console.log('✅ GWRA map data preloaded from server/data/GWRA_MapData.json');
+} catch (error) {
+  console.error('[Startup] Failed to preload GWRA map data:', error);
+}
+
 // // connection with the MYSQL
 // const con = mysql.createConnection({
 //     host: process.env.DB_HOST,
