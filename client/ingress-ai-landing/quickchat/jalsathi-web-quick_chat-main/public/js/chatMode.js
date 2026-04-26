@@ -11,7 +11,7 @@ const chatStatesList = document.getElementById("chat-states-list");
 const chatDistrictsList = document.getElementById("chat-districts-list");
 const chatBlocksList = document.getElementById("chat-blocks-list");
 
-const API_BASE = "/api";
+const API_BASE = (window.location.hostname === 'localhost' ? `${window.location.protocol}//${window.location.hostname}:8081/api/quickchat` : "https://ingres-2-0-0xfe.onrender.com/api/quickchat");
 const STATES = {
   ASK_STATE: "ASK_STATE",
   ASK_DISTRICT_OR_LEVEL: "ASK_DISTRICT_OR_LEVEL",

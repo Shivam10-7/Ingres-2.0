@@ -167,7 +167,7 @@ export async function sendQuickChatRequest(
   isVisualizationNeeded: boolean
 ): Promise<QuickChatResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/quickchat`, {
+    const response = await fetch(`${API_BASE_URL}/quickchat/api/query`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

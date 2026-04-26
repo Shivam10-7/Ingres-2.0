@@ -1,5 +1,17 @@
-const { pool } = require('./db');
-const { YEAR_TABLE_MAP, CATEGORY_THRESHOLDS } = require('./config');
+const fs = require('fs');
+const path = require('path');
+
+// Helper to load fallback data from the GWRA map JSON if DB queries fail
+function loadFallbackData() {
+  try {
+    const dataPath = path.resolve(__dirname, '../../../../Data/GWRA_MapData.json');
+    const raw = fs.readFileSync(dataPath, 'utf-8');
+    return JSON.parse(raw);
+  } catch (e) {
+    console.error('Failed to load fallback GWRA data:', e.message);
+    return null;
+  }
+}
 
 const latestYear = Math.max(...Object.keys(YEAR_TABLE_MAP).map(y => Number(y)));
 
@@ -71,6 +83,12 @@ async function getStates() {
   try {
     return await buildDistinctQuery('State', tables);
   } catch (error) {
+    // Fallback to GWRA map JSON data
+    const fallback = loadFallbackData();
+    if (fallback && fallback.states) {
+      console.warn('Falling back to GWRA map JSON for states');
+      return fallback.states;
+    }
     error.message = `getStates failed: ${error.message}`;
     throw error;
   }
@@ -82,6 +100,17 @@ async function getDistricts(state) {
   try {
     return await buildDistinctQuery('district', tables, whereClause, [state]);
   } catch (error) {
+    // Fallback using GWRA map JSON data
+    const fallback = loadFallbackData();
+    if (fallback && fallback.states && fallback.districts) {
+      console.warn('Falling back to GWRA map JSON for districts');
+      // Find districts for the given state in the fallback data
+      const districtsSet = new Set();
+      Object.entries(fallback.districts).forEach(([key, val]) => {
+        if (val.state === state) districtsSet.add(val.district);
+      });
+      return Array.from(districtsSet);
+    }
     error.message = `getDistricts failed for state="${state}": ${error.message}`;
     throw error;
   }
@@ -93,6 +122,18 @@ async function getBlocks(state, district) {
   try {
     return await buildDistinctQuery('assessment_unit_name', tables, whereClause, [state, district]);
   } catch (error) {
+    // Fallback using GWRA map JSON data
+    const fallback = loadFallbackData();
+    if (fallback && fallback.districts) {
+      console.warn('Falling back to GWRA map JSON for blocks');
+      const blocksSet = new Set();
+      Object.entries(fallback.districts).forEach(([key, val]) => {
+        if (val.state === state && val.district === district) {
+          blocksSet.add(val.assessment_unit_name || val.block || val.name);
+        }
+      });
+      return Array.from(blocksSet);
+    }
     error.message = `getBlocks failed for state="${state}", district="${district}": ${error.message}`;
     throw error;
   }

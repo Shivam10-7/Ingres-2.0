@@ -20,7 +20,7 @@ let currentMode = "single";
 let locationCounter = 1;
 let statesCache = [];
 
-const API_BASE = "/api";
+const API_BASE = (window.location.hostname === 'localhost' ? `${window.location.protocol}//${window.location.hostname}:8081/api/quickchat` : "https://ingres-2-0-0xfe.onrender.com/api/quickchat");
 
 /**
  * Helpers

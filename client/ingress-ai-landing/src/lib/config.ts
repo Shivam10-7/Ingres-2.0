@@ -20,5 +20,5 @@ export const RAG_API_BASE_URL = readEnv(
 
 export const QUICKCHAT_URL = readEnv(
   "VITE_QUICKCHAT_URL",
-  "http://localhost:3000/quick-mode"
+  "/quickchat/quick-mode.html"
 );

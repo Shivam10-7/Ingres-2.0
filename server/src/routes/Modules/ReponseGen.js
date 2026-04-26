@@ -129,7 +129,6 @@ Example 3 - Warning/Alert:
 Generate the final HTML response now using the dataString and userQuery:`;
   
 try {
-<<<<<<< HEAD
     console.log(`${RESPONSEGEN_LOG_PREFIX} Starting response generation`, {
       queryPreview: previewText(userQuery),
       queryLength: typeof userQuery === "string" ? userQuery.length : 0,
@@ -143,13 +142,7 @@ try {
     });
 
     console.log(`${RESPONSEGEN_LOG_PREFIX} Invoking response model`);
-    // const response = await LocalModel(RefinedPrompt);
-     const response = await ApiCaller(RefinedPrompt,dataString);
-=======
-    console.log("Response Generator Prompt:", RefinedPrompt);
-    const response = await LocalModel(RefinedPrompt);
-    //  const response = await ApiCaller(RefinedPrompt,dataString);
->>>>>>> c716a86f (Rolled backed to smaller prompt to focus on limited columns.)
+    const response = await ApiCaller(RefinedPrompt,dataString);
 
     console.log(`${RESPONSEGEN_LOG_PREFIX} Model response received`, {
       responseLength: typeof response === "string" ? response.length : 0,
@@ -181,3 +174,4 @@ try {
   }
 }
 module.exports = ReponseGen;
+

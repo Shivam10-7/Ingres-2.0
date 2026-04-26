@@ -21,8 +21,9 @@ const {
     getStates,
     getCitiesByState,
     getAssessmentUnits,
+    initGwraHierarchy,
 } = require('./src/routes/Modules/gwraLocations');
-const { getGwraMapData } = require('./src/routes/Modules/gwraMapData');
+const { getGwraMapData, initGwraMapData } = require('./src/routes/Modules/gwraMapData');
 
 mongoose.connect(process.env.MONGO_URI)
 .then(() => {
@@ -131,8 +132,8 @@ app.use('/auth', require('./src/routes/middleware/auth'));
 // QuickChat API integration
 const quickMeta = require('./src/routes/quickchat/metaRoutes');
 const quickQuery = require('./src/routes/quickchat/queryRoutes');
-app.use('/quickchat/api/meta', quickMeta);
-app.use('/quickchat/api/query', quickQuery);
+app.use('/api/quickchat/meta', quickMeta);
+app.use('/api/quickchat/query', quickQuery);
 
 // Serve QuickChat static frontend (quick-mode, chat-mode) from public folder
 const path = require('path');
@@ -456,6 +457,21 @@ app.post('/dataQuery/test', async (req, res) => {
 // }, 1000);
 
 const PORT = process.env.PORT || 8081;
+
+try {
+  initGwraHierarchy();
+  console.log('✅ GWRA hierarchy loaded successfully');
+} catch (error) {
+  console.error('[GWRA Startup] Failed to load hierarchy data:', error.message);
+}
+
+try {
+  initGwraMapData();
+  console.log('✅ GWRA map data loaded successfully');
+} catch (error) {
+  console.error('[GWRA Startup] Failed to load map data:', error.message);
+}
+
 app.listen(PORT, () => {
     console.log(`http://localhost:${PORT}`);
 });
