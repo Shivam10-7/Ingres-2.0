@@ -1158,23 +1158,15 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
         if (onStateSelect) onStateSelect(state, getStateData(state));
       });
 
-      setShowLoader(false);
-      console.info('▶ Premium GIS Map loaded. Click any state to reveal district boundaries.');
+        setShowLoader(false);
+        console.info('Map loaded. Click any state to reveal district boundaries.');
       } catch (error) {
-        console.error('Map initialization failed', error);
+        console.error('India map initialization failed:', error);
         setShowLoader(false);
       }
     });
 
-    const loaderTimeout = window.setTimeout(() => {
-      console.warn('Map initialization timed out; hiding loader.');
-      setShowLoader(false);
-    }, 12000);
-
-    return () => {
-      window.clearTimeout(loaderTimeout);
-      map.current?.remove();
-    };
+    return () => { map.current?.remove(); };
   }, [mapTheme]);
 
   const hierarchyLevelRef = useRef<'india' | 'state' | 'district'>('india');

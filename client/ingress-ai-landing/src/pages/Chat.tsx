@@ -381,12 +381,6 @@ function ChatPage() {
   const [suggestions, setSuggestions] = useState<SuggestionOption[]>([]);
   const [suggestionContextLabel, setSuggestionContextLabel] = useState('India');
   const [showInlineMapOptions, setShowInlineMapOptions] = useState(false);
-  const [mapSelection, setMapSelection] = useState<MapSelection | null>(null);
-  const [mapStatesData, setMapStatesData] = useState<Record<string, GwraMapSummary>>({});
-  const [mapDistrictsData, setMapDistrictsData] = useState<Record<string, GwraMapSummary>>({});
-  const mapStatesDataRef = useRef<Record<string, GwraMapSummary>>({});
-  const mapDistrictsDataRef = useRef<Record<string, GwraMapSummary>>({});
-  const derivedStateNamesRef = useRef<Set<string>>(new Set());
 
   //For Renaming & Deleting the ChatNames
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
@@ -1405,11 +1399,15 @@ function ChatPage() {
             </header>
 
             {/* Chat Area */}
-            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+            <div className="flex-1 h-full min-h-0 w-full overflow-hidden">
+              <div
+                className={`grid h-full w-full min-h-0 ${
+                  isMapPanelOpen ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'
+                }`}
+              >
               {/* Main Chat Column */}
               <div
-                className={`flex flex-col ${showDataPanel ? 'border-r border-white/5' : ''} transition-all duration-300`}
-                style={{ width: isMapPanelOpen ? '50%' : '100%', minWidth: 0 }}
+                className={`flex h-full min-h-0 min-w-0 flex-col transition-all duration-300 ${showDataPanel ? 'border-r border-white/5' : ''}`}
               >
                 {/* Messages */}
                 <div
@@ -1434,7 +1432,7 @@ function ChatPage() {
                       </h2>
 
                       <p
-                        className={`text-center max-w-md ${isLightMode ? 'text-slate-500' : 'text-white/50'} mb-4`}
+                        className={`text-center ${isLightMode ? 'text-slate-500' : 'text-white/50'} mb-4`}
                       >
                         Ask me anything about India's groundwater resources.
                       </p>
@@ -1446,7 +1444,7 @@ function ChatPage() {
                       )}
 
                       {suggestions.length > 0 && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-[800px] w-full">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
                           {suggestions.map((suggestion, index) => {
                             const icon = SUGGESTION_ICONS[index % SUGGESTION_ICONS.length];
                             return (
@@ -1478,7 +1476,7 @@ function ChatPage() {
                       )}
                     </div>
                   ) : (
-                    <div className="space-y-6 max-w-3xl mx-auto">
+                    <div className="space-y-6 w-full">
                       {messages.map((message) => (
                         <React.Fragment key={message.id}>
                           <div
@@ -1558,7 +1556,7 @@ function ChatPage() {
                             >
                               <div
                                 className={`
-        w-full md:max-w-[90%] lg:max-w-[85%] 
+        w-full
         p-4 rounded-2xl border transition-colors duration-500 ease-out
         ${message.sender === 'user'
                                     ? 'bg-blue-600 border-blue-500 text-white'
@@ -1663,10 +1661,12 @@ function ChatPage() {
 
                 {/* Input Area */}
                 <div
-                  className="p-4 md:p-4 fixed md:static left-0 right-0 z-40"
-                  style={{ bottom: keyboardHeight ? `${keyboardHeight + 16}px` : '16px', paddingBottom: 'calc(env(safe-area-inset-bottom, 12px) + 8px)' }}
+                  className={`sticky bottom-0 z-30 p-3 md:p-4 ${
+                    isLightMode ? 'bg-white/80' : 'bg-slate-950/70'
+                  } backdrop-blur supports-[backdrop-filter]:bg-transparent`}
+                  style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 12px) + 8px)' }}
                 >
-                  <div className="max-w-3xl mx-auto px-2">
+                  <div className="w-full px-2">
                     <div className={`rounded-2xl p-2 flex items-center gap-2 ${isLightMode ? 'glass-card' : 'glass-card-dark'}`}>
                       {/* Plus Button with Mode Dropdown */}
                       <div className="relative" ref={modeDropdownRef}>
@@ -1845,11 +1845,7 @@ function ChatPage() {
               {/* Map Panel — mounted lazily on first open, then kept alive with CSS visibility */}
               {(isMapInitialized || isMapPanelOpen) && (
                 <div
-                  className="border-l border-white/10 relative overflow-hidden transition-all duration-300 shrink-0 h-full min-h-0"
-                  style={{
-                    width: isMapPanelOpen ? (isMobile ? '100%' : '50%') : '0px',
-                    minWidth: isMapPanelOpen ? (isMobile ? '100%' : '320px') : '0',
-                  }}
+                  className={`relative h-full min-h-0 w-full overflow-hidden transition-all duration-300 ${isMapPanelOpen ? 'block' : 'hidden'}`}
                   onTransitionEnd={() => window.dispatchEvent(new Event('resize'))}
                 >
                   <IndiaMapComponent
@@ -1860,6 +1856,7 @@ function ChatPage() {
                   />
                 </div>
               )}
+              </div>
 
               {/* Data Query Panel - for Quick Chat mode */}
               {showDataPanel && (
