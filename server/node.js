@@ -74,29 +74,45 @@ app.use(express.json());
 app.use(cookieParser());
 
 // allow cross-origin requests from client (with credentials for cookies)
+const normalizeOrigin = (origin) => {
+  return origin
+    .trim()
+    .replace(/\/$/, '');
+};
+
 const defaultOrigins = [
   'http://localhost:5173',
   'http://localhost:8080',
   'http://localhost:8082',
   'http://10.212.167.242:8080',
   'http://10.212.167.242:8082',
-  'https://geekvelocity-ingres.netlify.app/'
-];
+  'https://geekvelocity-ingres.netlify.app',
+  'https://ingres-2-0-0xfe.onrender.com',
+  'https://ingres-2-0.onrender.com'
+].map(normalizeOrigin);
 const envOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
-  .map((origin) => origin.trim())
+  .map(normalizeOrigin)
   .filter(Boolean);
 const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
 
+console.log('✅ CORS allowed origins:', allowedOrigins);
+
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    if (!origin) {
+      // Allow non-browser or same-origin requests with no Origin header
+      return callback(null, true);
     }
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    console.warn(`CORS blocked for origin: ${origin}`);
+    return callback(new Error(`Origin ${origin} not allowed by CORS`));
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 
 // mongodb connection
