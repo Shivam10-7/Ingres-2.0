@@ -57,12 +57,22 @@
 }
 
 /* ── MAP CONTAINER ─────────────────────────────────────── */
-.map-container {
-  width: 100%;
-  height: 100%;
-  font-family: var(--sans);
+.map-container, #map {
+  width: 100vw !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  min-width: 100vw !important;
   position: relative;
-  background: var(--bg);
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.map-container[data-theme='light'] {
+  --border2: rgba(15, 23, 42, 0.16);
+  --muted: #64748b;
+  background: #f8fafc;
 }
 
 /* ── LAYOUT ─────────────────────────────────────────────── */
@@ -403,6 +413,16 @@
     transparent 40%,
     rgba(2, 6, 23, 0.25) 70%,
     rgba(2, 6, 23, 0.55) 100%
+  );
+}
+
+.map-container[data-theme='light'] .map-vignette {
+  background: linear-gradient(
+    90deg,
+    rgba(248, 250, 252, 0.18) 0%,
+    transparent 18%,
+    transparent 82%,
+    rgba(248, 250, 252, 0.18) 100%
   );
 }
 
@@ -837,4 +857,11 @@
 @keyframes glowPulse {
   0%, 100% { box-shadow: 0 0 8px var(--glow-soft); }
   50%       { box-shadow: 0 0 20px var(--glow); }
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
 }

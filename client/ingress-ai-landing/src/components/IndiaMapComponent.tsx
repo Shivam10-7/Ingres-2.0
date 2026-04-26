@@ -326,9 +326,22 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
 
   useEffect(() => {
     if (!map.current || !isVisible) return;
-    const delays = [120, 300, 600];
+    // Multiple delayed resizes to catch late layout/animation
+    const delays = [50, 150, 350, 700, 1200];
     const timers = delays.map(d => window.setTimeout(() => map.current?.resize(), d));
-    return () => timers.forEach(clearTimeout);
+    // Also resize on window resize
+    const onResize = () => map.current?.resize();
+    window.addEventListener('resize', onResize);
+    // Try to catch parent flex/grid/layout changes
+    const interval = window.setInterval(() => map.current?.resize(), 500);
+    // Stop after 3 seconds
+    const stopTimeout = window.setTimeout(() => clearInterval(interval), 3000);
+    return () => {
+      timers.forEach(clearTimeout);
+      window.removeEventListener('resize', onResize);
+      clearInterval(interval);
+      clearTimeout(stopTimeout);
+    };
   }, [isVisible]);
 
   useEffect(() => {
@@ -1246,6 +1259,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
   return (
     <div
       className="map-container h-full w-full relative"
+      data-theme={mapTheme}
       style={{ display: isVisible ? 'block' : 'none' }}
     >
       {/* Vignette overlay — cinematic edge darkening */}

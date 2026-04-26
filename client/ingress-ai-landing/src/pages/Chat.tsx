@@ -1447,20 +1447,23 @@ function ChatPage() {
                               <button
                                 key={suggestion.label}
                                 onClick={() => handleSend(suggestion.prompt)}
-                                className={`group relative overflow-hidden rounded-3xl border p-5 text-left transition-all duration-300 hover:-translate-y-0.5 hover:scale-[1.01] ${isLightMode
-                                  ? 'border-sky-200/80 bg-gradient-to-br from-white via-sky-50 to-cyan-100/80 shadow-[0_18px_45px_-28px_rgba(14,116,144,0.45)] hover:border-cyan-400 hover:shadow-[0_24px_60px_-28px_rgba(6,182,212,0.45)]'
-                                  : 'border-cyan-300/15 bg-[rgba(10,20,40,0.7)] shadow-[0_18px_45px_-30px_rgba(34,211,238,0.28)] hover:border-cyan-300/80 hover:bg-slate-800/30 hover:shadow-[0_24px_60px_-28px_rgba(34,211,238,0.2)]'}`}
+                                className={`group relative overflow-hidden rounded-2xl border p-5 text-left transition-all duration-300 hover:-translate-y-0.5 ${isLightMode
+                                    ? 'border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:bg-slate-50 hover:shadow-md'
+                                    : 'border-cyan-300/15 bg-[rgba(10,20,40,0.7)] shadow-[0_18px_45px_-30px_rgba(34,211,238,0.28)] hover:border-cyan-300/80 hover:bg-slate-800/30 hover:shadow-[0_24px_60px_-28px_rgba(34,211,238,0.2)]'
+                                  }`}
                               >
-                                <div
-                                  aria-hidden
-                                  className={`pointer-events-none absolute inset-0 opacity-80 transition-opacity duration-300 group-hover:opacity-100 ${isLightMode
-                                    ? 'bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.22),transparent_45%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.12),transparent_40%)]'
-                                    : 'bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.16),transparent_40%)]'}`}
-                                />
+                                {!isLightMode && (
+                                  <div
+                                    aria-hidden
+                                    className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.16),transparent_40%)] opacity-80 transition-opacity duration-300 group-hover:opacity-100"
+                                  />
+                                )}
                                 <div className="relative text-2xl">{icon}</div>
-                                <div className={`relative mt-3 text-base font-semibold ${isLightMode ? 'text-slate-900' : 'text-white'}`}>{suggestion.label}</div>
+                                <div className={`mt-2 text-base font-semibold ${isLightMode ? 'text-slate-900' : 'text-white'}`}>
+                                  {suggestion.label}
+                                </div>
                                 <div className={`relative mt-1 text-xs font-medium ${isLightMode ? 'text-cyan-700' : 'text-cyan-100/80'}`}>
-                                  {location?.city ? `${location.city}` : `${location?.state || 'India'}`}
+                                  {suggestionContextLabel}
                                 </div>
                               </button>
                             );
@@ -1558,6 +1561,15 @@ function ChatPage() {
                                       : 'bg-slate-900 border-slate-800'
                                   }
       `}
+                                style={{
+                                  height: '400px',
+                                  width: '100%',
+                                  maxWidth: '900px',
+                                  maxHeight: '400px',
+                                  overflow: 'hidden',
+                                  WebkitOverflowScrolling: 'touch',
+                                  touchAction: 'pan-y',
+                                }}
                               >
                                 {/* Increased height for better readability. 
           The Renderer now fills this container. 
@@ -1614,17 +1626,17 @@ function ChatPage() {
                               <button
                                 key={`${suggestionContextLabel}-${suggestion.label}`}
                                 onClick={() => handleSend(suggestion.prompt)}
-                                className={`group relative overflow-hidden rounded-3xl border p-5 text-left transition-all duration-300 hover:-translate-y-0.5 hover:scale-[1.01] ${isLightMode
-                                    ? 'border-sky-200/80 bg-gradient-to-br from-white via-sky-50 to-cyan-100/80 shadow-[0_18px_45px_-28px_rgba(14,116,144,0.4)] hover:border-cyan-400 hover:shadow-[0_24px_60px_-28px_rgba(6,182,212,0.42)]'
+                                className={`group relative overflow-hidden rounded-2xl border p-5 text-left transition-all duration-300 hover:-translate-y-0.5 ${isLightMode
+                                    ? 'border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:bg-slate-50 hover:shadow-md'
                                     : 'border-cyan-300/15 bg-[rgba(10,20,40,0.7)] shadow-[0_18px_45px_-30px_rgba(34,211,238,0.28)] hover:border-cyan-300/80 hover:bg-slate-800/30 hover:shadow-[0_24px_60px_-28px_rgba(34,211,238,0.2)]'
                                   }`}
                               >
-                                <div
-                                  aria-hidden
-                                  className={`pointer-events-none absolute inset-0 opacity-80 transition-opacity duration-300 group-hover:opacity-100 ${isLightMode
-                                    ? 'bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.22),transparent_45%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.12),transparent_40%)]'
-                                    : 'bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.16),transparent_40%)]'}`}
-                                />
+                                {!isLightMode && (
+                                  <div
+                                    aria-hidden
+                                    className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.16),transparent_40%)] opacity-80 transition-opacity duration-300 group-hover:opacity-100"
+                                  />
+                                )}
                                 <div className="relative text-2xl">{icon}</div>
                                 <div className={`mt-2 text-base font-semibold ${isLightMode ? 'text-slate-900' : 'text-white'}`}>
                                   {suggestion.label}
