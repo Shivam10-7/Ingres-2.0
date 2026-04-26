@@ -32,13 +32,6 @@ mongoose.connect(process.env.MONGO_URI)
     console.log("MongoDB connection error:", err);
 });
 
-try {
-  getGwraMapData();
-  console.log('✅ GWRA map data preloaded from server/data/GWRA_MapData.json');
-} catch (error) {
-  console.error('[Startup] Failed to preload GWRA map data:', error);
-}
-
 // // connection with the MYSQL
 // const con = mysql.createConnection({
 //     host: process.env.DB_HOST,
@@ -81,30 +74,45 @@ app.use(express.json());
 app.use(cookieParser());
 
 // allow cross-origin requests from client (with credentials for cookies)
+const normalizeOrigin = (origin) => {
+  return origin
+    .trim()
+    .replace(/\/$/, '');
+};
+
 const defaultOrigins = [
   'http://localhost:5173',
   'http://localhost:8080',
   'http://localhost:8082',
-  'http://localhost:4173',
   'http://10.212.167.242:8080',
   'http://10.212.167.242:8082',
-  'https://geekvelocity-ingres.netlify.app'
-];
+  'https://geekvelocity-ingres.netlify.app',
+  'https://ingres-2-0-0xfe.onrender.com',
+  'https://ingres-2-0.onrender.com'
+].map(normalizeOrigin);
 const envOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
-  .map((origin) => origin.trim())
+  .map(normalizeOrigin)
   .filter(Boolean);
 const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
 
+console.log('✅ CORS allowed origins:', allowedOrigins);
+
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    if (!origin) {
+      // Allow non-browser or same-origin requests with no Origin header
+      return callback(null, true);
     }
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    console.warn(`CORS blocked for origin: ${origin}`);
+    return callback(new Error(`Origin ${origin} not allowed by CORS`));
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 
 // mongodb connection
@@ -118,6 +126,18 @@ app.use(cors({
 // })
 
 // this is the route for the authorization
+app.use('/auth', require('./src/routes/middleware/auth'));
+
+// QuickChat API integration
+const quickMeta = require('./src/routes/quickchat/metaRoutes');
+const quickQuery = require('./src/routes/quickchat/queryRoutes');
+app.use('/quickchat/api/meta', quickMeta);
+app.use('/quickchat/api/query', quickQuery);
+
+// Serve QuickChat static frontend (quick-mode, chat-mode) from public folder
+const path = require('path');
+app.use('/quickchat', express.static(path.join(__dirname, '../client/ingress-ai-landing/public/quickchat')));
+
 app.use('/auth', require('./src/routes/middleware/auth'));
 
 // routes for chat history
@@ -436,7 +456,6 @@ app.post('/dataQuery/test', async (req, res) => {
 // }, 1000);
 
 const PORT = process.env.PORT || 8081;
-
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+app.listen(PORT, () => {
+    console.log(`http://localhost:${PORT}`);
 });
