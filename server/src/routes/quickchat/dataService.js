@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { YEAR_TABLE_MAP, CATEGORY_THRESHOLDS } = require('./config');
 
 // Helper to load fallback data from the GWRA map JSON if DB queries fail
 function loadFallbackData() {
