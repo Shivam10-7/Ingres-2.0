@@ -119,7 +119,7 @@ app.use('/quickchat/api/query', quickQuery);
 
 // Serve QuickChat static frontend (quick-mode, chat-mode) from public folder
 const path = require('path');
-app.use('/quickchat', express.static(path.join(__dirname, '../client/ingress-ai-landing/public/quickchat'));
+app.use('/quickchat', express.static(path.join(__dirname, '../client/ingress-ai-landing/public/quickchat')));
 
 app.use('/auth', require('./src/routes/middleware/auth'));
 
