@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import DOMPurify from 'dompurify';
 import {
   Plus,
   ChevronDown,
@@ -30,20 +31,22 @@ import {
   sendChatRequest,
   getGwraMapData,
   getGwraLocations,
+  getAuthHeaders,
   getUserChatSessions,
   createNewChatSession,
   getChatSessionHistory,
   saveChatMessage,
   ChatSession,
   GwraMapSummary,
-} from '@/lib/api';
-import { ChatSidebarContent } from '@/components/ChatSidebarContent';
-import { EChartsRenderer } from '@/components/EChartsRenderer';
-import IndiaMapComponent from '@/components/IndiaMapComponent';
-import gwraMapDataJson from '../../../../Data/GWRA_MapData.json';
-const logoLight = '/logo_LIGHT.png';
-const logoDark = '/logo_DARK.png';
-import '@/chat/index.css';
+} from "@/lib/api";
+import { API_BASE_URL, QUICKCHAT_URL } from "@/lib/config";
+import { ChatSidebarContent } from "@/components/ChatSidebarContent";
+import { EChartsRenderer } from "@/components/EChartsRenderer";
+import IndiaMapComponent from "@/components/IndiaMapComponent";
+import gwraMapDataJson from "../../../../Data/GWRA_MapData.json";
+const logoLight = "/logo_LIGHT.png";
+const logoDark = "/logo_DARK.png";
+import "@/chat/index.css";
 
 /** Smooth sidebar motion (ease-out; mobile + desktop stay in sync). */
 const SIDEBAR_DURATION = 0.48;
@@ -127,30 +130,30 @@ const buildLocationSuggestions = (place: string): SuggestionOption[] => [
   },
 ];
 
-const normalizeMapName = (value = '') =>
+const normalizeMapName = (value = "") =>
   String(value)
     .toLowerCase()
-    .replace(/&/g, 'and')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 
-const formatMapNumber = (value?: number | null, unit = '') => {
-  if (typeof value !== 'number' || Number.isNaN(value)) {
-    return 'N/A';
+const formatMapNumber = (value?: number | null, unit = "") => {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return "N/A";
   }
 
-  const formatted = value.toLocaleString('en-IN', {
+  const formatted = value.toLocaleString("en-IN", {
     maximumFractionDigits: value >= 1000 ? 0 : 2,
   });
 
   return unit ? `${formatted} ${unit}` : formatted;
 };
 
-const formatStatusLabel = (value = '') =>
+const formatStatusLabel = (value = "") =>
   String(value)
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
     .trim()
     .replace(/\b\w/g, (char) => char.toUpperCase());
 
@@ -214,7 +217,7 @@ const buildDerivedStateSummaries = (districtData: Record<string, GwraMapSummary>
 
     derivedStates[stateName] = {
       name: entry.name,
-      state: '',
+      state: "",
       recharge: roundMapMetric(entry.recharge / entry.districtCount),
       extractable: roundMapMetric(entry.extractable / entry.districtCount),
       extraction: roundMapMetric(entry.extraction / entry.districtCount),
@@ -233,6 +236,7 @@ const isSupportedMapQueryText = (value = '') => {
   const normalized = value.toLowerCase().trim();
   return (
     normalized.includes('groundwater level') ||
+    normalized.includes('ground water level') ||
     normalized.includes('groundwater_level') ||
     normalized.includes('total recharge') ||
     normalized.includes('total_recharge') ||
@@ -268,6 +272,33 @@ const formatMessageText = (text: string) => {
     );
   });
 };
+
+const hasHtmlMarkup = (text = '') => /<\/?[a-z][\s\S]*>/i.test(text);
+
+const SanitizedHtmlMessage = React.memo(({
+  html,
+  isNew,
+  onComplete,
+}: {
+  html: string;
+  isNew?: boolean;
+  onComplete?: () => void;
+}) => {
+  const sanitizedHtml = useMemo(() => DOMPurify.sanitize(html), [html]);
+
+  useEffect(() => {
+    if (isNew) {
+      onComplete?.();
+    }
+  }, [isNew, onComplete]);
+
+  return (
+    <div
+      className="chat-html-response space-y-2 [&_h4]:text-base [&_h4]:font-semibold [&_p]:m-0 [&_hr]:my-2 [&_hr]:border-current/15 [&_ul]:list-disc [&_ul]:pl-5 [&_strong]:font-semibold"
+      dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+    />
+  );
+});
 
 const TypewriterText = React.memo(({ text, isNew, onUpdate, onComplete }: { text: string, isNew?: boolean, onUpdate?: () => void, onComplete?: () => void }) => {
   const [displayedText, setDisplayedText] = React.useState(isNew ? '' : text);
@@ -334,6 +365,16 @@ function ChatPage() {
   const [isDetailedResponseNeeded, setIsDetailedResponseNeeded] = useState(false);
   const [isMapNeeded, setIsMapNeeded] = useState(false);
   const [lastChartData, setLastChartData] = useState<any>(null);
+  const [mapSelection, setMapSelection] = useState<MapSelection | null>(null);
+  const [mapStatesData, setMapStatesData] = useState<
+    Record<string, GwraMapSummary>
+  >({});
+  const [mapDistrictsData, setMapDistrictsData] = useState<
+    Record<string, GwraMapSummary>
+  >({});
+  const mapStatesDataRef = useRef<Record<string, GwraMapSummary>>({});
+  const mapDistrictsDataRef = useRef<Record<string, GwraMapSummary>>({});
+  const derivedStateNamesRef = useRef<Set<string>>(new Set());
 
   const [location, setLocation] = useState<{ city?: string; state?: string; lat: number; lng: number } | null>(null);
   const [locationStatus, setLocationStatus] = useState<'pending' | 'granted' | 'denied'>('pending');
@@ -357,8 +398,11 @@ function ChatPage() {
   useEffect(() => {
     const fetchUserAndChats = async () => {
       try {
-        const res = await fetch("http://localhost:8081/auth/verify", {
+        const res = await fetch(`${API_BASE_URL}/auth/verify`, {
           credentials: "include",
+          headers: {
+            ...getAuthHeaders(),
+          },
         });
         if (res.ok) {
           const data = await res.json();
@@ -526,7 +570,7 @@ function ChatPage() {
 
   // Map panel state (integrated in main chat screen)
   const [isMapPanelOpen, setIsMapPanelOpen] = useState(false); // start hidden until user clicks map icon
-  const [isMapInitialized, setIsMapInitialized] = useState(true); // start loading map in background immediately
+  const [isMapInitialized, setIsMapInitialized] = useState(false);
 
   // Handle mode selection
   const handleModeSelect = (mode) => {
@@ -534,12 +578,12 @@ function ChatPage() {
     setShowModeDropdown(false);
 
     if (mode.id === "quick") {
-      setShowQuickModal(true);
-      setShowDataPanel(false);
-    } else {
-      setShowQuickModal(false);
-      setShowDataPanel(false);
+      window.location.href = QUICKCHAT_URL;
+      return;
     }
+
+    setShowQuickModal(false);
+    setShowDataPanel(false);
 
     // ⭐ AUTO should reset everything
     if (mode.id === "auto") {
@@ -559,14 +603,14 @@ function ChatPage() {
   };
 
   useEffect(() => {
-    // Start loading the map immediately (hidden by default) so user-click is fast.
-    setIsMapInitialized(true);
-  }, []);
+    if (!isMapNeeded && !isMapPanelOpen) {
+      return;
+    }
 
-  useEffect(() => {
     const loadMapData = async () => {
       const response =
-        LOCAL_GWRA_MAP_DATA && Object.keys(LOCAL_GWRA_MAP_DATA.states ?? {}).length > 0
+        LOCAL_GWRA_MAP_DATA &&
+        Object.keys(LOCAL_GWRA_MAP_DATA.states ?? {}).length > 0
           ? LOCAL_GWRA_MAP_DATA
           : await getGwraMapData();
       const nextDistricts = response.districts ?? {};
@@ -584,7 +628,7 @@ function ChatPage() {
     };
 
     loadMapData();
-  }, []);
+  }, [isMapNeeded, isMapPanelOpen]);
 
   useEffect(() => {
     const loadStates = async () => {
@@ -594,7 +638,9 @@ function ChatPage() {
       setStateOptions(nextStates);
 
       if (nextStates.length > 0) {
-        setSelectedState((current) => (current && nextStates.includes(current) ? current : nextStates[0]));
+        setSelectedState((current) =>
+          current && nextStates.includes(current) ? current : nextStates[0],
+        );
       }
     };
 
@@ -763,9 +809,18 @@ function ChatPage() {
   // Handle logout
   const handleLogout = async () => {
     try {
-      await fetch('/auth/logout', { method: 'POST', credentials: 'include' });
-    } catch { }
-    navigate('/landing');
+      await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          ...getAuthHeaders(),
+        },
+      });
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem("authToken");
+      }
+    } catch {}
+    navigate("/landing");
   };
 
   // Mark message as complete (transition from typewriter to HTML)
@@ -799,9 +854,11 @@ function ChatPage() {
     if (direct) return direct;
 
     const normalized = normalizeMapName(stateName);
-    return Object.values(stateData).find(
-      (entry) => normalizeMapName(entry.name) === normalized
-    ) ?? null;
+    return (
+      Object.values(stateData).find(
+        (entry) => normalizeMapName(entry.name) === normalized,
+      ) ?? null
+    );
   };
 
   const findDistrictSummary = (districtName?: string, stateName?: string) => {
@@ -826,6 +883,19 @@ function ChatPage() {
     const stateEntries = Object.values(mapStatesDataRef.current);
     const districtEntries = Object.values(mapDistrictsDataRef.current);
     const normalizedLocationCity = normalizeMapName(location?.city || '');
+
+    const directDistrictMatch = districtEntries.find(
+      (entry) => normalizedQuery.includes(normalizeMapName(entry.name))
+    );
+
+    if (directDistrictMatch) {
+      const directDistrictState = findStateSummary(directDistrictMatch.state);
+      return {
+        requestedPlace: `${directDistrictMatch.name}, ${directDistrictMatch.state}`,
+        districtSummary: directDistrictMatch,
+        stateSummary: directDistrictState,
+      };
+    }
 
     const matchedState =
       stateEntries.find((entry) => normalizedQuery.includes(normalizeMapName(entry.name))) ||
@@ -1042,7 +1112,11 @@ function ChatPage() {
         return;
       }
 
-      const data = await sendChatRequest(textToSend, isDetailedResponseNeeded, isVisualizationNeeded);
+      const data = await sendChatRequest(
+        textToSend,
+        isDetailedResponseNeeded,
+        isVisualizationNeeded,
+      );
 
       if (!data.success) {
         throw new Error(data.error || 'Failed to fetch response');
@@ -1086,18 +1160,15 @@ function ChatPage() {
         }
       }
     } catch (err) {
-      console.error('Send failed', err);
-
-      if (isMapModeActive && isSupportedMapQueryText(textToSend)) {
-        const fallbackMessage: ChatMessageItem = {
-          id: crypto.randomUUID(),
-          text: 'I could not complete that request from the server, but the map-selection flow is now configured to answer directly from **GWRA_MapData.json** when the query matches the supported groundwater attributes.',
-          sender: 'bot',
-          timestamp: new Date(),
-          isNew: true,
-        };
-        setMessages(prev => [...prev, fallbackMessage]);
-      }
+      console.error("Send failed", err);
+      const fallbackMessage: ChatMessageItem = {
+        id: crypto.randomUUID(),
+        text: "I could not complete that request from the server. Please try again in a moment.",
+        sender: "bot",
+        timestamp: new Date(),
+        isNew: true,
+      };
+      setMessages((prev) => [...prev, fallbackMessage]);
     } finally {
       setIsTyping(false);
     }
@@ -1116,6 +1187,12 @@ function ChatPage() {
   //For Deleting Chat
   const handleDeleteChat = async (chatId: string) => {
     try {
+      await fetch(`${API_BASE_URL}/api/chats/${chatId}`, {
+        method: "DELETE",
+        headers: {
+          ...getAuthHeaders(),
+        },
+      });
 
       await fetch(`http://localhost:8081/api/chats/${chatId}`, {
         method: "DELETE"
@@ -1272,11 +1349,12 @@ function ChatPage() {
           )}
 
           {/* Main Content */}
-          <main className="flex-1 flex flex-col h-full relative min-w-0">
+          <main className="flex-1 flex flex-col h-full relative min-w-0 overflow-hidden">
             {/* Header with user profile and theme toggle */}
             <header
-              className={`h-auto glass-panel border-b-0 flex items-center justify-between pr-6 py-4 shrink-0 transition-[background,backdrop-filter,box-shadow,border-color] duration-500 ease-out ${sidebarOpen && !isMobile ? 'pl-6' : 'pl-16'
-                }`}
+              className={`h-auto glass-panel border-b-0 flex items-center justify-between pr-6 py-4 shrink-0 transition-[background,backdrop-filter,box-shadow,border-color] duration-500 ease-out ${
+                sidebarOpen && !isMobile ? "pl-6" : "pl-4 md:pl-16"
+              }`}
             >
               <div className="flex items-center">
 
@@ -1327,7 +1405,7 @@ function ChatPage() {
             </header>
 
             {/* Chat Area */}
-            <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
               {/* Main Chat Column */}
               <div
                 className={`flex flex-col ${showDataPanel ? 'border-r border-white/5' : ''} transition-all duration-300`}
@@ -1375,20 +1453,23 @@ function ChatPage() {
                               <button
                                 key={suggestion.label}
                                 onClick={() => handleSend(suggestion.prompt)}
-                                className={`group relative overflow-hidden rounded-3xl border p-5 text-left transition-all duration-300 hover:-translate-y-0.5 hover:scale-[1.01] ${isLightMode
-                                  ? 'border-sky-200/80 bg-gradient-to-br from-white via-sky-50 to-cyan-100/80 shadow-[0_18px_45px_-28px_rgba(14,116,144,0.45)] hover:border-cyan-400 hover:shadow-[0_24px_60px_-28px_rgba(6,182,212,0.45)]'
-                                  : 'border-cyan-300/15 bg-[rgba(10,20,40,0.7)] shadow-[0_18px_45px_-30px_rgba(34,211,238,0.28)] hover:border-cyan-300/80 hover:bg-slate-800/30 hover:shadow-[0_24px_60px_-28px_rgba(34,211,238,0.2)]'}`}
+                                className={`group relative overflow-hidden rounded-2xl border p-5 text-left transition-all duration-300 hover:-translate-y-0.5 ${isLightMode
+                                    ? 'border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:bg-slate-50 hover:shadow-md'
+                                    : 'border-cyan-300/15 bg-[rgba(10,20,40,0.7)] shadow-[0_18px_45px_-30px_rgba(34,211,238,0.28)] hover:border-cyan-300/80 hover:bg-slate-800/30 hover:shadow-[0_24px_60px_-28px_rgba(34,211,238,0.2)]'
+                                  }`}
                               >
-                                <div
-                                  aria-hidden
-                                  className={`pointer-events-none absolute inset-0 opacity-80 transition-opacity duration-300 group-hover:opacity-100 ${isLightMode
-                                    ? 'bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.22),transparent_45%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.12),transparent_40%)]'
-                                    : 'bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.16),transparent_40%)]'}`}
-                                />
+                                {!isLightMode && (
+                                  <div
+                                    aria-hidden
+                                    className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.16),transparent_40%)] opacity-80 transition-opacity duration-300 group-hover:opacity-100"
+                                  />
+                                )}
                                 <div className="relative text-2xl">{icon}</div>
-                                <div className={`relative mt-3 text-base font-semibold ${isLightMode ? 'text-slate-900' : 'text-white'}`}>{suggestion.label}</div>
+                                <div className={`mt-2 text-base font-semibold ${isLightMode ? 'text-slate-900' : 'text-white'}`}>
+                                  {suggestion.label}
+                                </div>
                                 <div className={`relative mt-1 text-xs font-medium ${isLightMode ? 'text-cyan-700' : 'text-cyan-100/80'}`}>
-                                  {location?.city ? `${location.city}` : `${location?.state || 'India'}`}
+                                  {suggestionContextLabel}
                                 </div>
                               </button>
                             );
@@ -1427,7 +1508,13 @@ function ChatPage() {
                               ) : (
                                 <div className={`text-sm leading-relaxed ${message.sender === 'user' ? 'text-white' : isLightMode ? 'text-slate-900' : 'text-white'}`}>
                                   {message.sender === 'bot' ? (
-                                    message.isNew ? (
+                                    hasHtmlMarkup(message.text) ? (
+                                      <SanitizedHtmlMessage
+                                        html={message.text}
+                                        isNew={message.isNew}
+                                        onComplete={() => markMessageComplete(message.id)}
+                                      />
+                                    ) : message.isNew ? (
                                       <TypewriterText text={message.text} isNew={message.isNew} onUpdate={scrollToBottom} onComplete={() => markMessageComplete(message.id)} />
                                     ) : (
                                       formatMessageText(message.text)
@@ -1480,6 +1567,15 @@ function ChatPage() {
                                       : 'bg-slate-900 border-slate-800'
                                   }
       `}
+                                style={{
+                                  height: '400px',
+                                  width: '100%',
+                                  maxWidth: '900px',
+                                  maxHeight: '400px',
+                                  overflow: 'hidden',
+                                  WebkitOverflowScrolling: 'touch',
+                                  touchAction: 'pan-y',
+                                }}
                               >
                                 {/* Increased height for better readability. 
           The Renderer now fills this container. 
@@ -1536,17 +1632,17 @@ function ChatPage() {
                               <button
                                 key={`${suggestionContextLabel}-${suggestion.label}`}
                                 onClick={() => handleSend(suggestion.prompt)}
-                                className={`group relative overflow-hidden rounded-3xl border p-5 text-left transition-all duration-300 hover:-translate-y-0.5 hover:scale-[1.01] ${isLightMode
-                                    ? 'border-sky-200/80 bg-gradient-to-br from-white via-sky-50 to-cyan-100/80 shadow-[0_18px_45px_-28px_rgba(14,116,144,0.4)] hover:border-cyan-400 hover:shadow-[0_24px_60px_-28px_rgba(6,182,212,0.42)]'
+                                className={`group relative overflow-hidden rounded-2xl border p-5 text-left transition-all duration-300 hover:-translate-y-0.5 ${isLightMode
+                                    ? 'border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:bg-slate-50 hover:shadow-md'
                                     : 'border-cyan-300/15 bg-[rgba(10,20,40,0.7)] shadow-[0_18px_45px_-30px_rgba(34,211,238,0.28)] hover:border-cyan-300/80 hover:bg-slate-800/30 hover:shadow-[0_24px_60px_-28px_rgba(34,211,238,0.2)]'
                                   }`}
                               >
-                                <div
-                                  aria-hidden
-                                  className={`pointer-events-none absolute inset-0 opacity-80 transition-opacity duration-300 group-hover:opacity-100 ${isLightMode
-                                    ? 'bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.22),transparent_45%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.12),transparent_40%)]'
-                                    : 'bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.16),transparent_40%)]'}`}
-                                />
+                                {!isLightMode && (
+                                  <div
+                                    aria-hidden
+                                    className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.16),transparent_40%)] opacity-80 transition-opacity duration-300 group-hover:opacity-100"
+                                  />
+                                )}
                                 <div className="relative text-2xl">{icon}</div>
                                 <div className={`mt-2 text-base font-semibold ${isLightMode ? 'text-slate-900' : 'text-white'}`}>
                                   {suggestion.label}
@@ -1695,6 +1791,7 @@ function ChatPage() {
                         onClick={() => {
                           setIsMapPanelOpen((prev) => {
                             const next = !prev;
+                            if (next) setIsMapInitialized(true);
                             setIsMapNeeded(next);
                             return next;
                           });
@@ -1732,10 +1829,11 @@ function ChatPage() {
                       <button
                         onClick={() => handleSend()}
                         disabled={isMapModeActive || !inputValue.trim()}
-                        className={`px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${!isMapModeActive && inputValue.trim()
-                          ? 'bg-blue-600 hover:bg-blue-500 text-white'
-                          : 'bg-white/5 text-white/30 cursor-not-allowed'
-                          }`}
+                        className={`px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
+                          !isMapModeActive && inputValue.trim()
+                            ? "bg-blue-600 hover:bg-blue-500 text-white"
+                            : "bg-white/5 text-white/30 cursor-not-allowed"
+                        }`}
                       >
                         Send
                       </button>
@@ -1745,10 +1843,13 @@ function ChatPage() {
               </div>
 
               {/* Map Panel — mounted lazily on first open, then kept alive with CSS visibility */}
-              {isMapInitialized && (
+              {(isMapInitialized || isMapPanelOpen) && (
                 <div
-                  className="border-l border-white/10 relative overflow-hidden transition-all duration-300 shrink-0"
-                  style={{ width: isMapPanelOpen ? '50%' : '0px', minWidth: isMapPanelOpen ? undefined : '0' }}
+                  className="border-l border-white/10 relative overflow-hidden transition-all duration-300 shrink-0 h-full min-h-0"
+                  style={{
+                    width: isMapPanelOpen ? (isMobile ? '100%' : '50%') : '0px',
+                    minWidth: isMapPanelOpen ? (isMobile ? '100%' : '320px') : '0',
+                  }}
                   onTransitionEnd={() => window.dispatchEvent(new Event('resize'))}
                 >
                   <IndiaMapComponent

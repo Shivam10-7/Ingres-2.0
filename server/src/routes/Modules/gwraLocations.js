@@ -1,9 +1,33 @@
 const fs = require('fs');
 const path = require('path');
 
-const HIERARCHY_PATH = path.resolve(__dirname, '../../../../Data/Extracted_Hierarchy.json');
+const HIERARCHY_PATH_CANDIDATES = [
+  process.env.EXTRACTED_HIERARCHY_PATH,
+  path.resolve(__dirname, '../../../../Data/Extracted_Hierarchy.json'),
+  path.resolve(__dirname, '../../../Data/Extracted_Hierarchy.json'),
+  path.resolve(process.cwd(), 'Data/Extracted_Hierarchy.json'),
+  path.resolve(process.cwd(), 'server/../Data/Extracted_Hierarchy.json'),
+].filter(Boolean);
 
 let cachedHierarchy = null;
+
+function resolveHierarchyPath() {
+  for (const candidate of HIERARCHY_PATH_CANDIDATES) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  throw new Error(
+    `Extracted_Hierarchy.json not found. Tried: ${HIERARCHY_PATH_CANDIDATES.join(', ')}`
+  );
+}
+
+function getHierarchyPath() {
+  if (cachedHierarchy && cachedHierarchy.sourcePath) {
+    return cachedHierarchy.sourcePath;
+  }
+  return resolveHierarchyPath();
+}
 
 function normalizeSpaces(value = '') {
   return String(value).replace(/\s+/g, ' ').trim();
@@ -35,11 +59,12 @@ function sortNames(values) {
 }
 
 function loadHierarchy() {
-  if (cachedHierarchy) {
+  if (cachedHierarchy && cachedHierarchy.loaded) {
     return cachedHierarchy;
   }
 
-  const raw = fs.readFileSync(HIERARCHY_PATH, 'utf8');
+  const hierarchyPath = resolveHierarchyPath();
+  const raw = fs.readFileSync(hierarchyPath, 'utf8');
   const parsed = JSON.parse(raw);
   const states = [];
   const citiesByState = {};
@@ -72,12 +97,18 @@ function loadHierarchy() {
   }
 
   cachedHierarchy = {
+    loaded: true,
+    sourcePath: hierarchyPath,
     states: sortNames(states),
     citiesByState,
     assessmentUnitsByStateAndCity,
   };
 
   return cachedHierarchy;
+}
+
+function initGwraHierarchy() {
+  return loadHierarchy();
 }
 
 function getStates() {
@@ -109,4 +140,5 @@ module.exports = {
   getStates,
   getCitiesByState,
   getAssessmentUnits,
+  initGwraHierarchy,
 };

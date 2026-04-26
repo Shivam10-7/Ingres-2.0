@@ -2,7 +2,7 @@
   "table": "ingresdata2025",
 
   "dimensions": {
-    "state": {
+    "_state": {
       "type": "geography",
       "level": "state"
     },
@@ -10,11 +10,11 @@
       "type": "geography",
       "level": "district"
     },
-    "assessment unit name": {
+    "assessment_unit_name": {
       "type": "geography",
       "level": "block"
     },
-    "assessment unit type": {
+    "assessment_unit_type": {
       "type": "classification"
     },
     "categorization": {
@@ -30,100 +30,100 @@
   },
 
   "measures": {
-    "total area of assessment unit (ha)": {
+    "total_area_of_assessment_unit_(ha)": {
       "category": "area",
       "unit": "ha"
     },
-    "recharge worthy area(ha)": {
+    "recharge_worthy_area(ha)": {
       "category": "area",
       "unit": "ha"
     },
 
-    "recharge from rainfall-monsoon season": {
+    "recharge_from_rainfall-monsoon_season": {
       "category": "recharge",
       "unit": "ham",
       "season": "monsoon"
     },
-    "recharge from other sources- monsoon season": {
+    "recharge_from_other_sources-_monsoon_season": {
       "category": "recharge",
       "unit": "ham",
       "season": "monsoon"
     },
-    "recharge from rainfall-non monsoon season": {
+    "recharge_from_rainfall-non_monsoon_season": {
       "category": "recharge",
       "unit": "ham",
       "season": "non-monsoon"
     },
-    "recharge from other sources- non monsoon season": {
+    "recharge_from_other_sources-_non_monsoon_season": {
       "category": "recharge",
       "unit": "ham",
       "season": "non-monsoon"
     },
 
-    "total annual ground water (ham) recharge": {
+    "total_annual_ground_water_(ham)_recharge": {
       "category": "recharge",
       "unit": "ham",
       "is_total": true,
       "components": [
-        "recharge from rainfall-monsoon season",
-        "recharge from other sources- monsoon season",
-        "recharge from rainfall-non monsoon season",
-        "recharge from other sources- non monsoon season"
+        "recharge_from_rainfall-monsoon_season",
+        "recharge_from_other_sources-_monsoon_season",
+        "recharge_from_rainfall-non_monsoon_season",
+        "recharge_from_other_sources-_non_monsoon_season"
       ]
     },
 
-    "total natural discharges (ham)": {
+    "total_natural_discharges_(ham)": {
       "category": "loss",
       "unit": "ham"
     },
 
-    "annual extractable ground water resource (ham)": {
+    "annual_extractable_ground_water_resource_(ham)": {
       "category": "availability",
       "unit": "ham",
       "derived_from": [
-        "total annual ground water (ham) recharge",
-        "total natural discharges (ham)"
+        "total_annual_ground_water_(ham)_recharge",
+        "total_natural_discharges_(ham)"
       ]
     },
 
-    "ground water extraction for irrigation use (ham)": {
+    "ground_water_extraction_for_irrigation_use_(ham)": {
       "category": "extraction",
       "unit": "ham",
       "type": "irrigation"
     },
-    "ground water extraction for industrial use (ham)": {
+    "ground_water_extraction_for_industrial_use_(ham)": {
       "category": "extraction",
       "unit": "ham",
       "type": "industrial"
     },
-    "ground water extraction for domestic use (ham)": {
+    "ground_water_extraction_for_domestic_use_(ham)": {
       "category": "extraction",
       "unit": "ham",
       "type": "domestic"
     },
 
-    "total extraction (ham)": {
+    "total_extraction_(ham)": {
       "category": "extraction",
       "unit": "ham",
       "is_total": true,
       "components": [
-        "ground water extraction for irrigation use (ham)",
-        "ground water extraction for industrial use (ham)",
-        "ground water extraction for domestic use (ham)"
+        "ground_water_extraction_for_irrigation_use_(ham)",
+        "ground_water_extraction_for_industrial_use_(ham)",
+        "ground_water_extraction_for_domestic_use_(ham)"
       ]
     },
 
-    "annual gw allocation for domestic use as on 2025 (ham)": {
+    "annual_gw_allocation_for_domestic_use_as_on_2025_(ham)": {
       "category": "planning",
       "unit": "ham"
     },
 
-    "net ground water availability for future use (ham)": {
+    "net_ground_water_availability_for_future_use_(ham)": {
       "category": "availability",
       "unit": "ham"
     },
 
-    "stage of ground water extraction (%)": {
+    "stage_of_ground_water_extraction_(%)": {
       "category": "ratio",
       "unit": "percent",
       "is_derived": true,
@@ -134,20 +134,20 @@
   "relationships": {
     "no_mixing_rules": [
       {
-        "total": "total extraction (ham)",
+        "total": "total_extraction_(ham)",
         "components": [
-          "ground water extraction for irrigation use (ham)",
-          "ground water extraction for industrial use (ham)",
-          "ground water extraction for domestic use (ham)"
+          "ground_water_extraction_for_irrigation_use_(ham)",
+          "ground_water_extraction_for_industrial_use_(ham)",
+          "ground_water_extraction_for_domestic_use_(ham)"
         ]
       },
       {
-        "total": "total annual ground water (ham) recharge",
+        "total": "total_annual_ground_water_(ham)_recharge",
         "components": [
-          "recharge from rainfall-monsoon season",
-          "recharge from other sources- monsoon season",
-          "recharge from rainfall-non monsoon season",
-          "recharge from other sources- non monsoon season"
+          "recharge_from_rainfall-monsoon_season",
+          "recharge_from_other_sources-_monsoon_season",
+          "recharge_from_rainfall-non_monsoon_season",
+          "recharge_from_other_sources-_non_monsoon_season"
         ]
       }
     ]

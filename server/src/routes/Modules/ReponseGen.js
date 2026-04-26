@@ -1,5 +1,27 @@
 const ApiCaller = require("../../../API-Service");
 const LocalModel = require("../../../LocalModel");
+
+const RESPONSEGEN_LOG_PREFIX = "[ReponseGen]";
+
+function previewText(value, maxLength = 280) {
+  if (value === undefined || value === null) return "";
+  const normalized = String(value).replace(/\s+/g, " ").trim();
+  return normalized.length > maxLength
+    ? `${normalized.slice(0, maxLength)}...`
+    : normalized;
+}
+
+function formatErrorDetails(error) {
+  if (!error) {
+    return { message: "Unknown error" };
+  }
+
+  return {
+    name: error.name,
+    message: error.message,
+    stack: error.stack,
+  };
+}
 /**
  * Generates a concise, localized response for the Jal Sathi assistant.
  * @param {string} userQuery - The raw input from the user.
@@ -107,14 +129,49 @@ Example 3 - Warning/Alert:
 Generate the final HTML response now using the dataString and userQuery:`;
   
 try {
-    console.log("Response Generator Prompt:", RefinedPrompt);
-    const response = await LocalModel(RefinedPrompt);
-    //  const response = await ApiCaller(RefinedPrompt,dataString);
+    console.log(`${RESPONSEGEN_LOG_PREFIX} Starting response generation`, {
+      queryPreview: previewText(userQuery),
+      queryLength: typeof userQuery === "string" ? userQuery.length : 0,
+      dataLength: typeof dataString === "string" ? dataString.length : 0,
+      dataPreview: previewText(dataString, 320),
+    });
 
-    return response.trim();
+    console.log(`${RESPONSEGEN_LOG_PREFIX} Prompt prepared`, {
+      promptLength: RefinedPrompt.length,
+      promptPreview: previewText(RefinedPrompt, 500),
+    });
+
+    console.log(`${RESPONSEGEN_LOG_PREFIX} Invoking response model`);
+    const response = await ApiCaller(RefinedPrompt,dataString);
+
+    console.log(`${RESPONSEGEN_LOG_PREFIX} Model response received`, {
+      responseLength: typeof response === "string" ? response.length : 0,
+      responsePreview: previewText(response, 400),
+    });
+
+    const finalResponse =
+      typeof response === "string" ? response.trim() : String(response ?? "").trim();
+
+    if (!finalResponse) {
+      console.warn(`${RESPONSEGEN_LOG_PREFIX} Model returned an empty response`, {
+        queryPreview: previewText(userQuery),
+      });
+    }
+
+    console.log(`${RESPONSEGEN_LOG_PREFIX} Response generation finished`, {
+      success: Boolean(finalResponse),
+      finalLength: finalResponse.length,
+    });
+
+    return finalResponse;
   } catch (error) {
-    console.error("Error in ReponseGen:", error);
+    console.error(`${RESPONSEGEN_LOG_PREFIX} Error while generating response`, {
+      ...formatErrorDetails(error),
+      queryPreview: previewText(userQuery),
+      dataPreview: previewText(dataString, 320),
+    });
     return "Sorry, I'm having trouble generating a response right now. Please try again later.";
   }
 }
 module.exports = ReponseGen;
+

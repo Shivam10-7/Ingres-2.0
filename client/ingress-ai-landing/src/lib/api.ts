@@ -1,8 +1,14 @@
-// legacy backend (Node service) used for auth/chat/etc.
-const API_BASE_URL = 'http://localhost:8081';
+import { API_BASE_URL, RAG_API_BASE_URL } from "@/lib/config";
 
-// python RAG service running via uvicorn
-const RAG_API_BASE_URL = 'http://127.0.0.1:8000';
+export const getAuthToken = () => {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem('authToken');
+};
+
+export const getAuthHeaders = () => {
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 export interface ChatResponse {
   success: boolean;
@@ -54,6 +60,16 @@ export interface GwraMapDataResponse {
   error?: string;
 }
 
+const normalizeChatQueryForBackend = (query: string) => {
+  if (typeof query !== 'string') return query;
+
+  return query
+    .replace(/\bground\s+water\s+level\b/gi, 'stage of groundwater extraction')
+    .replace(/\bgroundwater\s+level\b/gi, 'stage of groundwater extraction')
+    .replace(/\bgroundwater_level\b/gi, 'stage of groundwater extraction')
+    .replace(/\bgujrat\b/gi, 'Gujarat');
+};
+
 /**
  * Sends a chat request with detailed response and visualization options
  * (legacy /chat endpoint, kept for backwards compatibility).
@@ -64,14 +80,17 @@ export async function sendChatRequest(
   isVisualizationNeeded: boolean
 ): Promise<ChatResponse> {
   try {
+    const backendQuery = normalizeChatQueryForBackend(query);
+
     const response = await fetch(`${API_BASE_URL}/chat`, {
       method: 'POST',
       credentials: 'include', // Include cookies for session management
       headers: {
         'Content-Type': 'application/json',
+        ...getAuthHeaders(),
       },
       body: JSON.stringify({
-        query,
+        query: backendQuery,
         isDetailedResponseNeeded,
         isVisualizationNeeded,
       }),
@@ -111,6 +130,7 @@ export async function sendGeminiRagRequest(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...getAuthHeaders(),
       },
       body: JSON.stringify({
         user_query: userQuery,
@@ -147,10 +167,11 @@ export async function sendQuickChatRequest(
   isVisualizationNeeded: boolean
 ): Promise<QuickChatResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/quickchat`, {
+    const response = await fetch(`${API_BASE_URL}/quickchat/api/query`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...getAuthHeaders(),
       },
       body: JSON.stringify({
         query,
@@ -251,7 +272,7 @@ export async function createNewChatSession(userId: string, chatName: string = "N
   try {
     const res = await fetch(`${API_BASE_URL}/api/chats`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ userId, chatName }),
     });
     if (!res.ok) throw new Error('Failed to create new chat');
@@ -264,7 +285,9 @@ export async function createNewChatSession(userId: string, chatName: string = "N
 
 export async function getUserChatSessions(userId: string): Promise<ChatSession[]> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/chats/${userId}`);
+    const res = await fetch(`${API_BASE_URL}/api/chats/${userId}`, {
+      headers: { ...getAuthHeaders() },
+    });
     if (!res.ok) throw new Error('Failed to fetch user chats');
     return await res.json();
   } catch (error) {
@@ -275,7 +298,9 @@ export async function getUserChatSessions(userId: string): Promise<ChatSession[]
 
 export async function getChatSessionHistory(chatId: string): Promise<ChatHistoryResponse | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/chats/messages/${chatId}`);
+    const res = await fetch(`${API_BASE_URL}/api/chats/messages/${chatId}`, {
+      headers: { ...getAuthHeaders() },
+    });
     if (!res.ok) throw new Error('Failed to fetch chat history');
     return await res.json();
   } catch (error) {
@@ -288,7 +313,7 @@ export async function saveChatMessage(chatId: string, role: string, content: any
   try {
     const res = await fetch(`${API_BASE_URL}/api/chats/message`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ chatId, role, content }),
     });
     if (!res.ok) throw new Error('Failed to save message');
@@ -303,7 +328,8 @@ export const renameChatSession = async (chatId: string, chatName: string) => {
   const res = await fetch(`${API_BASE_URL}/api/chats/rename/${chatId}`, {
     method: "PUT",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      ...getAuthHeaders(),
     },
     body: JSON.stringify({ chatName })
   });

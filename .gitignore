@@ -1,2 +1,41 @@
+# --- General ---
+# Dependencies (e.g., node_modules, .venv)
+node_modules/
+/vendor/
+.venv/
+.myvenv/
+
+# Build outputs (e.g., dist, build, *.exe)
+dist/
+build/
+*.o
+*.out
+
+# Environment variables & Secrets (CRITICAL)
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# IDE/Editor Configs
 .vscode/
 .idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs
+*.log
+logs/
+
+# Optional: Ignore everything inside a folder but keep the folder itself
+# output/*
+# !output/.gitkeep

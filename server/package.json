@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "main": "node.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node node.js",
+    "test": "echo \"No automated test framework configured yet\" && exit 0",
+    "test:neon": "node scripts/testNeonConnection.js",
+    "test:neon:sample": "node scripts/testNeonConnection.js \"SELECT \\\"district\\\", ROUND(AVG(\\\"stage_of_ground_water_extraction_(%)\\\"), 2) AS \\\"avg_stage\\\" FROM ingresdata2025 GROUP BY \\\"district\\\" LIMIT 5;\""
   },
   "keywords": [],
   "author": "",
@@ -25,6 +28,7 @@
     "mysql2": "^3.16.3",
     "nodemon": "^3.1.11",
     "ollama": "^0.6.3",
+    "pg": "^8.20.0",
     "ws": "^8.19.0"
   }
 }

@@ -4,6 +4,7 @@ import * as GeoJSON from 'geojson';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@/components/IndiaMapComponent.css';
 import { getGwraMapData, type GwraMapSummary } from '@/lib/api';
+import localGwraMapData from '../../../../Data/GWRA_MapData.json';
 
 // ─── MAPBOX TOKEN ──────────────────────────────────────────────────────────────
 const mapboxToken =
@@ -261,6 +262,35 @@ const TOPO_OBJECT_NAME = 'india-districts-2019-734';
 const DISTRICTS_URL =
   'https://raw.githubusercontent.com/HindustanTimesLabs/shapefiles/master/india/districts/districts.json';
 
+async function fetchJsonWithTimeout(url: string, timeoutMs = 7000) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${url}: HTTP ${response.status}`);
+    }
+    return await response.json();
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs = 7000): Promise<T> {
+  let timeoutId: number | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error('Timed out')), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId !== undefined) {
+      window.clearTimeout(timeoutId);
+    }
+  }
+}
+
 // ─── COMPONENT ────────────────────────────────────────────────────────────────
 export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
   onStateSelect,
@@ -296,9 +326,22 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
 
   useEffect(() => {
     if (!map.current || !isVisible) return;
-    const delays = [120, 300, 600];
+    // Multiple delayed resizes to catch late layout/animation
+    const delays = [50, 150, 350, 700, 1200];
     const timers = delays.map(d => window.setTimeout(() => map.current?.resize(), d));
-    return () => timers.forEach(clearTimeout);
+    // Also resize on window resize
+    const onResize = () => map.current?.resize();
+    window.addEventListener('resize', onResize);
+    // Try to catch parent flex/grid/layout changes
+    const interval = window.setInterval(() => map.current?.resize(), 500);
+    // Stop after 3 seconds
+    const stopTimeout = window.setTimeout(() => clearInterval(interval), 3000);
+    return () => {
+      timers.forEach(clearTimeout);
+      window.removeEventListener('resize', onResize);
+      clearInterval(interval);
+      clearTimeout(stopTimeout);
+    };
   }, [isVisible]);
 
   useEffect(() => {
@@ -422,8 +465,27 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
       });
     });
 
+    map.current.on('error', (event) => {
+      console.warn('Mapbox reported a map error', event.error || event);
+      setShowLoader(false);
+    });
+
     map.current.on('load', async () => {
-      const mapData = await getGwraMapData();
+      try {
+      let mapData = localGwraMapData as {
+        states?: Record<string, GwraMapSummary>;
+        districts?: Record<string, GwraMapSummary>;
+      };
+
+      try {
+        const remoteMapData = await withTimeout(getGwraMapData(), 6000);
+        if (remoteMapData?.states || remoteMapData?.districts) {
+          mapData = remoteMapData;
+        }
+      } catch (error) {
+        console.warn('GWRA map data request failed; using bundled data', error);
+      }
+
       stateDataRef.current = mapData.states ?? {};
       districtDataRef.current = mapData.districts ?? {};
 
@@ -468,8 +530,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
         'https://raw.githubusercontent.com/geohacker/india/master/state/india_telengana.geojson';
       let stateGeoJSON: any;
       try {
-        const res = await fetch(STATE_URL);
-        stateGeoJSON = await res.json();
+        stateGeoJSON = await fetchJsonWithTimeout(STATE_URL, 6000);
         stateGeoJSON.features.forEach((f: any, i: number) => {
           f.id = i;
           const p = f.properties;
@@ -479,9 +540,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
           p._status = getEntrySeverity(gwData);
         });
       } catch (e) {
-        console.error('State GeoJSON load failed', e);
-        setShowLoader(false);
-        return;
+        console.warn('State GeoJSON load failed; district polygons will be used as fallback', e);
       }
 
       // ── 2. Load TopoJSON districts ─────────────────────────────────────────
@@ -508,11 +567,31 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
         const fullGeoJSON = topoToGeoJSON(topoData, objName);
         fullGeoJSON.features.forEach((f, i) => { (f as any).id = i; });
         allDistrictsGeoJSONRef.current = fullGeoJSON;
+        if (!stateGeoJSON) {
+          const stateMap = new Map<string, GeoJSON.Feature>();
+          fullGeoJSON.features.forEach((feature, index) => {
+            const props = feature.properties || {};
+            const stateName = String(props.st_nm || props.state || props.ST_NM || 'Unknown');
+            const key = normalizeLocationName(stateName);
+            if (!key || stateMap.has(key)) return;
+            const gwData = getStateData(stateName);
+            stateMap.set(key, {
+              ...feature,
+              id: index,
+              properties: { ...props, _name: stateName, _status: getEntrySeverity(gwData) },
+            });
+          });
+          stateGeoJSON = { type: 'FeatureCollection', features: Array.from(stateMap.values()) };
+        }
       } catch (e) {
         console.warn('District TopoJSON load failed — district layer unavailable', e);
       }
 
       // ── 3. State source & layers (premium paint system) ───────────────────
+      if (!stateGeoJSON) {
+        throw new Error('No India boundary data could be loaded');
+      }
+
       map.current!.addSource('india-states', {
         type: 'geojson',
         data: stateGeoJSON,
@@ -1081,9 +1160,21 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
 
       setShowLoader(false);
       console.info('▶ Premium GIS Map loaded. Click any state to reveal district boundaries.');
+      } catch (error) {
+        console.error('Map initialization failed', error);
+        setShowLoader(false);
+      }
     });
 
-    return () => { map.current?.remove(); };
+    const loaderTimeout = window.setTimeout(() => {
+      console.warn('Map initialization timed out; hiding loader.');
+      setShowLoader(false);
+    }, 12000);
+
+    return () => {
+      window.clearTimeout(loaderTimeout);
+      map.current?.remove();
+    };
   }, [mapTheme]);
 
   const hierarchyLevelRef = useRef<'india' | 'state' | 'district'>('india');
@@ -1168,6 +1259,7 @@ export const IndiaMapComponent: React.FC<IndiaMapComponentProps> = ({
   return (
     <div
       className="map-container h-full w-full relative"
+      data-theme={mapTheme}
       style={{ display: isVisible ? 'block' : 'none' }}
     >
       {/* Vignette overlay — cinematic edge darkening */}

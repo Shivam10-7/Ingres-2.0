@@ -1,4 +1,4 @@
-require('dotenv').config(); // Injected the .env file
+﻿require('dotenv').config(); // Injected the .env file
 const express = require('express');
 const app = express()
 const cors = require('cors');
@@ -11,17 +11,19 @@ const mongoose = require('mongoose');
 const Database = require('./src/routes/db/dataRetrive');
 const cookieParser = require('cookie-parser');
 const http = require('http');
+const { Pool } = require('pg');
 const chartDeterminer = require('./src/routes/Modules/ChartDeterminer'); // Ensure this is correctly imported for use in dataRetrive.js
 // Create an HTTP server using the Express app
 // const server = http.createServer(app);
-const mysql = require("mysql2"); // Keep the import for the connection block
+// const mysql = require("mysql2"); // Keep the import for the connection block
 const classifier = require('./src/routes/classifier');
 const {
     getStates,
     getCitiesByState,
     getAssessmentUnits,
+    initGwraHierarchy,
 } = require('./src/routes/Modules/gwraLocations');
-const { getGwraMapData } = require('./src/routes/Modules/gwraMapData');
+const { getGwraMapData, initGwraMapData } = require('./src/routes/Modules/gwraMapData');
 
 mongoose.connect(process.env.MONGO_URI)
 .then(() => {
@@ -31,46 +33,87 @@ mongoose.connect(process.env.MONGO_URI)
     console.log("MongoDB connection error:", err);
 });
 
-// connection with the MYSQL
-const con = mysql.createConnection({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
+// // connection with the MYSQL
+// const con = mysql.createConnection({
+//     host: process.env.DB_HOST,
+//     user: process.env.DB_USER,
+//     database: process.env.DB_NAME,
+//     password: process.env.DB_PASSWORD,
+// });
+// // Trying connection with the MYSQL
+// con.connect(function (err) {
+//     if (err) {
+//         console.warn("MySQL connection failed (continuing without DB):", err.message);
+//     } else {
+//         console.log("✅ MySQL Connected!");
+//     }
+// });
+
+// Stage-1 migration note:
+// Keeping old MySQL connectivity block above for reference.
+// Neon/Postgres connectivity check is now active below.
+const neonPool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
-// Trying connection with the MYSQL
-con.connect(function (err) {
-    if (err) {
-        console.warn("MySQL connection failed (continuing without DB):", err.message);
-    } else {
-        console.log("✅ MySQL Connected!");
-    }
-});
+
+neonPool.query('SELECT 1 AS neon_up')
+    .then((result) => {
+        console.log("✅ Neon/Postgres connected:", result.rows[0]);
+    })
+    .catch((err) => {
+        console.warn("Neon/Postgres connection failed (continuing without DB):", err.message);
+    });
 
 // Attach WebSocket server to SAME HTTP server
 // const wss = new WebSocket.Server({ server });
+
+// Trust proxy for secure cookies when deployed behind Render/NGINX
+app.set('trust proxy', 1);
 
 app.use(express.json());
 app.use(cookieParser());
 
 // allow cross-origin requests from client (with credentials for cookies)
-const allowedOrigins = [
+const normalizeOrigin = (origin) => {
+  return origin
+    .trim()
+    .replace(/\/$/, '');
+};
+
+const defaultOrigins = [
   'http://localhost:5173',
   'http://localhost:8080',
   'http://localhost:8082',
   'http://10.212.167.242:8080',
-  'http://10.212.167.242:8082'
-];
+  'http://10.212.167.242:8082',
+  'https://geekvelocity-ingres.netlify.app',
+  'https://ingres-2-0-0xfe.onrender.com',
+  'https://ingres-2-0.onrender.com'
+].map(normalizeOrigin);
+const envOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(normalizeOrigin)
+  .filter(Boolean);
+const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
+
+console.log('✅ CORS allowed origins:', allowedOrigins);
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    if (!origin) {
+      // Allow non-browser or same-origin requests with no Origin header
+      return callback(null, true);
     }
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    console.warn(`CORS blocked for origin: ${origin}`);
+    return callback(new Error(`Origin ${origin} not allowed by CORS`));
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 
 // mongodb connection
@@ -84,6 +127,18 @@ app.use(cors({
 // })
 
 // this is the route for the authorization
+app.use('/auth', require('./src/routes/middleware/auth'));
+
+// QuickChat API integration
+const quickMeta = require('./src/routes/quickchat/metaRoutes');
+const quickQuery = require('./src/routes/quickchat/queryRoutes');
+app.use('/api/quickchat/meta', quickMeta);
+app.use('/api/quickchat/query', quickQuery);
+
+// Serve QuickChat static frontend (quick-mode, chat-mode) from public folder
+const path = require('path');
+app.use('/quickchat', express.static(path.join(__dirname, '../client/ingress-ai-landing/public/quickchat')));
+
 app.use('/auth', require('./src/routes/middleware/auth'));
 
 // routes for chat history
@@ -199,7 +254,9 @@ app.post('/tester', async (req, res) => {
     // // this is for pie chart
     // const sql ="SELECT categorization, COUNT(*) AS Total_Assessment_Units FROM ingresdata2025 GROUP BY categorization;"
     // this is for line chart
-    const sql ="SELECT district, ROUND(AVG(`stage of ground water extraction (%)`), 2) AS Avg_Extraction_Stage FROM ingresdata2025 GROUP BY district LIMIT 100;"
+    // Old MySQL-style query kept for reference:
+    // const sql ="SELECT district, ROUND(AVG(`stage of ground water extraction (%)`), 2) AS Avg_Extraction_Stage FROM ingresdata2025 GROUP BY district LIMIT 100;"
+    const sql ='SELECT "district", ROUND(AVG("stage_of_ground_water_extraction_(%)"), 2) AS "Avg_Extraction_Stage" FROM ingresdata2025 GROUP BY "district" LIMIT 100;';
     const [rows, fields, ChartType] = await Database(sql);
     let result ='';
     const chartType = (ChartType && ChartType.chartType) || (ChartType && ChartType.type) || 'table';
@@ -254,6 +311,34 @@ if (result && typeof result === 'object') {
 } else {
     return res.status(500).json({ error: "Result is not a valid object", received: result });
 }
+});
+
+// Stage-1 verification endpoint for Neon/Postgres.
+// This helps test DB connectivity without running full LLM pipeline.
+app.get('/health/neon', async (req, res) => {
+    try {
+        const testSql = 'SELECT COUNT(*)::int AS total_rows FROM ingresdata2025;';
+        const result = await neonPool.query(testSql);
+        return res.status(200).json({
+            success: true,
+            message: "Neon DB reachable",
+            probe: result.rows[0]
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Neon DB probe failed",
+            error: error.message
+        });
+    }
+});
+
+// Simple root route to confirm deployed version is live.
+app.get('/', (req, res) => {
+    res.status(200).json({
+        status: "ok",
+        service: "ingres-server"
+    });
 });
 
 
@@ -371,6 +456,22 @@ app.post('/dataQuery/test', async (req, res) => {
 //     clients.forEach((c) => c.send(text));
 // }, 1000);
 
-app.listen(8081, () => {
-    console.log("http://localhost:8081");
-})
+const PORT = process.env.PORT || 8081;
+
+try {
+  initGwraHierarchy();
+  console.log('✅ GWRA hierarchy loaded successfully');
+} catch (error) {
+  console.error('[GWRA Startup] Failed to load hierarchy data:', error.message);
+}
+
+try {
+  initGwraMapData();
+  console.log('✅ GWRA map data loaded successfully');
+} catch (error) {
+  console.error('[GWRA Startup] Failed to load map data:', error.message);
+}
+
+app.listen(PORT, () => {
+    console.log(`http://localhost:${PORT}`);
+});

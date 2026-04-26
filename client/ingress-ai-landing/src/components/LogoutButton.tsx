@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LogOut } from "lucide-react";
+import { getAuthHeaders } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/config";
 
 const LogoutButton = () => {
   const navigate = useNavigate();
@@ -9,12 +11,18 @@ const LogoutButton = () => {
   const handleLogout = async () => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8081/auth/logout", {
+      const res = await fetch(`${API_BASE_URL}/auth/logout`, {
         method: "POST",
         credentials: "include",
+        headers: {
+          ...getAuthHeaders(),
+        },
       });
 
       if (res.ok) {
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem("authToken");
+        }
         // JWT cookie is cleared by server
         navigate("/");
       }

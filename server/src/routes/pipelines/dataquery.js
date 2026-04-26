@@ -1,15 +1,26 @@
 const Reponse = require('../Modules/ReponseGen');
-const { model } = require('mongoose'); // Note: Unused in this snippet, consider removing if unnecessary
 const SQLGen = require('../Modules/SQLGen');
 const database = require('../db/dataRetrive');
+
+function normalizeGroundwaterQuery(query) {
+    if (typeof query !== 'string') return query;
+
+    return query
+        .replace(/\bground\s+water\s+level\b/gi, 'stage of groundwater extraction')
+        .replace(/\bgroundwater\s+level\b/gi, 'stage of groundwater extraction')
+        .replace(/\bgroundwater_level\b/gi, 'stage of groundwater extraction')
+        .replace(/\bgujrat\b/gi, 'Gujarat');
+}
 /**
  * Orchestrates the full RAG (Retrieval-Augmented Generation) flow:
  * Natural Language -> SQL -> Database Data -> Natural Language Response
  */
 async function dataqueryHandler(Query) {
     try {
+        const normalizedQuery = normalizeGroundwaterQuery(Query);
+
         // 1. Generate SQL from User Query
-        const SQLJson = await SQLGen(Query);
+        const SQLJson = await SQLGen(normalizedQuery);
         
         // Safety Check: If SQLGen returns an error or no SQL, handle it gracefully
         if (!SQLJson || !SQLJson.sql) {

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title data-i18n="app.titleQuick">Groundwater | Quick Mode</title>
+    <link rel="stylesheet" href="./css/styles.css" />
+  </head>
+  <body>
+    <header class="page-header">
+      <div>
+        <p class="eyebrow" data-i18n="app.brand">JalSathi</p>
+        <h1>Groundwater Insights</h1>
+        <p class="subtitle" data-i18n="app.subtitle">
+          Explore state, district, and block level groundwater information.
+        </p>
+      </div>
+      <div class="mode-actions">
+        <div id="language-selector"></div>
+        <button id="complex-trigger" type="button" class="ghost" data-i18n="buttons.complexQuery">Complex Query</button>
+      </div>
+    </header>
+
+    <div class="page-shell">
+      <nav class="side-nav" aria-label="Navigate modes">
+        <a class="nav-link active" href="/quick-mode" data-i18n="navigation.quickMode">Quick Mode</a>
+        <a class="nav-link" href="/chat-mode" data-i18n="navigation.chatMode">Chat Mode</a>
+      </nav>
+
+      <main class="page-content">
+        <section class="panel quick-panel">
+          <div class="panel-header">
+            <h2 data-i18n="modes.quickMode">Quick Mode</h2>
+            <div class="mode-toggle">
+              <button id="single-mode" class="mode-btn active" data-mode="single" data-i18n="modes.singleQuery">Single Query</button>
+              <button id="compare-mode" class="mode-btn" data-mode="compare" data-i18n="modes.compareMode">Compare Mode</button>
+            </div>
+            <span class="tag">API driven</span>
+          </div>
+
+          <div id="single-query" class="query-section active">
+            <form id="quick-form" class="grid-form" novalidate>
+              <div class="field">
+              <label for="state-select" data-i18n="form.state">State</label>
+              <select id="state-select" name="state">
+                <option value="" data-i18n="placeholders.selectState">Select a state</option>
+              </select>
+              </div>
+
+              <div class="field">
+              <label for="district-select" data-i18n="form.district">District</label>
+              <select id="district-select" name="district" disabled>
+                <option value="" data-i18n="placeholders.selectDistrict">Select a district</option>
+              </select>
+              </div>
+
+              <div class="field">
+              <label for="block-select" data-i18n="form.block">Block / Assessment Unit</label>
+              <select id="block-select" name="block" disabled>
+                <option value="" data-i18n="placeholders.selectBlock">Select a block</option>
+              </select>
+              </div>
+
+              <div class="field field-years">
+                <label data-i18n="form.years">Years</label>
+                <div class="checkboxes">
+                  <label>
+                    <input type="checkbox" name="years" value="2023" />
+                    2023
+                  </label>
+                  <label>
+                    <input type="checkbox" name="years" value="2024" />
+                    2024
+                  </label>
+                  <p class="hint" data-i18n="form.yearsHint">Select none to use the latest year.</p>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <div id="compare-query" class="query-section">
+            <div class="compare-controls">
+              <div class="field">
+                <label data-i18n="form.years">Years</label>
+                <div class="checkboxes">
+                  <label>
+                    <input type="checkbox" name="compare-years" value="2023" />
+                    2023
+                  </label>
+                  <label>
+                    <input type="checkbox" name="compare-years" value="2024" />
+                    2024
+                  </label>
+                  <p class="hint" data-i18n="form.compareYearsHint">Select years to compare across locations.</p>
+                </div>
+              </div>
+              <button id="add-location" class="secondary-btn" data-i18n="buttons.addLocation">+ Add Location</button>
+            </div>
+
+            <div id="locations-container" class="locations-container">
+              <div class="location-card" data-location-id="1">
+                <div class="location-header">
+                  <h4>Location 1</h4>
+                  <button class="remove-location" data-location-id="1">×</button>
+                </div>
+                <div class="location-fields">
+                  <div class="field">
+                    <label data-i18n="form.state">State</label>
+                    <select class="compare-state" data-location-id="1">
+                      <option value="" data-i18n="placeholders.selectState">Select a state</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label data-i18n="form.district">District</label>
+                    <select class="compare-district" data-location-id="1" disabled>
+                      <option value="" data-i18n="placeholders.selectDistrict">Select a district</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label data-i18n="form.block">Block</label>
+                    <select class="compare-block" data-location-id="1" disabled>
+                      <option value="" data-i18n="placeholders.selectBlock">Select a block</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="get-data" type="button" data-i18n="buttons.getData">Get Data</button>
+            <p id="form-error" class="error-text" role="alert"></p>
+          </div>
+
+          <div id="results" class="results">
+            <p class="muted">Results will appear here.</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="./js/i18n.js"></script>
+    <script type="module" src="./js/quickMode.js"></script>
+    <script type="module" src="./js/complexMode.js"></script>
+
+    <div id="complex-modal" class="modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="complex-title">
+        <div class="modal-header">
+          <h3 id="complex-title">Complex Queries (Coming Soon)</h3>
+          <button id="complex-close" class="ghost" type="button">Close</button>
+        </div>
+        <p class="muted">
+          In the future, you'll be able to ask natural language questions like 'Compare groundwater
+          extraction in Rajasthan and Gujarat in 2023 and 2024' and get answers. For now, please use Chat
+          Mode or Quick Mode.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>

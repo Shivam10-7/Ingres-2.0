@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { API_BASE_URL } from "@/lib/config";
 
 const LoginCard = () => {
   const navigate = useNavigate();
@@ -52,7 +53,9 @@ const LoginCard = () => {
           }
 
           setLoading(true);
-          const endpoint = isSignUp ? "http://localhost:8081/auth/signup-email" : "http://localhost:8081/auth/login-email";
+          const endpoint = isSignUp
+            ? `${API_BASE_URL}/auth/signup-email`
+            : `${API_BASE_URL}/auth/login-email`;
           try {
             const res = await fetch(endpoint, {
               method: "POST",
@@ -63,6 +66,10 @@ const LoginCard = () => {
             if (!res.ok) {
               const err = await res.json();
               throw new Error(err.error || "Authentication failed");
+            }
+            const data = await res.json();
+            if (data?.token && typeof window !== "undefined") {
+              window.localStorage.setItem("authToken", data.token);
             }
             // on success the JWT cookie will be set automatically and user data stored in MongoDB
             navigate('/chat');

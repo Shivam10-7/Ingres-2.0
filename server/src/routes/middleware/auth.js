@@ -37,11 +37,13 @@ router.post("/login-email", async (req, res) => {
             { expiresIn: "1h" }
         );
 
+        const isProd = process.env.NODE_ENV === "production";
+
         // send cookie
         res.cookie("jwt", token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "Lax",
+            secure: isProd,
+            sameSite: isProd ? "None" : "Lax",
             maxAge: 60 * 60 * 1000,
         });
 
@@ -98,16 +100,21 @@ router.post("/signup-email", async (req, res) => {
             { expiresIn: "1h" }
         );
 
+        const isProd = process.env.NODE_ENV === "production";
+
         // 6. Send secure cookie
         res.cookie("jwt", token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "Lax",
+            secure: isProd,
+            sameSite: isProd ? "None" : "Lax",
             maxAge: 3600000, // 1 hour
         });
 
         return res.status(201).json({
             message: "User created and logged in successfully",
+            token,
+            userId: user._id,
+            email: user.email,
         });
 
     } catch (err) {
@@ -123,10 +130,11 @@ router.get("/verify", AuthJwt, (req, res) => {
 
 // logout route clears cookie
 router.post("/logout", (req, res) => {
+    const isProd = process.env.NODE_ENV === "production";
     res.clearCookie("jwt", {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "Lax",
+        secure: isProd,
+        sameSite: isProd ? "None" : "Lax",
     });
     return res.json({ message: "Logged out" });
 });
