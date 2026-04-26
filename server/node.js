@@ -79,7 +79,8 @@ const defaultOrigins = [
   'http://localhost:8080',
   'http://localhost:8082',
   'http://10.212.167.242:8080',
-  'http://10.212.167.242:8082'
+  'http://10.212.167.242:8082',
+  'https://geekvelocity-ingres.netlify.app/'
 ];
 const envOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
