@@ -1,0 +1,92 @@
+{
+  "app": {
+    "title": "Groundwater | Chat Mode",
+    "titleQuick": "Groundwater | Quick Mode",
+    "brand": "JalSathi",
+    "subtitle": "Explore state, district, and block level groundwater information."
+  },
+  "navigation": {
+    "quickMode": "Quick Mode",
+    "chatMode": "Chat Mode"
+  },
+  "modes": {
+    "chatMode": "Chat Mode",
+    "quickMode": "Quick Mode",
+    "singleQuery": "Single Query",
+    "compareMode": "Compare Mode"
+  },
+  "buttons": {
+    "send": "Send",
+    "getData": "Get Data",
+    "startOver": "Start over",
+    "complexQuery": "Complex Query",
+    "addLocation": "Add Location",
+    "exportCsv": "export csv",
+    "exportJson": "export json"
+  },
+  "form": {
+    "state": "State",
+    "district": "District",
+    "block": "Block / Assessment Unit",
+    "years": "Years",
+    "yearsHint": "Select none to use the latest year.",
+    "compareYearsHint": "Select years to compare across locations.",
+    "location": "Location"
+  },
+  "placeholders": {
+    "chatInput": "Type your message...",
+    "selectState": "Select a state",
+    "selectDistrict": "Select a district",
+    "selectBlock": "Select a block"
+  },
+  "messages": {
+    "loading": "Fetching data...",
+    "results": "Results will appear here.",
+    "noData": "No data found for this combination. Try changing the filters.",
+    "unableToLoad": "Unable to load data. Please try again later.",
+    "connectionFailed": "Connection failed. Please check your internet and try again.",
+    "serverError": "Server temporarily unavailable. Please try again in a few minutes.",
+    "exportSuccess": "file downloaded successfully!",
+    "startMessage": "Hi! I can help you with groundwater data for India. Which state are you interested in?"
+  },
+  "chat": {
+    "bot": "bot",
+    "user": "user",
+    "confirmation": "Using selection:",
+    "askState": "Which state are you interested in?",
+    "askDistrict": "Do you want a specific district, or should I show state-level data?",
+    "askYear": "Which year? You can say 2023, 2024, or both. If you skip, I'll use the latest year.",
+    "done": "Do you want to check another location? Tell me a state or hit Start over."
+  },
+  "table": {
+    "headers": {
+      "year": "Year",
+      "extractable": "Annual Extractable (BCM)",
+      "extraction": "Total Extraction (BCM)",
+      "stage": "Stage (%)",
+      "categorization": "Categorization"
+    }
+  },
+  "errors": {
+    "selectLocation": "Please select at least one of state, district, or block.",
+    "selectState": "Choose a state first.",
+    "selectDistrict": "Pick a district from the list.",
+    "selectBlock": "Pick a block from the list.",
+    "selectStateFirst": "Select a state before choosing a district.",
+    "selectDistrictFirst": "Select a district before choosing a block.",
+    "invalidState": "State not found. Please select from the dropdown.",
+    "invalidDistrict": "District not found. Please select from the dropdown.",
+    "invalidBlock": "Block not found. Please select from the dropdown.",
+    "formError": "Please pick a state from the list."
+  },
+  "interpretation": {
+    "safe": "Safe zone - Good groundwater availability",
+    "semiCritical": "Semi-critical - Moderate groundwater stress",
+    "critical": "Critical - High groundwater stress",
+    "overExploited": "Over-exploited - Severe groundwater depletion"
+  },
+  "complex": {
+    "title": "Complex Queries (Coming Soon)",
+    "description": "In the future, you'll be able to ask natural language questions like 'Compare groundwater extraction in Rajasthan and Gujarat in 2023 and 2024' and get answers. For now, please use Chat Mode or Quick Mode."
+  }
+}

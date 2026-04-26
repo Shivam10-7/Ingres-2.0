@@ -111,6 +111,18 @@ app.use(cors({
 // this is the route for the authorization
 app.use('/auth', require('./src/routes/middleware/auth'));
 
+// QuickChat API integration
+const quickMeta = require('./src/routes/quickchat/metaRoutes');
+const quickQuery = require('./src/routes/quickchat/queryRoutes');
+app.use('/quickchat/api/meta', quickMeta);
+app.use('/quickchat/api/query', quickQuery);
+
+// Serve QuickChat static frontend (quick-mode, chat-mode) from public folder
+const path = require('path');
+app.use('/quickchat', express.static(path.join(__dirname, '../client/ingress-ai-landing/public/quickchat'));
+
+app.use('/auth', require('./src/routes/middleware/auth'));
+
 // routes for chat history
 app.use('/api/chats', require('./src/routes/chatRoutes'));
 

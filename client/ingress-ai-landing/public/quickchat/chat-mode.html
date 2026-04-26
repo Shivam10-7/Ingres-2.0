@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title data-i18n="app.title">Groundwater | Chat Mode</title>
+    <link rel="stylesheet" href="./css/styles.css" />
+  </head>
+  <body>
+    <header class="page-header">
+      <div>
+        <p class="eyebrow" data-i18n="app.brand">JalSathi</p>
+        <h1 data-i18n="app.subtitle">Groundwater Insights</h1>
+        <p class="subtitle" data-i18n="app.subtitle">
+          Explore state, district, and block level groundwater information.
+        </p>
+      </div>
+      <div class="mode-actions">
+        <div id="language-selector"></div>
+        <button id="complex-trigger" type="button" class="ghost" data-i18n="buttons.complexQuery">Complex Query</button>
+      </div>
+    </header>
+
+    <div class="page-shell">
+      <nav class="side-nav" aria-label="Navigate modes">
+        <a class="nav-link" href="/quick-mode" data-i18n="navigation.quickMode">Quick Mode</a>
+        <a class="nav-link active" href="/chat-mode" data-i18n="navigation.chatMode">Chat Mode</a>
+      </nav>
+
+      <main class="page-content">
+        <section class="panel chat-panel">
+          <div class="panel-header">
+            <h2 data-i18n="modes.chatMode">Chat Mode</h2>
+            <span class="tag">Conversational</span>
+          </div>
+          <div class="chat-window" id="chat-window" aria-live="polite"></div>
+          <div class="chat-actions">
+            <input
+              type="text"
+              id="chat-input"
+              placeholder="Type your message..."
+              data-i18n="placeholders.chatInput"
+              autocomplete="off"
+              aria-label="Chat input"
+            />
+            <button id="chat-send" type="button" data-i18n="buttons.send">Send</button>
+            <button id="chat-reset" type="button" class="ghost" data-i18n="buttons.startOver">Start over</button>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="./js/i18n.js"></script>
+    <script type="module" src="./js/chatMode.js"></script>
+    <script type="module" src="./js/complexMode.js"></script>
+
+    <div id="complex-modal" class="modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="complex-title">
+        <div class="modal-header">
+          <h3 id="complex-title" data-i18n="complex.title">Complex Queries (Coming Soon)</h3>
+          <button id="complex-close" class="ghost" type="button">Close</button>
+        </div>
+        <p class="muted" data-i18n="complex.description">
+          In the future, you'll be able to ask natural language questions like 'Compare groundwater
+          extraction in Rajasthan and Gujarat in 2023 and 2024' and get answers. For now, please use Chat
+          Mode or Quick Mode.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>
