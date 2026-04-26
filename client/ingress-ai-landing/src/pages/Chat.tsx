@@ -388,6 +388,78 @@ function ChatPage() {
   const [menuOpenChatId, setMenuOpenChatId] = useState<string | null>(null)
   const [deleteChatId, setDeleteChatId] = useState<string | null>(null)
 
+  // ─── Sarvam AI – multilingual voice input ────────────────────────────────
+  const SARVAM_API_KEY = 'sk_tnyd57xn_N9lK0ECj6dS2GC42AjqivDUI';
+
+  // Sarvam BCP-47 language codes
+  const SARVAM_LANG_MAP: Record<string, string> = {
+    en: 'en-IN', hi: 'hi-IN', mr: 'mr-IN', ta: 'ta-IN',
+    te: 'te-IN', kn: 'kn-IN', ml: 'ml-IN', gu: 'gu-IN',
+    pa: 'pa-IN', bn: 'bn-IN', or: 'od-IN', as: 'as-IN',
+    ur: 'ur-IN', sa: 'sa-IN', kok: 'kok-IN', ks: 'ks-IN',
+    sd: 'sd-IN', mai: 'mai-IN', bho: 'bho-IN', doi: 'doi-IN',
+    nep: 'ne-IN', mni: 'mni-IN',
+  };
+
+  const INDIAN_LANGUAGES = [
+    { code: 'en',  label: 'English' },   { code: 'hi',  label: 'Hindi' },
+    { code: 'mr',  label: 'Marathi' },   { code: 'ta',  label: 'Tamil' },
+    { code: 'te',  label: 'Telugu' },    { code: 'kn',  label: 'Kannada' },
+    { code: 'ml',  label: 'Malayalam' }, { code: 'gu',  label: 'Gujarati' },
+    { code: 'pa',  label: 'Punjabi' },   { code: 'bn',  label: 'Bengali' },
+    { code: 'or',  label: 'Odia' },      { code: 'as',  label: 'Assamese' },
+    { code: 'ur',  label: 'Urdu' },      { code: 'sa',  label: 'Sanskrit' },
+    { code: 'kok', label: 'Konkani' },   { code: 'ks',  label: 'Kashmiri' },
+    { code: 'sd',  label: 'Sindhi' },    { code: 'mai', label: 'Maithili' },
+    { code: 'bho', label: 'Bhojpuri' },  { code: 'doi', label: 'Dogri' },
+    { code: 'nep', label: 'Nepali' },    { code: 'mni', label: 'Manipuri' },
+  ] as const;
+
+  /** Convert 2-letter code → Sarvam BCP-47. Already-full codes pass through. */
+  const toSarvamCode = (lang?: string | null): string => {
+    if (!lang) return 'en-IN';
+    if (lang.includes('-')) return lang;
+    return SARVAM_LANG_MAP[lang] ?? 'en-IN';
+  };
+
+  /**
+   * Detect the script/language of a string using Unicode block ranges.
+   * Returns a 2-letter code ('hi', 'gu', 'ta' …) or 'en'.
+   */
+  const detectLangFromText = (text: string): string => {
+    if (!text?.trim()) return 'en';
+    if (/[઀-૿]/.test(text)) return 'gu'; // Gujarati
+    if (/[஀-௿]/.test(text)) return 'ta'; // Tamil
+    if (/[ఀ-౿]/.test(text)) return 'te'; // Telugu
+    if (/[ಀ-೿]/.test(text)) return 'kn'; // Kannada
+    if (/[ഀ-ൿ]/.test(text)) return 'ml'; // Malayalam
+    if (/[਀-੿]/.test(text)) return 'pa'; // Gurmukhi (Punjabi)
+    if (/[଀-୿]/.test(text)) return 'or'; // Odia
+    if (/[ঀ-৿]/.test(text)) return 'bn'; // Bengali / Assamese
+    if (/[ऀ-ॿ]/.test(text)) return 'hi'; // Devanagari → Hindi
+    if (/[؀-ۿ]/.test(text)) return 'ur'; // Arabic script → Urdu
+    // Mostly ASCII → English
+    const ascii = (text.match(/[A-Za-z0-9 .,!?'"():;_-]/g) ?? []).length;
+    return ascii / Math.max(1, text.length) > 0.7 ? 'en' : 'hi';
+  };
+
+  // ── Sarvam state ──────────────────────────────────────────────────────────
+  /** Language pinned by user via dropdown (null = auto-detect from text/STT) */
+  const [selectedLang, setSelectedLang] = useState<string | null>(null);
+  /** Language resolved for the current turn – used to translateBack the response */
+  const [currentLang, setCurrentLang] = useState<string>('en');
+  const [showLangDropdown, setShowLangDropdown] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+
+  const mediaRecorderRef     = useRef<MediaRecorder | null>(null);
+  const audioChunksRef       = useRef<Blob[]>([]);
+  const speechRecognitionRef = useRef<any>(null);
+  const langDropdownRef      = useRef<HTMLDivElement>(null);
+  // Mirror selectedLang in a ref so MediaRecorder callbacks never see stale values
+  const selectedLangRef      = useRef<string | null>(null);
+  useEffect(() => { selectedLangRef.current = selectedLang; }, [selectedLang]);
+
   // Fetch user and chats on mount
   useEffect(() => {
     const fetchUserAndChats = async () => {
@@ -493,6 +565,17 @@ function ChatPage() {
     const handleClickOutside = (event) => {
       if (modeDropdownRef.current && !modeDropdownRef.current.contains(event.target)) {
         setShowModeDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Close language dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (langDropdownRef.current && !langDropdownRef.current.contains(e.target as Node)) {
+        setShowLangDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -1013,29 +1096,243 @@ function ChatPage() {
     return null;
   };
 
+  // ─── Sarvam AI helpers ──────────────────────────────────────────────────────
+
+  /** Translate any text to English. Returns original if already English or on error. */
+  const translateToEnglish = async (text: string, srcLang: string): Promise<string> => {
+    if (srcLang === 'en' || !text.trim()) return text;
+    try {
+      const res = await fetch('https://api.sarvam.ai/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'api-subscription-key': SARVAM_API_KEY },
+        body: JSON.stringify({
+          input: text,
+          source_language_code: toSarvamCode(srcLang),
+          target_language_code: 'en-IN',
+          speaker_gender: 'Male',
+          mode: 'formal',
+          model: 'mayura:v1',
+          enable_preprocessing: false,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { console.error('Sarvam →EN error:', data); return text; }
+      return (data.translated_text ?? '').trim() || text;
+    } catch (err) {
+      console.error('translateToEnglish:', err);
+      return text;
+    }
+  };
+
+  /** Translate English text back to targetLang. Returns original if target is 'en' or on error. */
+  const translateBack = async (text: string, targetLang: string): Promise<string> => {
+    if (targetLang === 'en' || !text.trim()) return text;
+    try {
+      const res = await fetch('https://api.sarvam.ai/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'api-subscription-key': SARVAM_API_KEY },
+        body: JSON.stringify({
+          input: text,
+          source_language_code: 'en-IN',
+          target_language_code: toSarvamCode(targetLang),
+          speaker_gender: 'Male',
+          mode: 'formal',
+          model: 'mayura:v1',
+          enable_preprocessing: false,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { console.error('Sarvam EN→ error:', data); return text; }
+      return (data.translated_text ?? '').trim() || text;
+    } catch (err) {
+      console.error('translateBack:', err);
+      return text;
+    }
+  };
+
+  /** Internal: start MediaRecorder-based recording and send to Sarvam STT. */
+  const startSarvamRecording = async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', ''];
+    const mime = mimes.find((m) => !m || MediaRecorder.isTypeSupported(m)) ?? '';
+    const recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+
+    mediaRecorderRef.current = recorder;
+    audioChunksRef.current   = [];
+
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+
+    recorder.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop());
+      setIsTranscribing(true);
+      try {
+        const actualMime = recorder.mimeType || 'audio/webm';
+        const ext = actualMime.includes('mp4') ? 'mp4' : actualMime.includes('ogg') ? 'ogg' : 'webm';
+        const blob = new Blob(audioChunksRef.current, { type: actualMime });
+        const fd   = new FormData();
+        fd.append('file', blob, `rec.${ext}`);
+        fd.append('model', 'saarika:v2');
+
+        const langForSTT = selectedLangRef.current; // read from ref – never stale
+        if (langForSTT && langForSTT !== 'en') fd.append('language_code', toSarvamCode(langForSTT));
+
+        const res     = await fetch('https://api.sarvam.ai/speech-to-text', {
+          method: 'POST',
+          headers: { 'api-subscription-key': SARVAM_API_KEY },
+          body: fd,
+        });
+        const sttData = await res.json();
+
+        // Robust transcript extraction – handle various Sarvam response shapes
+        const transcript: string = (
+          sttData?.transcript ??
+          sttData?.transcription ??
+          sttData?.text ??
+          sttData?.transcript_text ??
+          sttData?.utterance ??
+          ''
+        ).trim();
+
+        if (!transcript) { console.warn('STT: no transcript in', sttData); return; }
+
+        // Detected language from API (e.g. "gu-IN") → normalise to 2-letter
+        const apiLang = String(sttData?.language_code ?? '').split('-')[0] || 'en';
+        const chosenLang = langForSTT ?? apiLang;
+
+        setCurrentLang(chosenLang);
+        setInputValue((prev) => {
+          const base = prev.trim();
+          return base ? `${base} ${transcript}` : transcript;
+        });
+
+        requestAnimationFrame(() => {
+          const el = inputRef.current as HTMLInputElement | null;
+          if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+        });
+      } catch (err) {
+        console.error('STT processing error:', err);
+      } finally {
+        setIsTranscribing(false);
+      }
+    };
+
+    recorder.start(250); // 250 ms timeslice – data arrives frequently
+    setIsRecording(true);
+  };
+
+  /**
+   * handleMic – toggle recording on/off.
+   * Strategy: try Web Speech API first (instant feedback, no file upload).
+   * If unavailable or errors, fall back to MediaRecorder → Sarvam STT.
+   */
+  const handleMic = async () => {
+    // ── STOP ──────────────────────────────────────────────────────────────
+    if (isRecording) {
+      speechRecognitionRef.current?.stop?.();
+      try { mediaRecorderRef.current?.requestData(); } catch (_) {}
+      mediaRecorderRef.current?.stop();
+      setIsRecording(false);
+      return;
+    }
+
+    // ── START ─────────────────────────────────────────────────────────────
+    if (!navigator.mediaDevices?.getUserMedia) {
+      alert('Microphone access is not supported in this browser.');
+      return;
+    }
+
+    try {
+      const SpeechRecognitionCtor =
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+      if (SpeechRecognitionCtor) {
+        const recog = new SpeechRecognitionCtor();
+        speechRecognitionRef.current = recog;
+        recog.continuous      = false;
+        recog.interimResults  = true;
+        recog.lang            = selectedLangRef.current
+          ? toSarvamCode(selectedLangRef.current)   // e.g. 'gu-IN'
+          : 'en-IN';
+
+        recog.onresult = (event: any) => {
+          let transcript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            transcript += event.results[i][0]?.transcript ?? '';
+          }
+          transcript = transcript.trim();
+          if (!transcript) return;
+
+          // Detect language from the transcript itself when user chose auto
+          const detectedLang = selectedLangRef.current ?? detectLangFromText(transcript);
+          setCurrentLang(detectedLang);
+
+          setInputValue((prev) => {
+            const base = prev.trim();
+            return base ? `${base} ${transcript}` : transcript;
+          });
+          requestAnimationFrame(() => {
+            const el = inputRef.current as HTMLInputElement | null;
+            if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+          });
+        };
+
+        recog.onerror = async () => {
+          setIsRecording(false);
+          await startSarvamRecording().catch(console.error);
+        };
+        recog.onend = () => setIsRecording(false);
+
+        recog.start();
+        setIsRecording(true);
+        return;
+      }
+
+      // No Web Speech API – use Sarvam STT directly
+      await startSarvamRecording();
+    } catch (err) {
+      console.error('handleMic error:', err);
+      alert('Could not access microphone. Please check browser permissions.');
+    }
+  };
+
+  // ─── handleSend – translate in → English → backend → translate out ────────
   const handleSend = async (overrideText?: string) => {
     if (isMapModeActive && !overrideText) return;
 
-    const textToSend = overrideText?.trim() || inputValue.trim();
-    if (!textToSend) return;
+    const rawText = (overrideText ?? inputValue).trim();
+    if (!rawText) return;
+
+    // ── 1. Determine the language of this input ────────────────────────────
+    // Priority: user pinned lang > STT-detected lang > text-detection > 'en'
+    const turnLang: string =
+      selectedLang ??
+      (currentLang !== 'en' ? currentLang : null) ??
+      detectLangFromText(rawText);
+
+    // ── 2. Translate user text → English for the backend ──────────────────
+    const englishText = await translateToEnglish(rawText, turnLang);
+    // Guard: if translation returned empty use original
+    const textToSend  = englishText.trim() || rawText;
 
     let activeChatId = currentChatId;
 
+    // Clear input & reset currentLang for the next turn NOW (before awaits)
     setInputValue('');
+    setCurrentLang('en');
     setShowInlineMapOptions(false);
     setSuggestions([]);
 
+    // Show user's original text in the chat bubble (not the translated version)
     const userMsg: ChatMessageItem = {
       id: Date.now(),
-      text: textToSend,
+      text: rawText,
       sender: 'user',
       timestamp: new Date(),
     };
-
     setMessages(prev => [...prev, userMsg]);
     setIsTyping(true);
 
-    // Create new chat session if needed (only if user typed in regular flow)
+    // ── 3. Session management ──────────────────────────────────────────────
     if (!activeChatId && userId) {
       const newChat = await createNewChatSession(userId, textToSend.substring(0, 30));
       if (newChat) {
@@ -1044,16 +1341,25 @@ function ChatPage() {
         setChats(prev => [newChat, ...prev]);
       }
     }
-
-    // Save user message
     if (activeChatId) {
       await saveChatMessage(activeChatId, 'user', [{ response: textToSend }]);
     }
 
+    // Error message helper – always translated back to the user's language
+    const showError = async (englishMsg: string) => {
+      const localMsg = await translateBack(englishMsg, turnLang);
+      setMessages(prev => [...prev, {
+        id: crypto.randomUUID(),
+        text: localMsg,
+        sender: 'bot',
+        timestamp: new Date(),
+        isNew: true,
+      }]);
+    };
+
     try {
-      const shouldUseMapData =
-        isMapModeActive &&
-        isSupportedMapQueryText(textToSend);
+      // ── 4. Map-mode fast path ────────────────────────────────────────────
+      const shouldUseMapData = isMapModeActive && isSupportedMapQueryText(textToSend);
 
       if (shouldUseMapData && Object.keys(mapStatesDataRef.current).length === 0) {
         const response =
@@ -1062,10 +1368,7 @@ function ChatPage() {
             : await getGwraMapData();
         const nextDistricts = response.districts ?? {};
         const derivedStates = buildDerivedStateSummaries(nextDistricts);
-        const nextStates =
-          Object.keys(derivedStates).length > 0
-            ? derivedStates
-            : response.states ?? {};
+        const nextStates    = Object.keys(derivedStates).length > 0 ? derivedStates : response.states ?? {};
         mapStatesDataRef.current = nextStates;
         mapDistrictsDataRef.current = nextDistricts;
         derivedStateNamesRef.current = new Set(Object.keys(derivedStates));
@@ -1073,54 +1376,41 @@ function ChatPage() {
         setMapDistrictsData(nextDistricts);
       }
 
-      const mapModeAnswer =
-        shouldUseMapData &&
-        buildMapModeAnswer(textToSend);
+      const mapModeAnswer = shouldUseMapData && buildMapModeAnswer(textToSend);
 
       if (mapModeAnswer) {
+        // Translate map answer back to the user's language
+        const localMapAnswer = await translateBack(mapModeAnswer, turnLang);
         const botResponse: ChatMessageItem = {
           id: crypto.randomUUID(),
-          text: mapModeAnswer,
+          text: localMapAnswer,
           sender: 'bot',
           timestamp: new Date(),
           isNew: true,
         };
-
         setLastChartData(null);
         setMessages(prev => [...prev, botResponse]);
 
         if (activeChatId) {
-          await saveChatMessage(activeChatId, 'assistant', [
-            {
-              response: mapModeAnswer,
-              chartData: null,
-            },
-          ]);
-
-          if (userId) {
-            const updatedChats = await getUserChatSessions(userId);
-            setChats(updatedChats);
-          }
+          await saveChatMessage(activeChatId, 'assistant', [{ response: localMapAnswer, chartData: null }]);
+          if (userId) setChats(await getUserChatSessions(userId));
         }
-
         return;
       }
 
-      const data = await sendChatRequest(
-        textToSend,
-        isDetailedResponseNeeded,
-        isVisualizationNeeded,
-      );
+      // ── 5. Regular chatbot call (English text) ───────────────────────────
+      const data = await sendChatRequest(textToSend, isDetailedResponseNeeded, isVisualizationNeeded);
 
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to fetch response');
-      }
+      if (!data.success) throw new Error(data.error || 'Failed to fetch response');
 
       const responsePayload = data.response;
-      const answerText =
+      const englishAnswer =
         typeof responsePayload === 'string'
           ? responsePayload
           : responsePayload?.response ?? "I'm sorry, I received an empty response.";
+
+      // ── 6. Translate bot answer back to user's language ──────────────────
+      const localAnswer = await translateBack(englishAnswer, turnLang);
 
       const chartData =
         responsePayload && typeof responsePayload === 'object'
@@ -1130,39 +1420,23 @@ function ChatPage() {
       setLastChartData(chartData ?? null);
 
       const botResponse: ChatMessageItem = {
-        id: crypto.randomUUID(), // More robust unique ID
-        text: answerText,
+        id: crypto.randomUUID(),
+        text: localAnswer,
         chartData,
         sender: 'bot',
         timestamp: new Date(),
         isNew: true,
       };
-
       setMessages(prev => [...prev, botResponse]);
 
       if (activeChatId) {
-        await saveChatMessage(activeChatId, 'assistant', [
-          {
-            response: answerText,
-            chartData,
-          },
-        ]);
-
-        if (userId) {
-          const updatedChats = await getUserChatSessions(userId);
-          setChats(updatedChats);
-        }
+        await saveChatMessage(activeChatId, 'assistant', [{ response: localAnswer, chartData }]);
+        if (userId) setChats(await getUserChatSessions(userId));
       }
+
     } catch (err) {
-      console.error("Send failed", err);
-      const fallbackMessage: ChatMessageItem = {
-        id: crypto.randomUUID(),
-        text: "I could not complete that request from the server. Please try again in a moment.",
-        sender: "bot",
-        timestamp: new Date(),
-        isNew: true,
-      };
-      setMessages((prev) => [...prev, fallbackMessage]);
+      console.error('handleSend failed:', err);
+      await showError("I could not complete that request from the server. Please try again in a moment.");
     } finally {
       setIsTyping(false);
     }
@@ -1811,13 +2085,27 @@ function ChatPage() {
                         ref={inputRef}
                         type="text"
                         value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                        onChange={(e) => {
+                          setInputValue(e.target.value);
+                          // Auto-detect language from typed text when no lang is pinned
+                          if (!selectedLang) {
+                            const detected = detectLangFromText(e.target.value);
+                            setCurrentLang(detected);
+                          }
+                        }}
+                        onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
                         onFocus={() => {
-                          // ensure latest messages are visible when keyboard shows
                           setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
                         }}
-                        placeholder={isMapModeActive ? 'Custom prompts are temporarily disabled in map mode' : 'Type your message...'}
+                        placeholder={
+                          isMapModeActive
+                            ? 'Custom prompts are temporarily disabled in map mode'
+                            : isTranscribing
+                            ? 'Transcribing speech…'
+                            : isRecording
+                            ? 'Recording… tap 🎤 to stop'
+                            : 'Type your message…'
+                        }
                         disabled={isMapModeActive}
                         className={`flex-1 bg-transparent text-sm py-3 px-2 focus:outline-none ${isLightMode
                           ? 'text-slate-800 placeholder:text-slate-400 disabled:text-slate-400 disabled:placeholder:text-slate-400'
@@ -1825,14 +2113,100 @@ function ChatPage() {
                           }`}
                       />
 
+                      {/* Mic Button */}
+                      <button
+                        onClick={handleMic}
+                        disabled={isMapModeActive || isTranscribing}
+                        title={isRecording ? 'Stop recording' : isTranscribing ? 'Processing…' : 'Voice input'}
+                        className={`flex-shrink-0 p-2.5 rounded-xl transition-all duration-200 ${
+                          isRecording
+                            ? 'bg-red-500 text-white animate-pulse'
+                            : isTranscribing
+                            ? (isLightMode ? 'bg-blue-100 text-blue-400 cursor-wait' : 'bg-blue-900/30 text-blue-400 cursor-wait')
+                            : (isLightMode ? 'hover:bg-slate-200/80 text-slate-500' : 'hover:bg-white/10 text-white/60')
+                        }`}
+                      >
+                        {isTranscribing ? (
+                          <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                          </svg>
+                        ) : (
+                          <Mic className="w-5 h-5" />
+                        )}
+                      </button>
+
+                      {/* Language Selector */}
+                      <div className="relative flex-shrink-0" ref={langDropdownRef}>
+                        <button
+                          onClick={() => setShowLangDropdown((v) => !v)}
+                          title={selectedLang ? `Language: ${selectedLang}` : 'Auto-detect language'}
+                          className={`p-2.5 rounded-xl transition-all duration-200 flex items-center gap-1 text-xs font-medium ${
+                            selectedLang
+                              ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                              : currentLang !== 'en'
+                              ? 'bg-green-600/20 text-green-400 border border-green-500/30'
+                              : (isLightMode ? 'hover:bg-slate-200/80 text-slate-500' : 'hover:bg-white/10 text-white/60')
+                          }`}
+                        >
+                          <span>🌐</span>
+                          {(selectedLang || (currentLang !== 'en' ? currentLang : null)) && (
+                            <span className="text-[10px] uppercase tracking-wide">
+                              {selectedLang ?? currentLang}
+                            </span>
+                          )}
+                        </button>
+
+                        {showLangDropdown && (
+                          <div className={`absolute bottom-full right-0 mb-2 w-52 rounded-xl shadow-2xl overflow-hidden z-50 border ${
+                            isLightMode ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-white/10 text-white'
+                          }`}>
+                            {/* Auto-detect */}
+                            <button
+                              onClick={() => { setSelectedLang(null); setCurrentLang('en'); setShowLangDropdown(false); }}
+                              className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2 ${
+                                !selectedLang
+                                  ? 'bg-blue-600 text-white'
+                                  : (isLightMode ? 'hover:bg-slate-100' : 'hover:bg-white/10')
+                              }`}
+                            >
+                              🔍 <span>Auto-detect</span>
+                            </button>
+                            <div className={`border-t ${isLightMode ? 'border-slate-100' : 'border-white/10'}`} />
+                            <div className="max-h-64 overflow-y-auto">
+                              {INDIAN_LANGUAGES.map((lang) => (
+                                <button
+                                  key={lang.code}
+                                  onClick={() => {
+                                    setSelectedLang(lang.code);
+                                    setCurrentLang(lang.code);
+                                    setShowLangDropdown(false);
+                                  }}
+                                  className={`w-full text-left px-4 py-2 text-sm transition-colors flex items-center justify-between ${
+                                    selectedLang === lang.code
+                                      ? 'bg-blue-600 text-white'
+                                      : (isLightMode ? 'hover:bg-slate-100' : 'hover:bg-white/10')
+                                  }`}
+                                >
+                                  <span>{lang.label}</span>
+                                  <span className={`text-xs ${selectedLang === lang.code ? 'text-blue-200' : (isLightMode ? 'text-slate-400' : 'text-white/40')}`}>
+                                    {lang.code}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
                       {/* Send Button */}
                       <button
                         onClick={() => handleSend()}
                         disabled={isMapModeActive || !inputValue.trim()}
-                        className={`px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
+                        className={`flex-shrink-0 px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
                           !isMapModeActive && inputValue.trim()
-                            ? "bg-blue-600 hover:bg-blue-500 text-white"
-                            : "bg-white/5 text-white/30 cursor-not-allowed"
+                            ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                            : 'bg-white/5 text-white/30 cursor-not-allowed'
                         }`}
                       >
                         Send
