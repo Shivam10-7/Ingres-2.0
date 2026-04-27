@@ -29,6 +29,68 @@ function formatErrorDetails(error) {
   };
 }
 
+function normalizeResolverEntities(resolverResponse) {
+  if (!resolverResponse || typeof resolverResponse !== 'object') return [];
+
+  const normalizeEntity = (entity) => {
+    if (!entity || typeof entity !== 'object') return null;
+    const { type, ...rest } = entity;
+    const keys = Object.keys(rest);
+    if (!type || keys.length === 0) return null;
+    const valueKey = keys[0];
+    const value = entity[valueKey];
+    return value ? { type, value } : null;
+  };
+
+  const rawEntities = resolverResponse.entities || resolverResponse.resolved_entities || resolverResponse.resolvedEntities;
+  if (Array.isArray(rawEntities) && rawEntities.length > 0) {
+    return rawEntities
+      .map(normalizeEntity)
+      .filter((ent) => ent && ent.type && ent.value);
+  }
+
+  const options = Array.isArray(resolverResponse.options) ? resolverResponse.options : [];
+  if (options.length === 0) return [];
+
+  const chosenOption = options.find((option) => option.type === 'district')
+    || options.find((option) => option.type === 'state')
+    || options[0];
+
+  const result = [];
+  if (chosenOption.state) {
+    result.push({ type: 'state', value: chosenOption.state });
+  }
+  if (chosenOption.district) {
+    result.push({ type: 'district', value: chosenOption.district });
+  }
+  if (chosenOption.block) {
+    result.push({ type: 'assessment_unit_name', value: chosenOption.block });
+  }
+  if (chosenOption.taluk) {
+    result.push({ type: 'assessment_unit_name', value: chosenOption.taluk });
+  }
+  if (chosenOption.tehsil) {
+    result.push({ type: 'assessment_unit_name', value: chosenOption.tehsil });
+  }
+  if (chosenOption['assessment unit name']) {
+    result.push({ type: 'assessment_unit_name', value: chosenOption['assessment unit name'] });
+  }
+
+  if (result.length > 0) return result;
+
+  return Object.entries(chosenOption)
+    .filter(([key]) => key !== 'type')
+    .map(([key, value]) => {
+      if (!value) return null;
+      let type = key;
+      if (key === 'block' || key === 'taluk' || key === 'tehsil' || key === 'assessment unit name') {
+        type = 'assessment_unit_name';
+      }
+      return { type, value };
+    })
+    .filter((ent) => ent && ent.type && ent.value);
+}
+
 async function SQLGen(userQuery) {
 // let sqlGenerator = `
 // You are an expert MySQL query generator for a groundwater assessment database.
@@ -1011,16 +1073,8 @@ try {
     console.log(`${SQLGEN_LOG_PREFIX} Invoking entity resolver`);
     const Detectedentities = await EntityResolver(userQuery);
 
-    // Normalize → { type, value }
-    const normalizedEntities = (Detectedentities.entities || []).map(ent => {
-      const { type, ...rest } = ent;
-
-      const keys = Object.keys(rest);
-      const valueKey = keys[0]; // assumes first key is primary
-      const value = ent[valueKey];
-
-      return { type, value };
-    });
+    // Normalize resolver output into a consistent { type, value } array.
+    const normalizedEntities = normalizeResolverEntities(Detectedentities);
 
     // Convert to JSON string (THIS is what goes into prompt)
     const entityJSON = JSON.stringify(normalizedEntities);
@@ -1028,7 +1082,7 @@ try {
     console.log(
       `${SQLGEN_LOG_PREFIX} Entity resolution successful`,
       {
-        status: Detectedentities.status,
+        status: Detectedentities?.status,
         entityCount: normalizedEntities.length,
         entitiesPreview: previewText(entityJSON),
       }
