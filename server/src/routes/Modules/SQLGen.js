@@ -683,6 +683,7 @@ SCHEMA-AWARENESS RULES
 6) Use the most specific valid column for the user intent.
 7) If multiple columns are plausible, choose the one explicitly encoded in COLUMN_INTELLIGENCE_JSON.
 8) If ambiguity remains after schema and resolver inspection, return failure JSON.
+9) Percentage columns like "stage_of_ground_water_extraction_(%)" contain numeric values (e.g., 75.5) without '%' symbols. Do not attempt to remove '%' from them.
 
 ==================================================
 ENTITY RESOLUTION RULES
