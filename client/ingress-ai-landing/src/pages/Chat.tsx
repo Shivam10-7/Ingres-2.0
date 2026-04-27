@@ -459,6 +459,9 @@ function ChatPage() {
   // Mirror selectedLang in a ref so MediaRecorder callbacks never see stale values
   const selectedLangRef      = useRef<string | null>(null);
   useEffect(() => { selectedLangRef.current = selectedLang; }, [selectedLang]);
+  // Stores the text that was in the input box BEFORE recording started,
+  // so interim/final results replace only the speech portion (no echo).
+  const inputBeforeRecordingRef = useRef<string>('');
 
   // Fetch user and chats on mount
   useEffect(() => {
@@ -1160,6 +1163,9 @@ function ChatPage() {
     mediaRecorderRef.current = recorder;
     audioChunksRef.current   = [];
 
+    // Snapshot whatever the user had typed before recording started.
+    inputBeforeRecordingRef.current = inputValue.trim();
+
     recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
 
     recorder.onstop = async () => {
@@ -1200,10 +1206,10 @@ function ChatPage() {
         const chosenLang = langForSTT ?? apiLang;
 
         setCurrentLang(chosenLang);
-        setInputValue((prev) => {
-          const base = prev.trim();
-          return base ? `${base} ${transcript}` : transcript;
-        });
+        // Use the snapshot taken before recording started — do NOT append to
+        // whatever is in inputValue now (it may already contain a stale draft).
+        const base = inputBeforeRecordingRef.current;
+        setInputValue(base ? `${base} ${transcript}` : transcript);
 
         requestAnimationFrame(() => {
           const el = inputRef.current as HTMLInputElement | null;
@@ -1254,9 +1260,16 @@ function ChatPage() {
           ? toSarvamCode(selectedLangRef.current)   // e.g. 'gu-IN'
           : 'en-IN';
 
+        // Snapshot whatever text is already in the box BEFORE recording.
+        // All interim/final results replace only the speech portion,
+        // so the transcript never gets echoed/repeated.
+        inputBeforeRecordingRef.current = inputValue.trim();
+
         recog.onresult = (event: any) => {
+          // Rebuild the full transcript from all results so far (not just the delta).
+          // This avoids duplication when interim events fire multiple times.
           let transcript = '';
-          for (let i = event.resultIndex; i < event.results.length; i++) {
+          for (let i = 0; i < event.results.length; i++) {
             transcript += event.results[i][0]?.transcript ?? '';
           }
           transcript = transcript.trim();
@@ -1266,10 +1279,10 @@ function ChatPage() {
           const detectedLang = selectedLangRef.current ?? detectLangFromText(transcript);
           setCurrentLang(detectedLang);
 
-          setInputValue((prev) => {
-            const base = prev.trim();
-            return base ? `${base} ${transcript}` : transcript;
-          });
+          // Replace (not append) the speech portion so interim updates don't stack.
+          const base = inputBeforeRecordingRef.current;
+          setInputValue(base ? `${base} ${transcript}` : transcript);
+
           requestAnimationFrame(() => {
             const el = inputRef.current as HTMLInputElement | null;
             if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
